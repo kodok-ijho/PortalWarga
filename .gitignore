@@ -79,3 +79,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Screenshot utility (dev only)
+capture-screenshots.js
+docs/screenshots/capture.js

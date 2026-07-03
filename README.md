@@ -102,26 +102,34 @@ Aplikasi bisa langsung dijalankan **tanpa Supabase** menggunakan mode demo. Semu
 | 🏘️ **RT/RW** | `rt@palmvillage.id` | `demo123` | Kelola warga & keuangan |
 | 🧑 **Warga** | `warga@palmvillage.id` | `demo123` | Lihat data & bayar IPL |
 
-<details>
-<summary>📸 <strong>Lihat Screenshot (klik untuk expand)</strong></summary>
+---
 
-> 📎 **Cara menambahkan screenshot:**
-> 1. Jalankan app: `cd client && npm run dev`
-> 2. Login dengan akun demo di atas
-> 3. Screenshot setiap halaman
-> 4. Simpan di folder `docs/screenshots/`
-> 5. Update link gambar di sini
+## 📸 Screenshots
 
-```
-docs/screenshots/
-├── dashboard.png
-├── payment-matrix.png
-├── reports.png
-├── settings.png
-└── residents.png
-```
+<div align="center">
 
-</details>
+### 🔐 Login Page
+<img src="docs/screenshots/01-login.png" alt="Login Page" width="800" />
+
+### 🏠 Dashboard Admin
+<img src="docs/screenshots/02-dashboard.png" alt="Dashboard" width="800" />
+
+### 👥 Manajemen Warga
+<img src="docs/screenshots/03-residents.png" alt="Residents" width="800" />
+
+### 💳 Matriks Pembayaran IPL
+<img src="docs/screenshots/04-payment-matrix.png" alt="Payment Matrix" width="800" />
+
+### 📊 Laporan Keuangan
+<img src="docs/screenshots/05-reports.png" alt="Reports" width="800" />
+
+### 💰 Pengeluaran
+<img src="docs/screenshots/06-expenses.png" alt="Expenses" width="800" />
+
+### ⚙️ Pengaturan IPL
+<img src="docs/screenshots/07-settings.png" alt="Settings" width="800" />
+
+</div>
 
 ---
 
