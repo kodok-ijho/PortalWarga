@@ -234,7 +234,7 @@ export default function PaymentMatrix() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className={`space-y-5 ${selectedBills.length > 0 ? 'pb-32 sm:pb-28' : ''}`}>
       {/* Header & tahun */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -275,7 +275,7 @@ export default function PaymentMatrix() {
       </div>
 
       {/* Matriks */}
-      <div className="pv-card overflow-hidden">
+      <div className="pv-card relative z-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs table-fixed min-w-[960px] border-collapse">
             <thead>
@@ -364,7 +364,7 @@ export default function PaymentMatrix() {
 
       {/* Footer bayar — warga (QRIS) atau staff (catat manual) */}
       {selectedBills.length > 0 && (
-        <div className="sticky bottom-4 pv-card p-4 flex items-center justify-between gap-4 shadow-elevated border-gold-300">
+        <div className="sticky bottom-4 z-30 pv-card p-4 flex flex-col gap-3 border-gold-300 shadow-elevated sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
             <p className="text-sm font-medium text-forest-900">
               {selectedBills.length} bulan dipilih
@@ -381,7 +381,7 @@ export default function PaymentMatrix() {
               {selectedBills.map((b) => formatPeriod(b.period)).join(', ')}
             </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex w-full items-center justify-between gap-3 shrink-0 sm:w-auto">
             <div className="text-right">
               <p className="text-[11px] text-forest-500">Total</p>
               <p className="font-bold text-forest-900">{formatRupiah(totalToPay)}</p>
@@ -870,3 +870,4 @@ function formatPeriodShort(period) {
   const [y, m] = period.split('-');
   return `${MONTHS_LONG[parseInt(m, 10) - 1]} ${y}`;
 }
+

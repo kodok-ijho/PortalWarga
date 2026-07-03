@@ -31,7 +31,7 @@ export default function Header() {
   const items = isStaff ? [...mainNav, ...staffNav] : mainNav;
 
   return (
-    <header className="bg-forest-800 shadow-elevated sticky top-0 z-10">
+    <header className="bg-forest-800 shadow-elevated sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
         {/* Logo & judul */}
         <div className="flex items-center gap-3">
@@ -95,4 +95,5 @@ export default function Header() {
     </header>
   );
 }
+
 
