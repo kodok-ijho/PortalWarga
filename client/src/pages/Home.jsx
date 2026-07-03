@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import {
   AiOutlineUser,
+  AiOutlineHome,
   AiOutlineTable,
   AiOutlineBarChart,
   AiOutlineSetting,
@@ -26,6 +27,7 @@ export default function Home() {
   const features = isStaff
     ? [
         { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
+        { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
         { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Pantau status pembayaran IPL semua unit.' },
         { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
         { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
@@ -119,3 +121,4 @@ function StatBox({ label, value, color }) {
     </div>
   );
 }
+

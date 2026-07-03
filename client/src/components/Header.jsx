@@ -19,6 +19,7 @@ const mainNav = [
 
 // Menu staff-only (admin & rt_rw)
 const staffNav = [
+  { to: '/houses', label: 'Rumah', icon: AiOutlineHome },
   { to: '/expenses', label: 'Pengeluaran', icon: AiOutlineWallet },
   { to: '/reports', label: 'Laporan', icon: AiOutlineBarChart },
   { to: '/settings', label: 'Pengaturan', icon: AiOutlineSetting },
@@ -94,3 +95,4 @@ export default function Header() {
     </header>
   );
 }
+

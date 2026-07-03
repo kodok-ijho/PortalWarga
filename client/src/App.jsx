@@ -11,6 +11,7 @@ import NotFound from './pages/NotFound';
 // Lazy-load halaman berat untuk code-splitting (recharts, papaparse)
 import { lazy, Suspense } from 'react';
 const Residents = lazy(() => import('./pages/Residents'));
+const Houses = lazy(() => import('./pages/Houses'));
 const PaymentMatrix = lazy(() => import('./pages/PaymentMatrix'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -50,6 +51,14 @@ export default function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <Residents />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/houses"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <Houses />
                     </Suspense>
                   }
                 />
@@ -96,3 +105,4 @@ export default function App() {
     </QueryClientProvider>
   );
 }
+
