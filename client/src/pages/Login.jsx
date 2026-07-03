@@ -1,0 +1,199 @@
+import { useState } from 'react';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth, IS_DEMO_MODE, DEMO_ACCOUNT_LIST } from '../hooks/useAuth';
+
+export default function Login() {
+  const { signIn, signUp, isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || '/';
+
+  const [mode, setMode] = useState('login');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center text-forest-500">Memuat...</div>;
+  }
+  if (isAuthenticated) {
+    return <Navigate to={from} replace />;
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      if (mode === 'login') {
+        await signIn(email, password);
+      } else {
+        await signUp(email, password, fullName);
+      }
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err.message || 'Terjadi kesalahan.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const fillDemo = (acc) => {
+    setMode('login');
+    setEmail(acc.email);
+    setPassword('demo123');
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-forest-50 px-4">
+      <div className="w-full max-w-md">
+        {/* Logo besar di atas form */}
+        <div className="text-center mb-8">
+          <img
+            src="/logo.png"
+            alt="Logo Palm Village"
+            className="h-64 w-auto rounded-2xl object-cover mx-auto ring-4 ring-gold-500/30 shadow-elevated"
+          />
+          <h1 className="mt-4 text-2xl font-bold text-forest-800 font-display">
+            Portal Warga Palm Village
+          </h1>
+          <p className="mt-1 text-sm text-forest-500">Masuk ke akun Anda</p>
+        </div>
+
+        <div className="pv-card p-6">
+          {/* Tab login/register */}
+          <div className="flex gap-1 p-1 bg-forest-100 rounded-lg mb-6">
+            <button
+              type="button"
+              onClick={() => { setMode('login'); setError(''); }}
+              className={`flex-1 py-2.5 text-sm rounded-md transition-all ${
+                mode === 'login'
+                  ? 'bg-forest-800 text-gold-400 font-semibold shadow-sm'
+                  : 'text-forest-600 hover:text-forest-800'
+              }`}
+            >
+              Masuk
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('register'); setError(''); }}
+              className={`flex-1 py-2.5 text-sm rounded-md transition-all ${
+                mode === 'register'
+                  ? 'bg-forest-800 text-gold-400 font-semibold shadow-sm'
+                  : 'text-forest-600 hover:text-forest-800'
+              }`}
+            >
+              Daftar
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === 'register' && (
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Nama Lengkap</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 placeholder:text-forest-400 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
+                  placeholder="Nama lengkap Anda"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-forest-700 mb-1">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 placeholder:text-forest-400 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
+                placeholder="email@contoh.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-forest-700 mb-1">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 placeholder:text-forest-400 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
+                placeholder="Minimal 6 karakter"
+              />
+            </div>
+
+            {error && (
+              <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="pv-btn-primary w-full py-3 text-base rounded-lg"
+            >
+              {submitting
+                ? 'Memproses...'
+                : mode === 'login'
+                ? 'Masuk'
+                : 'Daftar Akun'}
+            </button>
+          </form>
+
+          {/* Demo accounts */}
+          {IS_DEMO_MODE && (
+            <div className="mt-6 rounded-lg bg-gold-50 border border-gold-200 p-4">
+              <p className="text-xs font-semibold text-gold-800 mb-3 flex items-center gap-1.5">
+                <span className="text-base">🔧</span> Mode Demo — klik akun untuk login cepat
+              </p>
+              <div className="space-y-2">
+                {DEMO_ACCOUNT_LIST.map((acc) => (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() =>
+                      fillDemo({
+                        email:
+                          acc.role === 'admin'
+                            ? 'admin@palmvillage.id'
+                            : acc.role === 'rt_rw'
+                            ? 'rt@palmvillage.id'
+                            : 'warga@palmvillage.id',
+                      })
+                    }
+                    className="w-full flex items-center justify-between text-left rounded-lg bg-white px-3 py-2.5 text-xs hover:bg-gold-100 transition-colors border border-gold-100 hover:border-gold-300 shadow-sm"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-8 w-8 rounded-full bg-forest-800 text-gold-400 flex items-center justify-center font-bold text-sm">
+                        {acc.full_name.charAt(0)}
+                      </span>
+                      <div>
+                        <p className="font-medium text-forest-900">{acc.full_name}</p>
+                        <p className="text-[10px] text-forest-500">admin@palmvillage.id / demo123</p>
+                      </div>
+                    </div>
+                    <span className="pv-badge bg-forest-800 text-gold-400">
+                      {acc.role === 'admin' ? 'Admin' : acc.role === 'rt_rw' ? 'RT/RW' : 'Warga'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-5 text-center text-xs text-forest-400">
+          Dengan masuk, Anda menyetujui kebijakan privasi &amp; UU PDP No.27/2022.
+        </p>
+      </div>
+    </div>
+  );
+}

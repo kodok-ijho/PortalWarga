@@ -1,0 +1,81 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+/dist
+/build
+/out
+/.next
+/.nuxt
+/.vuepress/dist
+/.gridsome
+/.cache
+/.temp
+client/dist/
+client/build/
+**/dist/
+**/build/
+
+# Environment variables
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage
+coverage/
+.lcov*
+
+# Generated files
+.sass-cache/
+.ionide/
+.lock-wscript
+
+# Build systems
+# Maven
+target/
+# Gradle
+build/
+# Maven Wrapper
+mavenw/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.csproj
+*.csproj.user
+*.sln
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
+
+# Editor
+*.swp
+*.swo
+*~

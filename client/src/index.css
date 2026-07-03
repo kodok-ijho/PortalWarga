@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-forest-50 text-forest-900 antialiased font-sans;
+  }
+}
+
+@layer components {
+  /* Kartu standar */
+  .pv-card {
+    @apply rounded-xl bg-white border border-forest-100 shadow-card;
+  }
+
+  /* Badge peran */
+  .pv-badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide;
+  }
+
+  /* Tombol utama */
+  .pv-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-gold-500 text-forest-900 font-semibold px-4 py-2.5 text-sm transition-colors hover:bg-gold-400 disabled:opacity-60;
+  }
+
+  .pv-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg text-forest-700 font-medium px-4 py-2.5 text-sm transition-colors hover:bg-forest-100;
+  }
+
+  .pv-btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 text-red-700 font-medium px-4 py-2.5 text-sm transition-colors hover:bg-red-100;
+  }
+
+  .pv-input {
+    @apply w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 placeholder:text-forest-400 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all;
+  }
+}
+
+/* Animasi toast */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Print styles untuk laporan */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+  }
+}
