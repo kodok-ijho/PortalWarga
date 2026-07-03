@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { FiEye, FiEyeOff } from 'react-icons/fi';
 import { useAuth, IS_DEMO_MODE, DEMO_ACCOUNT_LIST } from '../hooks/useAuth';
 
 export default function Login() {
@@ -12,6 +13,7 @@ export default function Login() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -117,16 +119,45 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-forest-700 mb-1">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 placeholder:text-forest-400 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
-                placeholder="Minimal 6 karakter"
-              />
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <label htmlFor="password" className="block text-sm font-medium text-forest-700">
+                  Password
+                </label>
+                <span
+                  className={`text-[11px] font-semibold transition-colors ${
+                    showPassword ? 'text-gold-700' : 'text-forest-400'
+                  }`}
+                  aria-hidden="true"
+                >
+                  {showPassword ? 'Peek mode aktif' : 'Rahasia aman'}
+                </span>
+              </div>
+              <div className="group relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 pr-24 text-sm text-forest-900 placeholder:text-forest-400 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
+                  placeholder="Minimal 6 karakter"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  className={`absolute right-1.5 top-1/2 inline-flex -translate-y-1/2 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-gold-500/30 ${
+                    showPassword
+                      ? 'bg-gold-100 text-gold-800 hover:bg-gold-200'
+                      : 'bg-forest-50 text-forest-700 hover:bg-forest-100'
+                  }`}
+                  aria-label={showPassword ? 'Sembunyikan password' : 'Lihat password'}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? <FiEyeOff aria-hidden="true" /> : <FiEye aria-hidden="true" />}
+                  <span>{showPassword ? 'Tutup' : 'Peek'}</span>
+                </button>
+              </div>
             </div>
 
             {error && (
