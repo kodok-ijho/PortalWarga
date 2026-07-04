@@ -2,12 +2,12 @@
 -- Portal Warga Palm Village — Skema Database & RLS (v1)
 -- ---------------------------------------------------------------------
 -- Jalankan di Supabase SQL Editor (dashboard) atau via `supabase db push`.
--- Sesuai PLAN.md §4 Skema Data. RBAC 3 level: admin, rt_rw, resident.
+-- Sesuai PLAN.md. RBAC 4 level: admin, bendahara, pengurus, warga.
 -- =====================================================================
 
 -- 1. ENUM & EXTENSIONS -------------------------------------------------
 
-create type user_role as enum ('admin', 'rt_rw', 'resident');
+create type user_role as enum ('admin', 'bendahara', 'pengurus', 'warga');
 create type bill_status as enum ('pending', 'paid', 'overdue', 'cancelled');
 create type payment_status as enum ('pending', 'completed', 'failed', 'refunded');
 create type payment_method as enum ('qris', 'bank_transfer', 'cash', 'other');
@@ -22,7 +22,7 @@ create table if not exists public.profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
   full_name   text        not null,
   phone       text,
-  role        user_role   not null default 'resident',
+  role        user_role   not null default 'warga',
   unit_id     bigint      references public.units(id) on delete set null,
   is_active   boolean     not null default true,
   created_at  timestamptz not null default now(),
@@ -211,14 +211,14 @@ as $$
   select role from public.profiles where id = auth.uid();
 $$;
 
--- Helper: apakah user login adalah staff (admin/rt_rw).
+-- Helper: apakah user login adalah staff (admin/bendahara/pengurus).
 create or replace function public.is_staff()
 returns boolean
 language sql
 security definer set search_path = public
 stable
 as $$
-  select public.current_role() in ('admin', 'rt_rw');
+  select public.current_role() in ('admin', 'bendahara', 'pengurus');
 $$;
 
 -- ---- PROFILES ----

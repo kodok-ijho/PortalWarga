@@ -7,17 +7,20 @@ import {
   AiOutlineBarChart,
   AiOutlineSetting,
   AiOutlineLogout,
+  AiOutlineTeam,
+  AiOutlineFileText,
 } from 'react-icons/ai';
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
+import { isStaffRole } from '../services/mockData';
 
 // Menu utama (semua role)
-const mainNav = [
+const wargaNav = [
   { to: '/', label: 'Beranda', icon: AiOutlineHome, end: true },
   { to: '/residents', label: 'Penghuni', icon: AiOutlineUser },
   { to: '/payment-matrix', label: 'Matriks Bayar', icon: AiOutlineTable },
 ];
 
-// Menu staff-only (admin & rt_rw)
+// Menu staff-only (pengurus, bendahara, admin)
 const staffNav = [
   { to: '/houses', label: 'Rumah', icon: AiOutlineHome },
   { to: '/expenses', label: 'Pengeluaran', icon: AiOutlineWallet },
@@ -25,10 +28,26 @@ const staffNav = [
   { to: '/settings', label: 'Pengaturan', icon: AiOutlineSetting },
 ];
 
+// Menu khusus admin
+const adminNav = [
+  { to: '/users', label: 'Kelola User', icon: AiOutlineTeam },
+  { to: '/logs', label: 'Log Sistem', icon: AiOutlineFileText },
+];
+
 export default function Header() {
   const { isAuthenticated, profile, role, signOut } = useAuth();
-  const isStaff = role === 'admin' || role === 'rt_rw';
-  const items = isStaff ? [...mainNav, ...staffNav] : mainNav;
+  
+  const getNavItems = () => {
+    if (role === 'admin') {
+      return [...wargaNav, ...staffNav, ...adminNav];
+    }
+    if (isStaffRole(role)) {
+      return [...wargaNav, ...staffNav];
+    }
+    return wargaNav;
+  };
+
+  const items = getNavItems();
 
   return (
     <header className="bg-forest-800 shadow-elevated sticky top-0 z-50">

@@ -18,12 +18,12 @@ export const OCCUPANCY_STATUS = {
 // dirujuk lewat profile.unit_id. Untuk unit yang dikontrakkan, pemilik
 // (owner) bukan penghuni — penghuni adalah profil dengan status 'tenant'.
 export const mockUnits = [
-  { id: 1, block: 'A', unit_number: '01', floor: 1, size: 72, is_occupied: true, owner_id: 'demo-rt' },
+  { id: 1, block: 'A', unit_number: '01', floor: 1, size: 72, is_occupied: true, owner_id: 'demo-bendahara' },
   { id: 2, block: 'A', unit_number: '02', floor: 1, size: 72, is_occupied: true, owner_id: 'demo-warga' },
   { id: 3, block: 'A', unit_number: '03', floor: 1, size: 72, is_occupied: true, owner_id: 'p-4' },
   { id: 4, block: 'A', unit_number: '04', floor: 2, size: 84, is_occupied: true, owner_id: 'p-5' },
   { id: 5, block: 'A', unit_number: '05', floor: 2, size: 84, is_occupied: true, owner_id: 'p-6' },
-  { id: 6, block: 'A', unit_number: '06', floor: 2, size: 84, is_occupied: false, owner_id: null },
+  { id: 6, block: 'A', unit_number: '06', floor: 2, size: 84, is_occupied: true, owner_id: 'demo-pengurus' },
   { id: 7, block: 'A', unit_number: '07', floor: 3, size: 96, is_occupied: true, owner_id: 'p-7' },
   { id: 8, block: 'A', unit_number: '08', floor: 3, size: 96, is_occupied: true, owner_id: 'p-8' },
   { id: 9, block: 'A', unit_number: '09', floor: 3, size: 96, is_occupied: true, owner_id: 'p-9' },
@@ -42,7 +42,7 @@ export const mockUnits = [
 export const mockProfiles = [
   {
     id: 'demo-admin',
-    full_name: 'Pak Hendra (Pengelola)',
+    full_name: 'Pak Hendra (Admin)',
     phone: '0812-1000-0001',
     role: 'admin',
     unit_id: null,
@@ -51,20 +51,30 @@ export const mockProfiles = [
     email: 'admin@palmvillage.id',
   },
   {
-    id: 'demo-rt',
-    full_name: 'Budi Santoso (Ketua RT 01)',
+    id: 'demo-bendahara',
+    full_name: 'Budi Santoso (Bendahara)',
     phone: '0813-2000-0002',
-    role: 'rt_rw',
+    role: 'bendahara',
     unit_id: 1,
     occupancy_status: 'owner_occupied',
     is_active: true,
-    email: 'rt@palmvillage.id',
+    email: 'bendahara@palmvillage.id',
+  },
+  {
+    id: 'demo-pengurus',
+    full_name: 'Ibu Ratna (Pengurus RT)',
+    phone: '0814-3000-0003',
+    role: 'pengurus',
+    unit_id: 6,
+    occupancy_status: 'owner_occupied',
+    is_active: true,
+    email: 'pengurus@palmvillage.id',
   },
   {
     id: 'demo-warga',
     full_name: 'Siti Rahayu',
     phone: '0812-3000-0003',
-    role: 'resident',
+    role: 'warga',
     unit_id: 2,
     occupancy_status: 'owner_occupied',
     is_active: true,
@@ -74,7 +84,7 @@ export const mockProfiles = [
     id: 'p-4',
     full_name: 'Ahmad Hidayat',
     phone: '0856-4000-0004',
-    role: 'resident',
+    role: 'warga',
     unit_id: 3,
     occupancy_status: 'owner_rented', // pemilik unit 3, dikontrakkan ke p-4b
     is_active: true,
@@ -85,7 +95,7 @@ export const mockProfiles = [
     id: 'p-4b',
     full_name: 'Eko Prasetyo (Penyewa)',
     phone: '0838-4100-0040',
-    role: 'resident',
+    role: 'warga',
     unit_id: 3,
     occupancy_status: 'tenant',
     is_active: true,
@@ -95,7 +105,7 @@ export const mockProfiles = [
     id: 'p-5',
     full_name: 'Dewi Lestari',
     phone: '0878-5000-0005',
-    role: 'resident',
+    role: 'warga',
     unit_id: 4,
     occupancy_status: 'owner_occupied',
     is_active: true,
@@ -105,7 +115,7 @@ export const mockProfiles = [
     id: 'p-6',
     full_name: 'Rudi Pratama',
     phone: '0819-6000-0006',
-    role: 'resident',
+    role: 'warga',
     unit_id: 5,
     occupancy_status: 'owner_occupied',
     is_active: true,
@@ -115,7 +125,7 @@ export const mockProfiles = [
     id: 'p-7',
     full_name: 'Lina Kusuma',
     phone: '0821-7000-0007',
-    role: 'resident',
+    role: 'warga',
     unit_id: 7,
     occupancy_status: 'owner_occupied',
     is_active: true,
@@ -125,7 +135,7 @@ export const mockProfiles = [
     id: 'p-8',
     full_name: 'Agus Wijaya',
     phone: '0857-8000-0008',
-    role: 'resident',
+    role: 'warga',
     unit_id: 8,
     occupancy_status: 'owner_rented', // pemilik unit 8, dikontrakkan ke p-8b
     is_active: false, // sudah pindah
@@ -136,7 +146,7 @@ export const mockProfiles = [
     id: 'p-8b',
     full_name: 'Maya Sari (Penyewa)',
     phone: '0833-8200-0080',
-    role: 'resident',
+    role: 'warga',
     unit_id: 8,
     occupancy_status: 'tenant',
     is_active: true,
@@ -146,7 +156,7 @@ export const mockProfiles = [
     id: 'p-9',
     full_name: 'Rina Wulandari',
     phone: '0896-9000-0009',
-    role: 'resident',
+    role: 'warga',
     unit_id: 9,
     occupancy_status: 'owner_occupied',
     is_active: true,
@@ -156,7 +166,7 @@ export const mockProfiles = [
     id: 'p-10',
     full_name: 'Dian Permata',
     phone: '0813-1111-0010',
-    role: 'resident',
+    role: 'warga',
     unit_id: 11,
     occupancy_status: 'owner_occupied',
     is_active: true,
@@ -166,7 +176,7 @@ export const mockProfiles = [
     id: 'p-11',
     full_name: 'Fajar Setiawan',
     phone: '0858-2222-0011',
-    role: 'resident',
+    role: 'warga',
     unit_id: 12,
     occupancy_status: 'owner_occupied',
     is_active: true,
@@ -176,7 +186,7 @@ export const mockProfiles = [
     id: 'p-12',
     full_name: 'Maya Anggraeni',
     phone: '0877-3333-0012',
-    role: 'resident',
+    role: 'warga',
     unit_id: 13,
     occupancy_status: 'owner_occupied',
     is_active: true,
@@ -186,7 +196,7 @@ export const mockProfiles = [
     id: 'p-13',
     full_name: 'Doni Cahyadi',
     phone: '0822-4444-0013',
-    role: 'resident',
+    role: 'warga',
     unit_id: 14,
     occupancy_status: 'owner_occupied',
     is_active: true,
@@ -196,7 +206,7 @@ export const mockProfiles = [
     id: 'p-14',
     full_name: 'Nurul Fadilah',
     phone: '0815-5555-0014',
-    role: 'resident',
+    role: 'warga',
     unit_id: 15,
     occupancy_status: 'owner_occupied',
     is_active: true,
@@ -463,9 +473,32 @@ export function billStatusColor(status) {
   return map[status] || 'bg-gray-100 text-gray-600 border-gray-200';
 }
 
+const ROLE_LEVEL = { warga: 1, pengurus: 2, bendahara: 3, admin: 4 };
+
+export function hasMinRole(userRole, minRole) {
+  return (ROLE_LEVEL[userRole] || 0) >= (ROLE_LEVEL[minRole] || 0);
+}
+
+export function isStaffRole(role) {
+  return hasMinRole(role, 'pengurus');
+}
+
+export function isBendaharaOrAbove(role) {
+  return hasMinRole(role, 'bendahara');
+}
+
+export function isAdminRole(role) {
+  return role === 'admin';
+}
+
 /** Label role */
 export function roleLabel(role) {
-  const map = { admin: 'Admin', rt_rw: 'RT/RW', resident: 'Warga' };
+  const map = {
+    admin: 'Admin',
+    bendahara: 'Bendahara',
+    pengurus: 'Pengurus',
+    warga: 'Warga',
+  };
   return map[role] || role;
 }
 
@@ -473,8 +506,9 @@ export function roleLabel(role) {
 export function roleColor(role) {
   const map = {
     admin: 'bg-gold-500 text-forest-900',
-    rt_rw: 'bg-forest-800 text-gold-400',
-    resident: 'bg-forest-100 text-forest-700 border border-forest-200',
+    bendahara: 'bg-emerald-600 text-white',
+    pengurus: 'bg-forest-800 text-gold-400',
+    warga: 'bg-forest-100 text-forest-700 border border-forest-200',
   };
   return map[role] || 'bg-gray-100 text-gray-600';
 }
@@ -493,48 +527,93 @@ export const mockExpenseCategories = [
   'Lain-lain',
 ];
 
-export const mockExpenses = [
-  {
-    id: 'exp-1',
-    date: '2026-06-05',
-    category: 'Kebersihan',
-    amount: 750000,
-    description: 'Honor petugas kebersihan 2 orang (awal Juni)',
-    receipt_file: 'kwitansi-kebersihan-jun.pdf',
-    recorded_by: 'Budi Santoso (Ketua RT 01)',
-    created_at: '2026-06-05T08:00:00Z',
-  },
-  {
-    id: 'exp-2',
-    date: '2026-06-08',
-    category: 'Listrik & Air',
-    amount: 1250000,
-    description: 'Pembayaran token listrik lampu jalan kompleks',
-    receipt_file: 'struk-listrik-jun.jpg',
-    recorded_by: 'Budi Santoso (Ketua RT 01)',
-    created_at: '2026-06-08T10:30:00Z',
-  },
-  {
-    id: 'exp-3',
-    date: '2026-06-12',
-    category: 'Perawatan Fasilitas',
-    amount: 500000,
-    description: 'Servis pompa air taman bermain',
-    receipt_file: null,
-    recorded_by: 'Pak Hendra (Pengelola)',
-    created_at: '2026-06-12T14:00:00Z',
-  },
-  {
-    id: 'exp-4',
-    date: '2026-05-20',
-    category: 'Keamanan',
-    amount: 1800000,
-    description: 'Honor satpam 3 orang (Mei)',
-    receipt_file: 'honor-satpam-mei.pdf',
-    recorded_by: 'Budi Santoso (Ketua RT 01)',
-    created_at: '2026-05-20T09:00:00Z',
-  },
-];
+export const mockExpenses = [];
+
+// Helper to generate expenses dynamically from Jan 2025
+function generateDemoExpenses() {
+  const list = [];
+  const start = new Date('2025-01-01');
+  const end = new Date(); // current date
+  
+  let current = new Date(start);
+  while (current <= end) {
+    const year = current.getFullYear();
+    const month = current.getMonth() + 1;
+    const period = `${year}-${String(month).padStart(2, '0')}`;
+    
+    // 1. Kebersihan (tiap bulan)
+    list.push({
+      id: `exp-gen-${period}-1`,
+      date: `${year}-${String(month).padStart(2, '0')}-05`,
+      category: 'Kebersihan',
+      amount: 750000,
+      description: `Honor petugas kebersihan untuk periode ${period}`,
+      receipt_file: `kwitansi-kebersihan-${period}.pdf`,
+      recorded_by: 'Budi Santoso (Bendahara)',
+      created_at: `${year}-${String(month).padStart(2, '0')}-05T08:00:00Z`,
+    });
+    
+    // 2. Keamanan (tiap bulan)
+    list.push({
+      id: `exp-gen-${period}-2`,
+      date: `${year}-${String(month).padStart(2, '0')}-05`,
+      category: 'Keamanan',
+      amount: 1800000,
+      description: `Honor satpam komplek untuk periode ${period}`,
+      receipt_file: `honor-satpam-${period}.pdf`,
+      recorded_by: 'Budi Santoso (Bendahara)',
+      created_at: `${year}-${String(month).padStart(2, '0')}-05T09:00:00Z`,
+    });
+    
+    // 3. Listrik & Air (bulan genap)
+    if (month % 2 === 0) {
+      list.push({
+        id: `exp-gen-${period}-3`,
+        date: `${year}-${String(month).padStart(2, '0')}-08`,
+        category: 'Listrik & Air',
+        amount: 1250000,
+        description: `Pembayaran token listrik lampu jalan komplek periode ${period}`,
+        receipt_file: `struk-listrik-${period}.jpg`,
+        recorded_by: 'Budi Santoso (Bendahara)',
+        created_at: `${year}-${String(month).padStart(2, '0')}-08T10:30:00Z`,
+      });
+    }
+    
+    // 4. Perawatan Fasilitas (setiap 3 bulan: Maret, Juni, September, Desember)
+    if (month % 3 === 0) {
+      list.push({
+        id: `exp-gen-${period}-4`,
+        date: `${year}-${String(month).padStart(2, '0')}-12`,
+        category: 'Perawatan Fasilitas',
+        amount: 500000,
+        description: `Servis pompa air taman & fasilitas umum periode ${period}`,
+        receipt_file: `kwitansi-servis-${period}.pdf`,
+        recorded_by: 'Budi Santoso (Bendahara)',
+        created_at: `${year}-${String(month).padStart(2, '0')}-12T14:00:00Z`,
+      });
+    }
+    
+    // 5. Administrasi (setiap 6 bulan: Juni, Desember)
+    if (month % 6 === 0) {
+      list.push({
+        id: `exp-gen-${period}-5`,
+        date: `${year}-${String(month).padStart(2, '0')}-15`,
+        category: 'Administrasi',
+        amount: 300000,
+        description: `Pembelian ATK & biaya administrasi RT periode ${period}`,
+        receipt_file: null,
+        recorded_by: 'Budi Santoso (Bendahara)',
+        created_at: `${year}-${String(month).padStart(2, '0')}-15T16:00:00Z`,
+      });
+    }
+    
+    // Move to next month
+    current.setMonth(current.getMonth() + 1);
+  }
+  return list;
+}
+
+mockExpenses.push(...generateDemoExpenses());
 
 // Tambah pengeluaran baru
 export function addExpense(data) {
@@ -576,6 +655,44 @@ export function getExpensesForPeriod(period) {
 // Hitung total pengeluaran untuk periode
 export function getTotalExpenses(period) {
   return getExpensesForPeriod(period).reduce((s, e) => s + e.amount, 0);
+}
+
+/**
+ * Daftar pembayaran IPL yang DIBAYAR pada bulan/tahun tertentu (basis kas masuk),
+ * terlepas dari periode IPL yang dibayarnya. Dipakai untuk Laporan B.
+ *
+ * Berbeda dari computeReport() yang berbasis PERIODE tagihan: fungsi ini
+ * berbasis TANGGAL PEMBAYARAN (paid_at). Satu pembayaran untuk periode lampau
+ * yang baru dilunasi bulan ini akan muncul di sini.
+ * @param {number} year
+ * @param {number} month  // 1-12
+ * @returns {Array<{paymentId, paidAt, amount, method, unitId, block, unitNumber, residentName, period, recordedBy}>}
+ */
+export function getPaymentsByMonth(year, month) {
+  const prefix = `${year}-${String(month).padStart(2, '0')}`;
+  return mockPayments
+    .filter(
+      (p) => p.status === 'completed' && typeof p.paid_at === 'string' && p.paid_at.startsWith(prefix)
+    )
+    .map((p) => {
+      const bill = mockIPLBills.find((b) => b.id === p.ipl_bill_id);
+      const unit = bill ? getUnitById(bill.unit_id) : null;
+      const profile = getProfileById(p.resident_id);
+      return {
+        paymentId: p.id,
+        paidAt: p.paid_at,
+        amount: p.amount,
+        method: p.method,
+        unitId: bill?.unit_id || null,
+        block: unit?.block || '-',
+        unitNumber: unit?.unit_number || '-',
+        residentName:
+          profile?.full_name || (bill ? bill.resident_name : 'Warga') || '-',
+        period: bill?.period || '-',
+        recordedBy: p.metadata?.recorded_by || p.metadata?.payer || null,
+      };
+    })
+    .sort((a, b) => (a.paidAt < b.paidAt ? 1 : a.paidAt > b.paidAt ? -1 : 0));
 }
 
 /** Ambil semua tagihan untuk tahun tertentu */
@@ -638,6 +755,92 @@ export const MONTHS_LONG = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
 ];
+
+/**
+ * Hitung running balance dari Januari 2025 sampai bulan target.
+ * Mengembalikan array objek per bulan secara berurutan.
+ * 
+ * @param {number} targetYear - tahun target (misal 2026)
+ * @param {number} targetMonth - bulan target 1-12 (misal 6 = Juni)
+ * @returns {Array<{
+ *   period: string,
+ *   year: number,
+ *   month: number,
+ *   openingBalance: number,
+ *   totalIncome: number,
+ *   totalExpense: number,
+ *   closingBalance: number,
+ *   incomeCount: number,
+ *   expenseCount: number,
+ * }>}
+ */
+export function computeRunningBalance(targetYear, targetMonth) {
+  const result = [];
+  let cumulativeBalance = 0; // Saldo awal Januari 2025 = 0
+
+  const startYear = 2025;
+  const startMonth = 1;
+
+  let y = startYear;
+  let m = startMonth;
+
+  while (y < targetYear || (y === targetYear && m <= targetMonth)) {
+    const period = `${y}-${String(m).padStart(2, '0')}`;
+    
+    // Kas masuk: pembayaran IPL yang paid_at di bulan ini
+    const payments = getPaymentsByMonth(y, m);
+    const totalIncome = payments.reduce((s, p) => s + p.amount, 0);
+    
+    // Kas keluar: pengeluaran di bulan ini  
+    const expenses = getExpensesForPeriod(period);
+    const totalExpense = expenses.reduce((s, e) => s + e.amount, 0);
+    
+    const openingBalance = cumulativeBalance;
+    const closingBalance = openingBalance + totalIncome - totalExpense;
+    
+    result.push({
+      period,
+      year: y,
+      month: m,
+      openingBalance,
+      totalIncome,
+      totalExpense,
+      closingBalance,
+      incomeCount: payments.length,
+      expenseCount: expenses.length,
+    });
+    
+    cumulativeBalance = closingBalance;
+    
+    // Next month
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Ambil running balance untuk SATU bulan spesifik.
+ * Menghitung seluruh chain dari Jan 2025 untuk mendapatkan saldo awal yang benar.
+ */
+export function getMonthBalance(year, month) {
+  const chain = computeRunningBalance(year, month);
+  return chain[chain.length - 1] || {
+    period: `${year}-${String(month).padStart(2, '0')}`,
+    year,
+    month,
+    openingBalance: 0,
+    totalIncome: 0,
+    totalExpense: 0,
+    closingBalance: 0,
+    incomeCount: 0,
+    expenseCount: 0,
+  };
+}
 
 /**
  * Hitung laporan keuangan IPL untuk periode (YYYY-MM) tertentu.
@@ -803,3 +1006,78 @@ export function formatShort(amount) {
   if (amount >= 1000) return `${Math.round(amount / 1000)}k`;
   return String(amount);
 }
+
+// User Management CRUD mock functions
+export function getUserList() {
+  return mockProfiles;
+}
+
+export function addMockUser(data) {
+  const newUser = {
+    id: `u-gen-${Date.now()}`,
+    full_name: data.full_name,
+    phone: data.phone || '',
+    role: data.role,
+    unit_id: data.unit_id ? Number(data.unit_id) : null,
+    occupancy_status: data.occupancy_status || null,
+    is_active: true,
+    email: data.email,
+  };
+  mockProfiles.push(newUser);
+  return newUser;
+}
+
+export function updateMockUser(id, data) {
+  const idx = mockProfiles.findIndex((p) => p.id === id);
+  if (idx !== -1) {
+    mockProfiles[idx] = {
+      ...mockProfiles[idx],
+      ...data,
+      unit_id: data.unit_id !== undefined ? (data.unit_id ? Number(data.unit_id) : null) : mockProfiles[idx].unit_id,
+    };
+    return mockProfiles[idx];
+  }
+  return null;
+}
+
+export function deactivateMockUser(id) {
+  const idx = mockProfiles.findIndex((p) => p.id === id);
+  if (idx !== -1) {
+    mockProfiles[idx].is_active = false;
+    return mockProfiles[idx];
+  }
+  return null;
+}
+
+// Mock System Logs
+export const mockLogSettings = {
+  loginLogEnabled: true,
+  accessLogEnabled: true,
+  transactionLogEnabled: true,
+};
+
+export const mockLoginLogs = [
+  { id: 'log-1', email: 'admin@palmvillage.id', timestamp: '2026-07-04T08:00:00Z', status: 'success', ip: '192.168.1.10' },
+  { id: 'log-2', email: 'bendahara@palmvillage.id', timestamp: '2026-07-04T08:05:00Z', status: 'success', ip: '192.168.1.11' },
+  { id: 'log-3', email: 'pengurus@palmvillage.id', timestamp: '2026-07-04T08:10:00Z', status: 'success', ip: '192.168.1.12' },
+  { id: 'log-4', email: 'warga@palmvillage.id', timestamp: '2026-07-04T08:15:00Z', status: 'success', ip: '192.168.1.13' },
+  { id: 'log-5', email: 'stranger@gmail.com', timestamp: '2026-07-04T09:00:00Z', status: 'failed', ip: '202.152.0.45' },
+  { id: 'log-6', email: 'warga@palmvillage.id', timestamp: '2026-07-03T19:30:00Z', status: 'success', ip: '182.253.12.11' },
+  { id: 'log-7', email: 'admin@palmvillage.id', timestamp: '2026-07-03T08:00:00Z', status: 'success', ip: '192.168.1.10' },
+  { id: 'log-8', email: 'guest@palmvillage.id', timestamp: '2026-07-02T14:22:00Z', status: 'failed', ip: '110.138.54.98' },
+];
+
+export const mockAccessLogs = [
+  { id: 'acc-1', userName: 'Pak Hendra (Admin)', page: '/users', timestamp: '2026-07-04T08:01:00Z' },
+  { id: 'acc-2', userName: 'Budi Santoso (Bendahara)', page: '/expenses', timestamp: '2026-07-04T08:06:00Z' },
+  { id: 'acc-3', userName: 'Ibu Ratna (Pengurus RT)', page: '/reports', timestamp: '2026-07-04T08:11:00Z' },
+  { id: 'acc-4', userName: 'Siti Rahayu', page: '/payment-matrix', timestamp: '2026-07-04T08:16:00Z' },
+  { id: 'acc-5', userName: 'Pak Hendra (Admin)', page: '/logs', timestamp: '2026-07-04T08:30:00Z' },
+];
+
+export const mockTransactionLogs = [
+  { id: 'txn-1', userName: 'Budi Santoso (Bendahara)', action: 'Catat Pengeluaran', details: 'Honor petugas kebersihan', amount: 750000, timestamp: '2026-07-04T08:07:00Z' },
+  { id: 'txn-2', userName: 'Siti Rahayu', action: 'Bayar IPL', details: 'Pelunasan IPL Blok A/02', amount: 500000, timestamp: '2026-07-04T08:18:00Z' },
+  { id: 'txn-3', userName: 'Budi Santoso (Bendahara)', action: 'Catat Pembayaran', details: 'Pembayaran IPL Blok A/03 (Manual)', amount: 500000, timestamp: '2026-07-04T08:45:00Z' },
+  { id: 'txn-4', userName: 'Pak Hendra (Admin)', action: 'Ubah Pengaturan', details: 'Perubahan tanggal jatuh tempo menjadi tgl 10', amount: null, timestamp: '2026-07-04T09:12:00Z' },
+];

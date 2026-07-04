@@ -98,9 +98,10 @@ Aplikasi bisa langsung dijalankan **tanpa Supabase** menggunakan mode demo. Semu
 
 | Role | Email | Password | Akses |
 |:-----|:------|:---------|:------|
-| 🔑 **Admin** | `admin@palmvillage.id` | `demo123` | Akses penuh sistem |
-| 🏘️ **RT/RW** | `rt@palmvillage.id` | `demo123` | Kelola warga & keuangan |
-| 🧑 **Warga** | `warga@palmvillage.id` | `demo123` | Lihat data & bayar IPL |
+| 👑 **Admin** | `admin@palmvillage.id` | `demo123` | Akses penuh sistem (Kelola User & Log) |
+| 💰 **Bendahara** | `bendahara@palmvillage.id` | `demo123` | CRUD Pengeluaran, catat tunai & transfer |
+| 📋 **Pengurus** | `pengurus@palmvillage.id` | `demo123` | Read-only pengeluaran, catat transfer only |
+| 🧑 **Warga** | `warga@palmvillage.id` | `demo123` | Lihat unit & bayar IPL rumah sendiri |
 
 ---
 
@@ -187,20 +188,23 @@ Warga pilih bulan ──▶ Generate QRIS (Mayar) ──▶ Scan & Bayar
 
 ## 👥 Role-Based Access Control (RBAC)
 
-Sistem punya 3 role dengan hak akses berbeda. Keamanan diterapkan **dua lapis**: frontend route guard + database RLS.
+Sistem memiliki 4 role dengan pembagian hak akses terperinci. Keamanan diterapkan dua lapis: frontend route guard + database RLS.
 
-| Halaman / Fitur | 🔑 Admin | 🏘️ RT/RW | 🧑 Warga |
-|:----------------|:--------:|:--------:|:-------:|
-| 🏠 Dashboard | ✅ | ✅ | ✅ |
-| 👥 Daftar Warga | ✅ CRUD + CSV | ✅ CRUD + CSV | 👁️ Lihat saja |
-| 💳 Matriks Pembayaran | ✅ Semua unit | ✅ Semua unit | ✅ Unit sendiri |
-| 💵 Bayar IPL (QRIS) | — | — | ✅ |
-| 📝 Catat Pembayaran Manual | ✅ | ✅ | ❌ |
-| 📊 Laporan Keuangan | ✅ | ✅ | 🔒 Blocked |
-| 💰 Pengeluaran | ✅ CRUD | ✅ CRUD | 🔒 Blocked |
-| ⚙️ Pengaturan IPL | ✅ | ✅ | 🔒 Blocked |
-| 📅 Kalender Acara | 🚧 | 🚧 | 🚧 |
-| 💬 Forum Diskusi | 🚧 | 🚧 | 🚧 |
+| Halaman / Fitur | 👑 Admin | 💰 Bendahara | 📋 Pengurus | 🧑 Warga |
+|:----------------|:--------:|:------------:|:-----------:|:-------:|
+| 🏠 Dashboard | ✅ | ✅ | ✅ | ✅ |
+| 👥 Daftar Warga | ✅ CRUD + CSV | ✅ CRUD + CSV | ✅ CRUD + CSV | 👁️ Lihat saja |
+| 💳 Matriks Pembayaran | ✅ Semua unit | ✅ Semua unit | ✅ Semua unit | ✅ Unit sendiri |
+| 📝 Catat Bayar Tunai | ✅ | ✅ | ❌ | ❌ |
+| 📝 Catat Bayar Transfer | ✅ | ✅ | ✅ | ❌ |
+| 💵 Bayar IPL (QRIS) | ❌ | ❌ | ❌ | ✅ |
+| 📊 Laporan Keuangan | ✅ | ✅ | ✅ | 🔒 Blocked |
+| 💰 Pengeluaran (CRUD) | ✅ | ✅ | 👁️ Lihat saja | 🔒 Blocked |
+| ⚙️ Pengaturan IPL (Edit)| ✅ | 👁️ Lihat saja | 👁️ Lihat saja | 🔒 Blocked |
+| 👤 Kelola User (CRUD) | ✅ | ❌ | ❌ | ❌ |
+| 📋 Log Sistem (Audit) | ✅ | ❌ | ❌ | ❌ |
+| 📅 Kalender Acara | 🚧 | 🚧 | 🚧 | 🚧 |
+| 💬 Forum Diskusi | 🚧 | 🚧 | 🚧 | 🚧 |
 
 ---
 

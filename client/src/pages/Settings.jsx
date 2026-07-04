@@ -7,7 +7,7 @@ import {
 } from 'react-icons/ai';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
-import { mockSettings, computeIPLAmount, formatRupiah } from '../services/mockData';
+import { mockSettings, computeIPLAmount, formatRupiah, hasMinRole, isAdminRole } from '../services/mockData';
 
 /**
  * Halaman Settings IPL — staff only (admin & rt_rw).
@@ -33,10 +33,12 @@ export default function Settings() {
     mockSettings.ipl_components.map((c) => ({ ...c }))
   );
 
-  // Staff-only guard
-  if (role !== 'admin' && role !== 'rt_rw') {
+  // Staff-only guard (pengurus, bendahara, admin)
+  if (!hasMinRole(role, 'pengurus')) {
     return <Navigate to="/" replace />;
   }
+
+  const canEdit = isAdminRole(role);
 
   const handleAddComponent = () => {
     setComponents((prev) => [...prev, { name: '', amount: 0 }]);
@@ -103,6 +105,13 @@ export default function Settings() {
         </p>
       </div>
 
+      {!canEdit && (
+        <div className="pv-card p-3 bg-blue-50 border border-blue-200 text-blue-700 text-sm flex items-center gap-2">
+          <span>ℹ️</span>
+          <span>Anda melihat pengaturan dalam mode read-only. Hanya Admin yang dapat mengubah pengaturan.</span>
+        </div>
+      )}
+
       <form onSubmit={handleSave} className="space-y-5">
         {/* Besaran IPL & Jatuh Tempo */}
         <div className="pv-card p-5">
@@ -134,7 +143,8 @@ export default function Settings() {
                   onChange={(e) => setDueDay(e.target.value)}
                   min="1"
                   max="28"
-                  className="w-full rounded-lg border border-forest-200 bg-white pl-10 pr-3 py-2.5 text-sm text-forest-900 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
+                  disabled={!canEdit}
+                  className="w-full rounded-lg border border-forest-200 bg-white disabled:bg-forest-50 pl-10 pr-3 py-2.5 text-sm text-forest-900 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
                 />
               </div>
               <p className="text-[11px] text-forest-400 mt-1">Setiap bulan, tanggal 1-28</p>
@@ -150,7 +160,7 @@ export default function Settings() {
           </p>
           <div className="space-y-2">
             <label
-              className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
+              className={`flex items-start gap-2.5 p-3 rounded-lg border ${!canEdit ? 'cursor-not-allowed bg-forest-50/50' : 'cursor-pointer'} transition-colors ${
                 billRecipient === 'occupant'
                   ? 'border-gold-400 bg-gold-50'
                   : 'border-forest-200 hover:bg-forest-50'
@@ -161,6 +171,7 @@ export default function Settings() {
                 name="billRecipient"
                 checked={billRecipient === 'occupant'}
                 onChange={() => setBillRecipient('occupant')}
+                disabled={!canEdit}
                 className="mt-1 accent-gold-500"
               />
               <div>
@@ -171,7 +182,7 @@ export default function Settings() {
               </div>
             </label>
             <label
-              className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
+              className={`flex items-start gap-2.5 p-3 rounded-lg border ${!canEdit ? 'cursor-not-allowed bg-forest-50/50' : 'cursor-pointer'} transition-colors ${
                 billRecipient === 'owner'
                   ? 'border-gold-400 bg-gold-50'
                   : 'border-forest-200 hover:bg-forest-50'
@@ -182,6 +193,7 @@ export default function Settings() {
                 name="billRecipient"
                 checked={billRecipient === 'owner'}
                 onChange={() => setBillRecipient('owner')}
+                disabled={!canEdit}
                 className="mt-1 accent-gold-500"
               />
               <div>
@@ -204,6 +216,7 @@ export default function Settings() {
                 type="checkbox"
                 checked={lateFeeEnabled}
                 onChange={(e) => setLateFeeEnabled(e.target.checked)}
+                disabled={!canEdit}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-forest-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold-500"></div>
@@ -217,7 +230,8 @@ export default function Settings() {
                 <select
                   value={lateFeeType}
                   onChange={(e) => setLateFeeType(e.target.value)}
-                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-700 focus:border-gold-500 outline-none"
+                  disabled={!canEdit}
+                  className="w-full rounded-lg border border-forest-200 bg-white disabled:bg-forest-50 px-3 py-2.5 text-sm text-forest-700 focus:border-gold-500 outline-none"
                 >
                   <option value="percent">Persentase (%)</option>
                   <option value="fixed">Nominal Tetap (Rp)</option>
@@ -233,7 +247,8 @@ export default function Settings() {
                   onChange={(e) => setLateFeeValue(e.target.value)}
                   min="0"
                   step={lateFeeType === 'percent' ? '0.5' : '1000'}
-                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
+                  disabled={!canEdit}
+                  className="w-full rounded-lg border border-forest-200 bg-white disabled:bg-forest-50 px-3 py-2.5 text-sm text-forest-900 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
                 />
                 {lateFeeType === 'percent' && (
                   <p className="text-[11px] text-forest-400 mt-1">
@@ -252,18 +267,20 @@ export default function Settings() {
               <h3 className="text-sm font-semibold text-forest-800">Komponen IPL</h3>
               <p className="text-[11px] text-forest-400">Rincian apa saja yang ditanggung iuran</p>
             </div>
-            <button
-              type="button"
-              onClick={handleAddComponent}
-              className="pv-btn-ghost text-xs"
-            >
-              <AiOutlinePlus /> Tambah
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={handleAddComponent}
+                className="pv-btn-ghost text-xs"
+              >
+                <AiOutlinePlus /> Tambah
+              </button>
+            )}
           </div>
 
           {components.length === 0 ? (
             <p className="text-sm text-forest-400 text-center py-4">
-              Belum ada komponen. Klik "Tambah" untuk menambah.
+              Belum ada komponen. {canEdit ? 'Klik "Tambah" untuk menambah.' : ''}
             </p>
           ) : (
             <div className="space-y-2">
@@ -274,7 +291,8 @@ export default function Settings() {
                     value={comp.name}
                     onChange={(e) => handleComponentChange(idx, 'name', e.target.value)}
                     placeholder="Nama komponen (mis. Kebersihan)"
-                    className="flex-1 rounded-lg border border-forest-200 bg-white px-3 py-2 text-sm text-forest-900 focus:border-gold-500 outline-none"
+                    disabled={!canEdit}
+                    className="flex-1 rounded-lg border border-forest-200 bg-white disabled:bg-forest-50 px-3 py-2 text-sm text-forest-900 focus:border-gold-500 outline-none"
                   />
                   <div className="relative w-36">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-forest-400">Rp</span>
@@ -284,17 +302,20 @@ export default function Settings() {
                       onChange={(e) => handleComponentChange(idx, 'amount', e.target.value)}
                       min="0"
                       step="1000"
-                      className="w-full rounded-lg border border-forest-200 bg-white pl-8 pr-2 py-2 text-sm text-forest-900 focus:border-gold-500 outline-none"
+                      disabled={!canEdit}
+                      className="w-full rounded-lg border border-forest-200 bg-white disabled:bg-forest-50 pl-8 pr-2 py-2 text-sm text-forest-900 focus:border-gold-500 outline-none"
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveComponent(idx)}
-                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    aria-label="Hapus komponen"
-                  >
-                    <AiOutlineDelete />
-                  </button>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveComponent(idx)}
+                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      aria-label="Hapus komponen"
+                    >
+                      <AiOutlineDelete />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -312,11 +333,13 @@ export default function Settings() {
         </div>
 
         {/* Save */}
-        <div className="flex justify-end gap-2">
-          <button type="submit" className="pv-btn-primary">
-            <AiOutlineSave /> Simpan Pengaturan
-          </button>
-        </div>
+        {canEdit && (
+          <div className="flex justify-end gap-2">
+            <button type="submit" className="pv-btn-primary">
+              <AiOutlineSave /> Simpan Pengaturan
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

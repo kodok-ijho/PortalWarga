@@ -5,6 +5,9 @@ import {
   AiOutlineTable,
   AiOutlineBarChart,
   AiOutlineSetting,
+  AiOutlineTeam,
+  AiOutlineFileText,
+  AiOutlineWallet,
 } from 'react-icons/ai';
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
 import {
@@ -13,29 +16,51 @@ import {
   computeReport,
   formatRupiah,
   MONTHS_LONG,
+  isStaffRole,
+  roleLabel,
+  roleColor,
 } from '../services/mockData';
 
 export default function Home() {
   const { profile, role } = useAuth();
-  const isStaff = role === 'admin' || role === 'rt_rw';
+  const isStaff = isStaffRole(role);
 
   // Stats untuk bulan berjalan
   const now = new Date();
   const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const report = IS_DEMO_MODE ? computeReport(currentPeriod) : null;
 
-  const features = isStaff
-    ? [
+  const getFeatures = () => {
+    const base = [
+      { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Lihat daftar penghuni kompleks.' },
+      { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Bayar IPL beberapa bulan sekaligus via QRIS.' },
+    ];
+    if (role === 'admin') {
+      return [
         { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
         { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
         { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Pantau status pembayaran IPL semua unit.' },
+        { to: '/expenses', icon: AiOutlineWallet, title: 'Pengeluaran', desc: 'Lihat & kelola biaya operasional perumahan.' },
         { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
         { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
-      ]
-    : [
-        { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Lihat daftar penghuni kompleks.' },
-        { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Bayar IPL beberapa bulan sekaligus via QRIS.' },
+        { to: '/users', icon: AiOutlineTeam, title: 'Kelola User', desc: 'Kelola akun Gmail warga dan hak akses role.' },
+        { to: '/logs', icon: AiOutlineFileText, title: 'Log Sistem', desc: 'Audit log login, akses halaman, dan transaksi.' },
       ];
+    }
+    if (isStaffRole(role)) {
+      return [
+        { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
+        { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
+        { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Pantau status pembayaran IPL semua unit.' },
+        { to: '/expenses', icon: AiOutlineWallet, title: 'Pengeluaran', desc: 'Lihat & kelola biaya operasional perumahan.' },
+        { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
+        { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
+      ];
+    }
+    return base;
+  };
+
+  const features = getFeatures();
 
   return (
     <div className="space-y-6">
@@ -56,8 +81,8 @@ export default function Home() {
               <p className="mt-4 inline-flex items-center gap-2 bg-forest-900/40 backdrop-blur rounded-full px-4 py-1.5 text-sm text-gold-300 border border-gold-500/20">
                 🌴 Halo, {profile.full_name}
                 {role && (
-                  <span className="pv-badge bg-gold-500/20 text-gold-400 ml-1">
-                    {role === 'admin' ? 'Admin' : role === 'rt_rw' ? 'RT/RW' : 'Warga'}
+                  <span className={`pv-badge ml-1 ${roleColor(role)}`}>
+                    {roleLabel(role)}
                   </span>
                 )}
               </p>

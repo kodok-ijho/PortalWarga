@@ -21,6 +21,8 @@ import {
   occupancyStatusColor,
   mockIPLBills,
   mockPayments,
+  isStaffRole,
+  isBendaharaOrAbove,
 } from '../services/mockData';
 
 export default function PaymentMatrix() {
@@ -34,9 +36,11 @@ export default function PaymentMatrix() {
   const [payModal, setPayModal] = useState(null);
   // Manual payment (staff)
   const [manualModal, setManualModal] = useState(null); // { bill, unitId, monthIdx }
+  // Detail bukti bayar (lunas)
+  const [detailModal, setDetailModal] = useState(null); // { bill, payment }
 
   // Semua role bisa LIHAT semua unit. Interaksi (bayar) di-gate per baris.
-  const isStaff = role === 'admin' || role === 'rt_rw';
+  const isStaff = isStaffRole(role);
   const myUnitId = profile?.unit_id;
 
   const matrix = useMemo(() => getBillMatrix(year), [year]);
@@ -325,7 +329,7 @@ export default function PaymentMatrix() {
               {matrix.length === 0 ? (
                 <tr>
                   <td colSpan={13} className="px-4 py-10 text-center text-forest-400">
-                    {role === 'resident'
+                    {role === 'warga'
                       ? 'Anda belum memiliki unit. Hubungi pengelola.'
                       : 'Belum ada data unit.'}
                   </td>
@@ -333,7 +337,7 @@ export default function PaymentMatrix() {
               ) : (
                 matrix.map((row) => {
                   // Warga hanya bisa interaksi (bayar) untuk unitnya sendiri.
-                  const isMyUnit = role === 'resident' && row.unit.id === myUnitId;
+                  const isMyUnit = role === 'warga' && row.unit.id === myUnitId;
                   const canInteract = isStaff || isMyUnit;
                   // Sel belum-bayar unit lain DIKUNCI saat ada unit aktif (hanya
                   // relevan untuk staff — warga hanya punya satu unit sendiri).
@@ -388,6 +392,11 @@ export default function PaymentMatrix() {
                               canInteract={canInteract}
                               isLockedOtherUnit={isLockedOtherUnit}
                               onClick={() => {
+                                if (cell?.status === 'paid') {
+                                  const payment = getPaymentForBill(cell.bill.id);
+                                  setDetailModal({ bill: cell.bill, payment });
+                                  return;
+                                }
                                 if (!canInteract || isLockedOtherUnit) return;
                                 toggleCell(cell?.bill);
                               }}
@@ -462,8 +471,19 @@ export default function PaymentMatrix() {
       {manualModal && (
         <ManualPaymentModal
           bills={manualModal.bills}
+          role={role}
           onConfirm={confirmManual}
           onClose={() => setManualModal(null)}
+        />
+      )}
+
+      {detailModal && (
+        <PaymentDetailModal
+          bill={detailModal.bill}
+          payment={detailModal.payment}
+          role={role}
+          myUnitId={myUnitId}
+          onClose={() => setDetailModal(null)}
         />
       )}
     </div>
@@ -487,7 +507,8 @@ function Cell({ cell, unitId, isSelected, isStaff, canInteract, isLockedOtherUni
   if (isPaid) {
     return (
       <span
-        className="block h-12 rounded bg-emerald-50 border border-emerald-200 flex flex-col items-center justify-center px-0.5"
+        onClick={onClick}
+        className="block h-12 rounded bg-emerald-50 border border-emerald-200 flex flex-col items-center justify-center px-0.5 cursor-pointer hover:bg-emerald-100 transition-colors"
         title={`Lunas ${formatRupiah(bill.amount)}${payment ? ' · ' + formatDate(payment.paid_at) : ''}${
           payment?.method && payment.method !== 'qris' ? ' · ' + payment.method : ''
         }`}
@@ -746,8 +767,9 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
 
 // ── Modal input manual (bendahara, multi-bulan lintas tahun) ───────
 // Mendukung 3 metode: Tunai, Transfer Bank (wajib bukti), QRIS.
-function ManualPaymentModal({ bills, onConfirm, onClose }) {
-  const [method, setMethod] = useState('cash');
+function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
+  const canRecordCash = isBendaharaOrAbove(role);
+  const [method, setMethod] = useState(canRecordCash ? 'cash' : 'bank_transfer');
   const [paidAt, setPaidAt] = useState(new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState('');
   const [receiptFile, setReceiptFile] = useState(null);
@@ -855,11 +877,11 @@ function ManualPaymentModal({ bills, onConfirm, onClose }) {
           </div>
         </div>
 
-        {/* Metode: Tunai / Transfer / QRIS (3 opsi untuk staff) */}
+        {/* Metode: Tunai / Transfer / QRIS */}
         <div>
           <label className="block text-sm font-medium text-forest-700 mb-1">Metode Pembayaran</label>
-          <div className="grid grid-cols-3 gap-2">
-            {methodBtn('cash', '💵 Tunai')}
+          <div className={`grid ${canRecordCash ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
+            {canRecordCash && methodBtn('cash', '💵 Tunai')}
             {methodBtn('bank_transfer', '🏦 Transfer')}
             {methodBtn('qris', '📱 QRIS')}
           </div>
@@ -935,5 +957,97 @@ function ManualPaymentModal({ bills, onConfirm, onClose }) {
 function formatPeriodShort(period) {
   const [y, m] = period.split('-');
   return `${MONTHS_LONG[parseInt(m, 10) - 1]} ${y}`;
+}
+
+// Modal Detail Pembayaran Lunas
+function PaymentDetailModal({ bill, payment, role, myUnitId, onClose }) {
+  const isMyUnit = bill.unit_id === myUnitId;
+  const canViewReceipt = isStaffRole(role) || isMyUnit;
+
+  return (
+    <Modal open onClose={onClose} title="Detail Bukti Pembayaran IPL" size="md">
+      <div className="space-y-4 text-sm text-forest-900">
+        <div className="grid grid-cols-2 gap-4 rounded-lg bg-forest-50 p-3">
+          <div>
+            <p className="text-xs text-forest-500 font-medium">Rumah / Unit</p>
+            <p className="font-semibold text-forest-800">
+              {(() => {
+                const u = getUnitById(bill.unit_id);
+                return u ? `Blok ${u.block}/${u.unit_number}` : '-';
+              })()}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-forest-500 font-medium">Periode IPL</p>
+            <p className="font-semibold text-forest-800">{formatPeriod(bill.period)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-forest-500 font-medium">Jumlah Tagihan</p>
+            <p className="font-bold text-forest-900">{formatRupiah(bill.amount)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-forest-500 font-medium">Tanggal Bayar</p>
+            <p className="font-semibold text-forest-800">{payment ? formatDate(payment.paid_at) : '-'}</p>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs text-forest-500 font-medium mb-1">Metode Pembayaran</p>
+          <span className="pv-badge bg-forest-100 text-forest-700 font-medium">
+            {payment?.method === 'qris' ? '📱 QRIS' : payment?.method === 'cash' ? '💵 Tunai' : '🏦 Transfer Bank'}
+          </span>
+        </div>
+
+        {payment?.metadata?.recorded_by && (
+          <div>
+            <p className="text-xs text-forest-500 font-medium mb-0.5">Dicatat Oleh</p>
+            <p className="text-forest-700">{payment.metadata.recorded_by}</p>
+          </div>
+        )}
+
+        {payment?.metadata?.note && (
+          <div>
+            <p className="text-xs text-forest-500 font-medium mb-0.5">Catatan</p>
+            <p className="text-forest-700 italic">"{payment.metadata.note}"</p>
+          </div>
+        )}
+
+        {/* Lampiran Bukti Bayar */}
+        <div>
+          <p className="text-xs text-forest-500 font-medium mb-1.5">Bukti Bayar</p>
+          {canViewReceipt ? (
+            payment?.receipt_file ? (
+              <div className="rounded-lg border border-forest-200 bg-white p-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xl">📎</span>
+                  <span className="truncate text-xs font-medium text-forest-700">{payment.receipt_file}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => alert(`Mengunduh file: ${payment.receipt_file}`)}
+                  className="text-xs font-semibold text-forest-800 hover:text-gold-600 transition-colors"
+                >
+                  Unduh
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-forest-400 italic">Tidak ada file bukti (pembayaran otomatis QRIS).</p>
+            )
+          ) : (
+            <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-red-700 text-xs flex items-center gap-2">
+              <span>🔒</span>
+              <span>Anda tidak memiliki izin untuk melihat bukti pembayaran unit lain.</span>
+            </div>
+          )}
+        </div>
+
+        <div className="pt-2">
+          <button type="button" onClick={onClose} className="pv-btn-primary w-full text-sm">
+            Tutup
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
 }
 

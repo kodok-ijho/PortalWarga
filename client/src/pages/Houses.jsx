@@ -18,6 +18,7 @@ import {
   mockUnits,
   getUnitOccupant,
   getUnitOwner,
+  isStaffRole,
 } from '../services/mockData';
 
 const EMPTY_FORM = {
@@ -33,7 +34,7 @@ const EMPTY_FORM = {
 export default function Houses() {
   const { role } = useAuth();
   const toast = useToast();
-  const isStaff = role === 'admin' || role === 'rt_rw';
+  const isStaff = isStaffRole(role);
 
   const [units, setUnits] = useState([...mockUnits]);
   const [search, setSearch] = useState('');

@@ -22,12 +22,13 @@ import {
   occupancyStatusLabel,
   occupancyStatusColor,
   OCCUPANCY_STATUS,
+  isStaffRole,
 } from '../services/mockData';
 
 export default function Residents() {
   const { role } = useAuth();
   const toast = useToast();
-  const isStaff = role === 'admin' || role === 'rt_rw';
+  const isStaff = isStaffRole(role);
 
   // State filter & search
   const [search, setSearch] = useState('');
@@ -166,7 +167,7 @@ export default function Residents() {
         const phone = r.Telepon || r.phone || r.telepon || '';
         const block = (r.Blok || r.block || '').toString().toUpperCase();
         const unitNumber = (r.Unit || r.unit_number || '').toString();
-        const roleVal = (r.Role || r.role || 'resident').toString().toLowerCase();
+        const roleVal = (r.Role || r.role || 'warga').toString().toLowerCase();
         const isActiveRaw = (r.Status || r.status || 'Aktif').toString().toLowerCase();
         const occupancyRaw = r['Status Tinggal'] || r.occupancy_status || '';
 
@@ -180,7 +181,7 @@ export default function Residents() {
           email: email,
           phone: phone,
           unit_id,
-          role: ['admin', 'rt_rw', 'resident'].includes(roleVal) ? roleVal : 'resident',
+          role: ['admin', 'bendahara', 'pengurus', 'warga'].includes(roleVal) ? roleVal : 'warga',
           is_active: isActiveRaw.includes('aktif') || isActiveRaw === 'true',
           occupancy_status: resolveStatus(occupancyRaw),
         };
@@ -193,8 +194,8 @@ export default function Residents() {
     }
 
     if (mode === 'delete-insert') {
-      // Hapus semua resident, replace dengan import (pertahankan admin/rt)
-      const keepStaff = mockProfiles.filter((p) => p.role !== 'resident');
+      // Hapus semua warga, replace dengan import (pertahankan staff/admin)
+      const keepStaff = mockProfiles.filter((p) => p.role !== 'warga');
       const newProfiles = [...keepStaff, ...mapped];
       mockProfiles.length = 0;
       mockProfiles.push(...newProfiles);
@@ -478,7 +479,7 @@ function ProfileFormModal({ profile, onSave, onClose }) {
     email: profile?.email || '',
     phone: profile?.phone || '',
     unit_id: profile?.unit_id || '',
-    role: profile?.role || 'resident',
+    role: profile?.role || 'warga',
     is_active: profile?.is_active ?? true,
     occupancy_status: profile?.occupancy_status || '',
   });
@@ -562,8 +563,9 @@ function ProfileFormModal({ profile, onSave, onClose }) {
               onChange={(e) => setForm({ ...form, role: e.target.value })}
               className="pv-input"
             >
-              <option value="resident">Warga</option>
-              <option value="rt_rw">RT/RW</option>
+              <option value="warga">Warga</option>
+              <option value="pengurus">Pengurus</option>
+              <option value="bendahara">Bendahara</option>
               <option value="admin">Admin</option>
             </select>
           </Field>
@@ -612,7 +614,7 @@ function UploadCSVModal({ onImport, onClose }) {
   const downloadTemplate = () => {
     const csv = Papa.unparse({
       fields: ['Nama', 'Email', 'Telepon', 'Blok', 'Unit', 'Status', 'Role'],
-      data: [['Contoh Warga', 'contoh@email.com', '08123456789', 'A', '01', 'Aktif', 'resident']],
+      data: [['Contoh Warga', 'contoh@email.com', '08123456789', 'A', '01', 'Aktif', 'warga']],
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -673,7 +675,7 @@ function UploadCSVModal({ onImport, onClose }) {
               />
               <div>
                 <p className="text-sm font-medium text-forest-800">Delete & Insert</p>
-                <p className="text-[11px] text-forest-500">Hapus SEMUA warga (resident), ganti dengan data CSV. Admin & RT/RW dipertahankan.</p>
+                <p className="text-[11px] text-forest-500">Hapus SEMUA warga, ganti dengan data CSV. Admin & Pengurus RT/RW dipertahankan.</p>
               </div>
             </label>
           </div>

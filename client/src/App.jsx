@@ -16,6 +16,8 @@ const PaymentMatrix = lazy(() => import('./pages/PaymentMatrix'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Expenses = lazy(() => import('./pages/Expenses'));
+const Users = lazy(() => import('./pages/Users'));
+const Logs = lazy(() => import('./pages/Logs'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center py-20">
@@ -91,6 +93,22 @@ export default function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <Expenses />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/users"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <Users />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/logs"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <Logs />
                     </Suspense>
                   }
                 />

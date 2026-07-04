@@ -15,6 +15,7 @@ import {
   canPayBill,
   occupancyStatusLabel,
   occupancyStatusColor,
+  isStaffRole,
 } from '../services/mockData';
 import Placeholder from '../components/Placeholder';
 
@@ -30,12 +31,12 @@ export default function IPLBills() {
     []
   );
 
-  // Warga hanya lihat tagihan sendiri, admin/rt lihat semua
+  // Warga hanya lihat tagihan sendiri, staff lihat semua
   const myBills = useMemo(() => {
-    if (role === 'resident' && profile?.id) {
+    if (!isStaffRole(role) && profile?.id) {
       return mockIPLBills.filter((b) => b.resident_id === profile.id);
     }
-    return mockIPLBills; // admin / rt_rw
+    return mockIPLBills; // staff roles (pengurus, bendahara, admin)
   }, [profile?.id, role]);
 
   // Filter
@@ -77,7 +78,7 @@ export default function IPLBills() {
       <div>
         <h2 className="text-lg font-bold text-forest-900">Tagihan Iuran Pemeliharaan Lingkungan</h2>
         <p className="text-sm text-forest-500">
-          {role === 'resident' ? 'Tagihan IPL Anda' : 'Semua tagihan IPL warga'}
+          {!isStaffRole(role) ? 'Tagihan IPL Anda' : 'Semua tagihan IPL warga'}
         </p>
       </div>
 
@@ -143,13 +144,13 @@ export default function IPLBills() {
                       {formatPeriod(bill.period)}
                     </p>
                     {/* Admin/RT bisa lihat unit & penghuni */}
-                    {role !== 'resident' && (
+                    {isStaffRole(role) && (
                       <p className="text-xs text-forest-500">
                         {unit ? `Blok ${unit.block}/${unit.unit_number}` : '—'}
                         {resident && ` · ${resident.full_name}`}
                       </p>
                     )}
-                    {role === 'resident' && unit && (
+                    {!isStaffRole(role) && unit && (
                       <p className="text-xs text-forest-500">
                         Blok {unit.block}/{unit.unit_number}
                       </p>
@@ -224,7 +225,7 @@ function BillDetailModal({ bill, payment, role, onClose }) {
         </span>
 
         <div className="mt-5 space-y-3 text-sm">
-          {role !== 'resident' && (
+          {isStaffRole(role) && (
             <>
               <InfoRow
                 label="Penghuni"

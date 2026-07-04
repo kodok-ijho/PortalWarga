@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
 import { useAuth, IS_DEMO_MODE, DEMO_ACCOUNT_LIST } from '../hooks/useAuth';
+import { roleLabel, roleColor } from '../services/mockData';
 
 export default function Login() {
   const { signIn, signUp, isAuthenticated, loading } = useAuth();
@@ -192,12 +193,7 @@ export default function Login() {
                     type="button"
                     onClick={() =>
                       fillDemo({
-                        email:
-                          acc.role === 'admin'
-                            ? 'admin@palmvillage.id'
-                            : acc.role === 'rt_rw'
-                            ? 'rt@palmvillage.id'
-                            : 'warga@palmvillage.id',
+                        email: acc.email,
                       })
                     }
                     className="w-full flex items-center justify-between text-left rounded-lg bg-white px-3 py-2.5 text-xs hover:bg-gold-100 transition-colors border border-gold-100 hover:border-gold-300 shadow-sm"
@@ -208,11 +204,11 @@ export default function Login() {
                       </span>
                       <div>
                         <p className="font-medium text-forest-900">{acc.full_name}</p>
-                        <p className="text-[10px] text-forest-500">admin@palmvillage.id / demo123</p>
+                        <p className="text-[10px] text-forest-500">{acc.email} / demo123</p>
                       </div>
                     </div>
-                    <span className="pv-badge bg-forest-800 text-gold-400">
-                      {acc.role === 'admin' ? 'Admin' : acc.role === 'rt_rw' ? 'RT/RW' : 'Warga'}
+                    <span className={`pv-badge ${roleColor(acc.role)}`}>
+                      {roleLabel(acc.role)}
                     </span>
                   </button>
                 ))}

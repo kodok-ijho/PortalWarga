@@ -19,23 +19,21 @@ import {
   deleteExpense,
   formatRupiah,
   formatDate,
+  hasMinRole,
+  isBendaharaOrAbove,
 } from '../services/mockData';
 
 export default function Expenses() {
   const { role, profile } = useAuth();
   const toast = useToast();
-  const isStaff = role === 'admin' || role === 'rt_rw';
+  const isStaff = hasMinRole(role, 'pengurus');
+  const canEdit = isBendaharaOrAbove(role);
 
   const [expenses, setExpenses] = useState(mockExpenses);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
   const [modalForm, setModalForm] = useState(null); // null | 'add' | expense obj
   const [viewReceipt, setViewReceipt] = useState(null); // expense obj
-
-  // Staff-only
-  if (!isStaff) {
-    return <Navigate to="/" replace />;
-  }
 
   // Bulan tersedia dari data
   const availableMonths = useMemo(() => {
@@ -54,6 +52,11 @@ export default function Expenses() {
   }, [expenses, filterCategory, filterMonth]);
 
   const totalAmount = filtered.reduce((s, e) => s + e.amount, 0);
+
+  // Staff-only (pengurus, bendahara, admin)
+  if (!isStaff) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleSave = (data) => {
     if (modalForm === 'add') {
@@ -87,6 +90,14 @@ export default function Expenses() {
 
   return (
     <div className="space-y-5">
+      {/* Read-only banner */}
+      {!canEdit && (
+        <div className="pv-card p-3 bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center gap-2">
+          <span>ℹ️</span>
+          <span>Anda melihat data pengeluaran dalam mode read-only. Hanya Bendahara yang dapat mencatat/mengubah pengeluaran.</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -95,9 +106,11 @@ export default function Expenses() {
             {filtered.length} transaksi · Total {formatRupiah(totalAmount)}
           </p>
         </div>
-        <button onClick={() => setModalForm('add')} className="pv-btn-primary text-xs">
-          <AiOutlinePlus /> Catat Pengeluaran
-        </button>
+        {canEdit && (
+          <button onClick={() => setModalForm('add')} className="pv-btn-primary text-xs">
+            <AiOutlinePlus /> Catat Pengeluaran
+          </button>
+        )}
       </div>
 
       {/* Filter */}
@@ -166,22 +179,24 @@ export default function Expenses() {
                   </button>
                 )}
                 <p className="font-bold text-forest-900 text-sm">{formatRupiah(exp.amount)}</p>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setModalForm(exp)}
-                    className="p-2 text-forest-500 hover:text-forest-800 hover:bg-forest-50 rounded-lg transition-colors"
-                    title="Edit"
-                  >
-                    <AiOutlineEdit />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(exp)}
-                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Hapus"
-                  >
-                    <AiOutlineDelete />
-                  </button>
-                </div>
+                {canEdit && (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setModalForm(exp)}
+                      className="p-2 text-forest-500 hover:text-forest-800 hover:bg-forest-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <AiOutlineEdit />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(exp)}
+                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Hapus"
+                    >
+                      <AiOutlineDelete />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
