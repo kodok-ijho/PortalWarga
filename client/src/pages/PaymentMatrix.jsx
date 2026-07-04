@@ -41,6 +41,17 @@ export default function PaymentMatrix() {
 
   const matrix = useMemo(() => getBillMatrix(year), [year]);
 
+  // Unit yang sedang "aktif" = unit dari tagihan pertama yang terpilih.
+  // Selama ada seleksi, sel unit lain DIKUNCI (tidak bisa diklik) supaya
+  // satu transaksi tetap satu unit (satu tanda terima). Seluruh seleksi
+  // yang valid selalu satu unit, jadi ambil unit_id dari sembarang key.
+  const activeUnitId = useMemo(() => {
+    const firstId = Object.keys(selected)[0];
+    if (!firstId) return null;
+    const bill = mockIPLBills.find((b) => b.id === firstId);
+    return bill ? bill.unit_id : null;
+  }, [selected]);
+
   // ── Seleksi multi-bulan runut (warga) ───────────────────────────
   // Helper: ambil daftar periode yang sudah di-select untuk sebuah unit.
   // Key sekarang bill.id (unik lintas tahun), jadi aman untuk multi-tahun.
@@ -57,6 +68,9 @@ export default function PaymentMatrix() {
   // Sel yang sudah paid atau sudah di-select tidak perlu dicek lagi.
   const canSelectBill = (bill) => {
     if (!bill || bill.status === 'paid' || bill.status === 'cancelled') return false;
+    // Cegah seleksi lintas unit: jika sudah ada unit aktif, hanya boleh unit itu.
+    // Satu transaksi = satu unit (satu tanda terima).
+    if (activeUnitId !== null && bill.unit_id !== activeUnitId) return false;
     // Periode yang sudah di-select untuk unit ini dianggap "akan dibayar".
     const alreadySelected = selectedPeriodsForUnit(bill.unit_id);
     return canPayBill(bill.unit_id, bill.period, alreadySelected);
@@ -101,7 +115,16 @@ export default function PaymentMatrix() {
         return revalidateSelections(without);
       }
 
-      // Select baru: cek boleh tidak (runut lintas tahun)
+      // Select baru: cegah lintas unit (proaktif, bukan hanya di akhir).
+      // Pesan kontekstual: beri tahu unit mana yang sedang aktif.
+      if (activeUnitId !== null && bill.unit_id !== activeUnitId) {
+        const u = getUnitById(activeUnitId);
+        toast.warning(
+          `Selesaikan dulu transaksi untuk Blok ${u.block}/${u.unit_number}, atau kosongkan seleksi sebelum memilih unit lain.`
+        );
+        return prev;
+      }
+
       if (!canSelectBill(bill)) {
         // Cari tagihan sebelumnya yang belum lunas untuk pesan informatif
         const extraSet = new Set(selectedPeriodsForUnit(bill.unit_id, prev));
@@ -195,10 +218,15 @@ export default function PaymentMatrix() {
     }
     const validBills = validateAndGetSelected();
     if (!validBills) return;
-    // Staff hanya mencatat untuk satu unit per transaksi (satu tanda terima).
+    // Defense-in-depth: seleksi lintas unit seharusnya sudah dicegah sejak
+    // pemilihan sel (lihat canSelectBill & toggleCell). Tetap cek di sini
+    // sebagai lapisan terakhir sebelum membuka modal pencatatan.
     const unitIds = new Set(validBills.map((b) => b.unit_id));
     if (unitIds.size > 1) {
-      toast.warning('Pilih tagihan dari satu rumah/unit saja dalam satu transaksi.');
+      const u = getUnitById([...unitIds][0]);
+      toast.warning(
+        `Pilih tagihan dari satu rumah/unit saja dalam satu transaksi (aktif: Blok ${u.block}/${u.unit_number}).`
+      );
       return;
     }
     setManualModal({ bills: validBills });
@@ -307,14 +335,28 @@ export default function PaymentMatrix() {
                   // Warga hanya bisa interaksi (bayar) untuk unitnya sendiri.
                   const isMyUnit = role === 'resident' && row.unit.id === myUnitId;
                   const canInteract = isStaff || isMyUnit;
+                  // Sel belum-bayar unit lain DIKUNCI saat ada unit aktif (hanya
+                  // relevan untuk staff — warga hanya punya satu unit sendiri).
+                  const isLockedOtherUnit =
+                    canInteract && activeUnitId !== null && row.unit.id !== activeUnitId;
                   // Background OPAQUE untuk kolom sticky kiri, supaya sel
                   // bulan tidak tembus/silang saat scroll horizontal. Pakai
                   // versi solid (bukan /alpha) sesuai state baris.
                   const stickyBg = isMyUnit ? 'bg-gold-50' : 'bg-white';
+                  // Dim baris unit non-aktif saat ada seleksi; highlight ring
+                  // tipis untuk baris unit aktif.
+                  const isActiveRow = activeUnitId !== null && row.unit.id === activeUnitId;
+                  const rowBg = isActiveRow
+                    ? 'bg-gold-50/30 ring-1 ring-inset ring-gold-200'
+                    : isLockedOtherUnit
+                    ? 'opacity-50'
+                    : isMyUnit
+                    ? 'bg-gold-50/40'
+                    : 'hover:bg-forest-50/50';
                   return (
                     <tr
                       key={row.unit.id}
-                      className={isMyUnit ? 'bg-gold-50/40' : 'hover:bg-forest-50/50'}
+                      className={rowBg}
                     >
                       <td className={`sticky left-0 z-10 ${stickyBg} px-3 py-2 border-r border-forest-100`}>
                         <p className={`font-medium ${isMyUnit ? 'text-gold-700' : 'text-forest-900'}`}>
@@ -344,9 +386,9 @@ export default function PaymentMatrix() {
                               isSelected={isSelected}
                               isStaff={isStaff}
                               canInteract={canInteract}
-                              selectedPeriods={selectedPeriodsForUnit(row.unit.id)}
+                              isLockedOtherUnit={isLockedOtherUnit}
                               onClick={() => {
-                                if (!canInteract) return; // warga di unit lain: view only
+                                if (!canInteract || isLockedOtherUnit) return;
                                 toggleCell(cell?.bill);
                               }}
                             />
@@ -368,10 +410,10 @@ export default function PaymentMatrix() {
           <div className="min-w-0">
             <p className="text-sm font-medium text-forest-900">
               {selectedBills.length} bulan dipilih
-              {isStaff && selectedBills.length > 0 && (
+              {isStaff && activeUnitId !== null && (
                 <span className="ml-2 text-[11px] text-forest-500">
                   · {(() => {
-                    const u = getUnitById(selectedBills[0].unit_id);
+                    const u = getUnitById(activeUnitId);
                     return u ? `Blok ${u.block}/${u.unit_number}` : '';
                   })()}
                 </span>
@@ -386,6 +428,13 @@ export default function PaymentMatrix() {
               <p className="text-[11px] text-forest-500">Total</p>
               <p className="font-bold text-forest-900">{formatRupiah(totalToPay)}</p>
             </div>
+            <button
+              onClick={() => setSelected({})}
+              className="pv-btn-ghost text-xs px-2.5 py-1.5"
+              title="Kosongkan seleksi untuk berganti unit"
+            >
+              ✕ Kosongkan
+            </button>
             {isStaff ? (
               <button onClick={handleStaffPay} className="pv-btn-primary text-sm">
                 Catat Pembayaran →
@@ -422,7 +471,7 @@ export default function PaymentMatrix() {
 }
 
 // ── Komponen sel matriks ──────────────────────────────────────────
-function Cell({ cell, unitId, isSelected, isStaff, canInteract, selectedPeriods = [], onClick }) {
+function Cell({ cell, unitId, isSelected, isStaff, canInteract, isLockedOtherUnit = false, onClick }) {
   if (!cell) {
     return <span className="block h-12 rounded bg-gray-50"></span>;
   }
@@ -467,6 +516,23 @@ function Cell({ cell, unitId, isSelected, isStaff, canInteract, selectedPeriods 
         title={isOverdue ? 'Terlambat' : isPending ? 'Belum bayar' : ''}
       >
         <span className="text-[8px] mt-0.5 leading-none opacity-60">{formatShort(bill.amount)}</span>
+      </span>
+    );
+  }
+
+  // Sel belum-bayar tapi UNIT LAIN sedang aktif → kunci (tidak bisa diklik).
+  // Hanya muncul untuk staff saat sudah ada seleksi di unit lain. Sel lunas
+  // tetap ditampilkan normal (baris isPaid di atas sudah return lebih dulu).
+  if (isLockedOtherUnit) {
+    return (
+      <span
+        className="block h-12 rounded border border-gray-200 bg-gray-50 flex flex-col items-center justify-center cursor-not-allowed"
+        title="Selesaikan dulu transaksi unit aktif, atau kosongkan seleksi sebelum memilih unit lain."
+      >
+        <span className="text-[10px] leading-none text-gray-400">🔒</span>
+        <span className="text-[8px] mt-0.5 leading-none text-gray-300">
+          {formatShort(bill.amount)}
+        </span>
       </span>
     );
   }
