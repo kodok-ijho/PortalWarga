@@ -483,7 +483,7 @@ export default function Reports() {
                 </span>
               </div>
               <p className="text-[11px] text-forest-400 pt-1">
-                Laporan ini dihitung menggunakan basis kas masuk running balance (kumulatif), dimulai dari Januari 2025 (Saldo Awal = Rp 0).
+                Laporan ini dihitung menggunakan basis kas masuk running balance (kumulatif), dimulai dari Januari 2025 (Saldo Awal Kas = Rp 15.000.000 dari peralihan pengurus sebelumnya).
               </p>
             </div>
           </div>

@@ -18,21 +18,24 @@ export const OCCUPANCY_STATUS = {
 // dirujuk lewat profile.unit_id. Untuk unit yang dikontrakkan, pemilik
 // (owner) bukan penghuni — penghuni adalah profil dengan status 'tenant'.
 export const mockUnits = [
-  { id: 1, block: 'A', unit_number: '01', floor: 1, size: 72, is_occupied: true, owner_id: 'demo-bendahara' },
-  { id: 2, block: 'A', unit_number: '02', floor: 1, size: 72, is_occupied: true, owner_id: 'demo-warga' },
-  { id: 3, block: 'A', unit_number: '03', floor: 1, size: 72, is_occupied: true, owner_id: 'p-4' },
-  { id: 4, block: 'A', unit_number: '04', floor: 2, size: 84, is_occupied: true, owner_id: 'p-5' },
-  { id: 5, block: 'A', unit_number: '05', floor: 2, size: 84, is_occupied: true, owner_id: 'p-6' },
-  { id: 6, block: 'A', unit_number: '06', floor: 2, size: 84, is_occupied: true, owner_id: 'demo-pengurus' },
-  { id: 7, block: 'A', unit_number: '07', floor: 3, size: 96, is_occupied: true, owner_id: 'p-7' },
-  { id: 8, block: 'A', unit_number: '08', floor: 3, size: 96, is_occupied: true, owner_id: 'p-8' },
-  { id: 9, block: 'A', unit_number: '09', floor: 3, size: 96, is_occupied: true, owner_id: 'p-9' },
-  { id: 10, block: 'A', unit_number: '10', floor: 3, size: 96, is_occupied: false, owner_id: null },
-  { id: 11, block: 'B', unit_number: '01', floor: 1, size: 72, is_occupied: true, owner_id: 'p-10' },
-  { id: 12, block: 'B', unit_number: '02', floor: 1, size: 72, is_occupied: true, owner_id: 'p-11' },
-  { id: 13, block: 'B', unit_number: '03', floor: 1, size: 72, is_occupied: true, owner_id: 'p-12' },
-  { id: 14, block: 'B', unit_number: '04', floor: 2, size: 84, is_occupied: true, owner_id: 'p-13' },
-  { id: 15, block: 'B', unit_number: '05', floor: 2, size: 84, is_occupied: true, owner_id: 'p-14' },
+  { id: 1, block: 'A', unit_number: '01', floor: 1, size: 72, is_occupied: true, owner_id: 'demo-bendahara', ipl_schema_id: 'schema-komplit' },
+  { id: 2, block: 'A', unit_number: '02', floor: 1, size: 72, is_occupied: true, owner_id: 'demo-warga', ipl_schema_id: 'schema-komplit' },
+  { id: 3, block: 'A', unit_number: '03', floor: 1, size: 72, is_occupied: true, owner_id: 'p-4', ipl_schema_id: 'schema-komplit' },
+  { id: 4, block: 'A', unit_number: '04', floor: 2, size: 84, is_occupied: true, owner_id: 'p-5', ipl_schema_id: 'schema-komplit' },
+  { id: 5, block: 'A', unit_number: '05', floor: 2, size: 84, is_occupied: true, owner_id: 'p-6', ipl_schema_id: 'schema-komplit' },
+  { id: 6, block: 'A', unit_number: '06', floor: 2, size: 84, is_occupied: true, owner_id: 'demo-pengurus', ipl_schema_id: 'schema-komplit' },
+  { id: 7, block: 'A', unit_number: '07', floor: 3, size: 96, is_occupied: true, owner_id: 'p-7', ipl_schema_id: 'schema-komplit' },
+  { id: 8, block: 'A', unit_number: '08', floor: 3, size: 96, is_occupied: true, owner_id: 'p-8', ipl_schema_id: 'schema-komplit' },
+  { id: 9, block: 'A', unit_number: '09', floor: 3, size: 96, is_occupied: true, owner_id: 'p-9', ipl_schema_id: 'schema-komplit' },
+  { id: 10, block: 'A', unit_number: '10', floor: 3, size: 96, is_occupied: false, owner_id: 'p-14', ipl_schema_id: 'schema-basic' },
+  { id: 11, block: 'B', unit_number: '01', floor: 1, size: 72, is_occupied: true, owner_id: 'p-10', ipl_schema_id: 'schema-komplit' },
+  { id: 12, block: 'B', unit_number: '02', floor: 1, size: 72, is_occupied: true, owner_id: 'p-11', ipl_schema_id: 'schema-komplit' },
+  { id: 13, block: 'B', unit_number: '03', floor: 1, size: 72, is_occupied: false, owner_id: 'p-12', ipl_schema_id: 'schema-basic' },
+  { id: 14, block: 'B', unit_number: '04', floor: 2, size: 84, is_occupied: true, owner_id: 'p-13', ipl_schema_id: 'schema-komplit' },
+  { id: 15, block: 'B', unit_number: '05', floor: 2, size: 84, is_occupied: true, owner_id: 'p-14', ipl_schema_id: 'schema-komplit' },
+  { id: 16, block: 'C', unit_number: '01', floor: 1, size: 72, is_occupied: false, owner_id: null, ipl_schema_id: 'schema-basic' },
+  { id: 17, block: 'C', unit_number: '02', floor: 1, size: 72, is_occupied: false, owner_id: null, ipl_schema_id: 'schema-basic' },
+  { id: 18, block: 'C', unit_number: '03', floor: 2, size: 84, is_occupied: false, owner_id: null, ipl_schema_id: 'schema-basic' },
 ];
 
 
@@ -298,23 +301,64 @@ export const mockSettings = {
   late_fee_type: 'percent', // 'percent' | 'fixed'
   late_fee_value: 5, // 5% atau nilai fixed (Rp)
   bill_recipient: 'occupant', // 'occupant' | 'owner' — ke siapa tagihan ditujukan
-  ipl_components: [
-    { name: 'Kebersihan', amount: 150000 },
-    { name: 'Keamanan', amount: 200000 },
-    { name: 'Lampu Jalan', amount: 100000 },
-    { name: 'Administrasi', amount: 50000 },
+  ipl_schemas: [
+    {
+      id: 'schema-komplit',
+      name: 'IPL Komplit (Rumah Ditempati)',
+      description: 'Wajib dibayar untuk seluruh rumah yang ditempati oleh pemilik atau penyewa.',
+      components: [
+        { name: 'Keamanan', amount: 80000 },
+        { name: 'Kebersihan', amount: 30000 },
+        { name: 'DDC (Dana Duka Cita)', amount: 7000 },
+        { name: 'Kas', amount: 23000 },
+      ],
+    },
+    {
+      id: 'schema-basic',
+      name: 'IPL Basic (Rumah Kosong)',
+      description: 'Dibebankan kepada pemilik untuk rumah yang tidak dihuni / kosong.',
+      components: [
+        { name: 'Keamanan', amount: 80000 },
+        { name: 'Kebersihan', amount: 30000 },
+      ],
+    },
   ],
 };
 
+export function getIPLSchemas() {
+  return mockSettings.ipl_schemas || [];
+}
+
+export function getIPLSchemaById(schemaId) {
+  const schemas = getIPLSchemas();
+  return schemas.find((s) => s.id === schemaId) || schemas[0];
+}
+
+export function computeSchemaAmount(schema) {
+  if (!schema || !schema.components) return 0;
+  return schema.components.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+}
+
 /**
- * Hitung besaran IPL per bulan = penjumlahan semua komponen IPL.
- * Ini adalah satu-satunya cara menentukan nominal IPL; tidak ada lagi
- * field `ipl_amount` terpisah yang bisa menyimpang dari total komponen.
- * @param {Array<{amount: number}>} [components] - default mockSettings.ipl_components
+ * Hitung besaran IPL per bulan = penjumlahan semua komponen di dalam skema IPL yang menempel pada unit.
+ * @param {number|object|Array} [arg] - bisa berupa unitId (number), unit obj, schema obj, atau array components
  * @returns {number}
  */
-export function computeIPLAmount(components = mockSettings.ipl_components) {
-  return components.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+export function computeIPLAmount(arg) {
+  if (Array.isArray(arg)) {
+    return arg.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  }
+  if (arg && typeof arg === 'object' && arg.components) {
+    return computeSchemaAmount(arg);
+  }
+  let unitId = typeof arg === 'object' ? arg?.id : arg;
+  const unit = mockUnits.find((u) => u.id === Number(unitId));
+  if (unit && unit.ipl_schema_id) {
+    const schema = getIPLSchemaById(unit.ipl_schema_id);
+    return computeSchemaAmount(schema);
+  }
+  const defaultSchema = getIPLSchemas()[0];
+  return computeSchemaAmount(defaultSchema);
 }
 
 // ── IPL BILLS ────────────────────────────────────────────────────
@@ -340,7 +384,7 @@ const periods = [
 export const mockIPLBills = [];
 let billId = 1;
 
-const occupiedUnits = mockUnits.filter((u) => u.is_occupied);
+const occupiedUnits = mockUnits; // Semua unit (terhuni maupun kosong) dikenakan tagihan IPL sesuai skema
 const residentsWithUnit = mockProfiles.filter((p) => p.unit_id && p.is_active);
 
 // ── Tentukan batas bayar absolut per unit ────────────────────────
@@ -367,7 +411,7 @@ for (const period of periods) {
     const recipient = getBillRecipient(unit.id);
     const [y, m] = period.split('-').map(Number);
     const dueDate = new Date(y, m - 1, mockSettings.due_day);
-    const amount = computeIPLAmount();
+    const amount = computeIPLAmount(unit.id);
 
     // Jangan generate tagihan untuk periode masa depan yang belum ada
     const isPast = now > new Date(y, m, 0); // akhir bulan periode
@@ -647,7 +691,7 @@ function generateDemoExpenses() {
       id: `exp-gen-${period}-1`,
       date: `${year}-${String(month).padStart(2, '0')}-05`,
       category: 'Kebersihan',
-      amount: 750000,
+      amount: 450000,
       description: `Honor petugas kebersihan untuk periode ${period}`,
       receipt_file: `kwitansi-kebersihan-${period}.pdf`,
       recorded_by: 'Budi Santoso (Bendahara)',
@@ -659,7 +703,7 @@ function generateDemoExpenses() {
       id: `exp-gen-${period}-2`,
       date: `${year}-${String(month).padStart(2, '0')}-05`,
       category: 'Keamanan',
-      amount: 1800000,
+      amount: 1100000,
       description: `Honor satpam komplek untuk periode ${period}`,
       receipt_file: `honor-satpam-${period}.pdf`,
       recorded_by: 'Budi Santoso (Bendahara)',
@@ -672,7 +716,7 @@ function generateDemoExpenses() {
         id: `exp-gen-${period}-3`,
         date: `${year}-${String(month).padStart(2, '0')}-08`,
         category: 'Listrik & Air',
-        amount: 1250000,
+        amount: 350000,
         description: `Pembayaran token listrik lampu jalan komplek periode ${period}`,
         receipt_file: `struk-listrik-${period}.jpg`,
         recorded_by: 'Budi Santoso (Bendahara)',
@@ -686,7 +730,7 @@ function generateDemoExpenses() {
         id: `exp-gen-${period}-4`,
         date: `${year}-${String(month).padStart(2, '0')}-12`,
         category: 'Perawatan Fasilitas',
-        amount: 500000,
+        amount: 300000,
         description: `Servis pompa air taman & fasilitas umum periode ${period}`,
         receipt_file: `kwitansi-servis-${period}.pdf`,
         recorded_by: 'Budi Santoso (Bendahara)',
@@ -700,7 +744,7 @@ function generateDemoExpenses() {
         id: `exp-gen-${period}-5`,
         date: `${year}-${String(month).padStart(2, '0')}-15`,
         category: 'Administrasi',
-        amount: 300000,
+        amount: 200000,
         description: `Pembelian ATK & biaya administrasi RT periode ${period}`,
         receipt_file: null,
         recorded_by: 'Budi Santoso (Bendahara)',
@@ -821,7 +865,7 @@ export function getBillMatrix(year, opts = {}) {
   const { scopeUnitId } = opts;
   const units = scopeUnitId
     ? mockUnits.filter((u) => u.id === scopeUnitId)
-    : mockUnits.filter((u) => u.is_occupied);
+    : mockUnits; // Tampilkan seluruh unit (termasuk rumah kosong) di dalam matriks
 
   const billsForYear = getBillsForYear(year);
 
@@ -877,7 +921,7 @@ export const MONTHS_LONG = [
  */
 export function computeRunningBalance(targetYear, targetMonth) {
   const result = [];
-  let cumulativeBalance = 0; // Saldo awal Januari 2025 = 0
+  let cumulativeBalance = 15000000; // Saldo awal Januari 2025 = Rp 15.000.000 (Kas peralihan periode pengurus sebelumnya)
 
   const startYear = 2025;
   const startMonth = 1;
@@ -934,10 +978,10 @@ export function getMonthBalance(year, month) {
     period: `${year}-${String(month).padStart(2, '0')}`,
     year,
     month,
-    openingBalance: 0,
+    openingBalance: 15000000,
     totalIncome: 0,
     totalExpense: 0,
-    closingBalance: 0,
+    closingBalance: 15000000,
     incomeCount: 0,
     expenseCount: 0,
   };
@@ -1342,3 +1386,111 @@ export const mockTransactionLogs = [
   { id: 'txn-3', userName: 'Budi Santoso (Bendahara)', action: 'Catat Pembayaran', details: 'Pembayaran IPL Blok A/03 (Manual)', amount: 500000, timestamp: '2026-07-04T08:45:00Z' },
   { id: 'txn-4', userName: 'Pak Hendra (Admin)', action: 'Ubah Pengaturan', details: 'Perubahan tanggal jatuh tempo menjadi tgl 10', amount: null, timestamp: '2026-07-04T09:12:00Z' },
 ];
+
+/**
+ * Generator dokumen Kuitansi Digital (HTML file download)
+ */
+export function downloadDigitalReceipt({ bill, unit, owner, occupant }) {
+  const schema = getIPLSchemaById(unit?.ipl_schema_id);
+  const amount = bill?.amount || computeSchemaAmount(schema);
+  const dateStr = bill?.paid_at || bill?.created_at || new Date().toISOString().split('T')[0];
+  const noKuitansi = `PV/IPL/${bill?.period || '2026'}/${bill?.id || '0'}`;
+  const targetName = occupant?.full_name || owner?.full_name || `Warga Blok ${unit?.block || '-'}/${unit?.unit_number || '-'}`;
+  
+  const htmlContent = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Kuitansi Digital - ${noKuitansi}</title>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f0f4f1; padding: 40px; color: #1a3323; }
+    .receipt { max-w: 650px; margin: 0 auto; background: #ffffff; border: 2px solid #1a3323; border-radius: 12px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); position: relative; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #c2d1c7; padding-bottom: 20px; margin-bottom: 24px; }
+    .logo-text { font-size: 24px; font-weight: 800; color: #1a3323; letter-spacing: -0.5px; }
+    .badge { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; text-transform: uppercase; }
+    .title { font-size: 18px; font-weight: 700; color: #5c7664; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+    .row { display: flex; justify-content: space-between; margin-bottom: 14px; font-size: 15px; border-bottom: 1px solid #f0f4f1; padding-bottom: 8px; }
+    .label { color: #5c7664; font-weight: 500; }
+    .val { font-weight: 700; color: #1a3323; }
+    .total-box { background: #1a3323; color: #d4af37; padding: 18px 24px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-top: 28px; font-size: 20px; font-weight: 800; }
+    .footer { margin-top: 32px; text-align: center; font-size: 12px; color: #789381; border-top: 1px solid #e0e9e2; padding-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="receipt">
+    <div class="header">
+      <div>
+        <div class="logo-text">🌴 PALM VILLAGE</div>
+        <div style="font-size: 12px; color: #5c7664; margin-top: 4px;">Portal Warga & Manajemen IPL Digital</div>
+      </div>
+      <div class="badge">✔ LUNAS / TERVERIFIKASI</div>
+    </div>
+    <div class="title">Kuitansi Pembayaran IPL</div>
+    <div class="row">
+      <span class="label">No. Kuitansi</span>
+      <span class="val">${noKuitansi}</span>
+    </div>
+    <div class="row">
+      <span class="label">Tanggal Verifikasi</span>
+      <span class="val">${dateStr}</span>
+    </div>
+    <div class="row">
+      <span class="label">Diterima dari</span>
+      <span class="val">${targetName}</span>
+    </div>
+    <div class="row">
+      <span class="label">Unit Rumah</span>
+      <span class="val">Blok ${unit?.block || '-'}/${unit?.unit_number || '-'}</span>
+    </div>
+    <div class="row">
+      <span class="label">Periode Tagihan</span>
+      <span class="val">${bill?.period || '-'}</span>
+    </div>
+    <div class="row">
+      <span class="label">Skema IPL</span>
+      <span class="val">${schema?.name || 'IPL Basic'}</span>
+    </div>
+    <div class="row">
+      <span class="label">Metode Pembayaran</span>
+      <span class="val">${(bill?.method || 'Transfer Bank').toUpperCase()}</span>
+    </div>
+    <div class="total-box">
+      <span>TOTAL DIBAYAR</span>
+      <span>${formatRupiah(amount)}</span>
+    </div>
+    <div class="footer">
+      Kuitansi ini diterbitkan secara otomatis oleh Sistem Portal Warga Palm Village sebagai bukti pembayaran sah tanpa tanda tangan basah.<br>
+      Unduh atau simpan dokumen ini sebagai arsip digital Anda.
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Kuitansi-IPL-${unit?.block || ''}-${unit?.unit_number || ''}-${bill?.period || ''}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Simulasi pengiriman Kuitansi Digital via Email
+ */
+export function sendEmailReceipt({ bill, unit, owner, occupant }) {
+  const targetEmail = occupant?.email || owner?.email || `warga.${unit?.block || 'A'}${unit?.unit_number || '1'}@palmvillage.id`;
+  const noKuitansi = `PV/IPL/${bill?.period || '2026'}/${bill?.id || '0'}`;
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        success: true,
+        email: targetEmail,
+        noKuitansi,
+        message: `Kuitansi digital ${noKuitansi} berhasil dikirim ke email ${targetEmail}.`,
+      });
+    }, 600);
+  });
+}

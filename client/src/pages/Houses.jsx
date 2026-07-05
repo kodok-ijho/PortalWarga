@@ -19,6 +19,11 @@ import {
   getUnitOccupant,
   getUnitOwner,
   isStaffRole,
+  isBendaharaOrAbove,
+  getIPLSchemas,
+  getIPLSchemaById,
+  formatRupiah,
+  computeSchemaAmount,
 } from '../services/mockData';
 
 const EMPTY_FORM = {
@@ -28,6 +33,7 @@ const EMPTY_FORM = {
   size: 72,
   is_occupied: false,
   owner_id: '',
+  ipl_schema_id: 'schema-basic',
   notes: '',
 };
 
@@ -106,6 +112,7 @@ export default function Houses() {
     setFormUnit({
       ...unit,
       owner_id: unit.owner_id || '',
+      ipl_schema_id: unit.ipl_schema_id || (unit.is_occupied ? 'schema-komplit' : 'schema-basic'),
       notes: unit.notes || '',
     });
   };
@@ -118,6 +125,7 @@ export default function Houses() {
       floor: Number(data.floor) || 1,
       size: Number(data.size) || 0,
       owner_id: data.owner_id || null,
+      ipl_schema_id: data.ipl_schema_id || 'schema-basic',
       notes: data.notes?.trim() || '',
     };
 
@@ -143,7 +151,7 @@ export default function Houses() {
         unit.id === normalized.id ? { ...unit, ...normalized } : unit
       );
       syncUnits(nextUnits);
-      toast.success(`Rumah ${normalized.block}/${normalized.unit_number} diperbarui.`);
+      toast.success(`Rumah ${normalized.block}/${normalized.unit_number} dan skema IPL diperbarui.`);
     } else {
       const nextId = Math.max(0, ...units.map((unit) => Number(unit.id) || 0)) + 1;
       syncUnits([...units, { ...normalized, id: nextId }]);
@@ -184,9 +192,9 @@ export default function Houses() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-forest-900">Manajemen Rumah</h2>
+          <h2 className="text-lg font-bold text-forest-900">Manajemen Rumah & Skema IPL</h2>
           <p className="text-sm text-forest-500">
-            Rawat master data nomor rumah Palm Village dan cocokkan dengan mapsite.
+            Rawat master data unit rumah Palm Village dan tempelkan profil skema biaya IPL.
           </p>
         </div>
         <button type="button" onClick={openAdd} className="pv-btn-primary text-xs">
@@ -225,8 +233,8 @@ export default function Houses() {
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
           <StatCard label="Total Rumah" value={stats.total} tone="forest" />
-          <StatCard label="Terhuni" value={stats.occupied} tone="green" />
-          <StatCard label="Kosong/Nonaktif" value={stats.vacant} tone="amber" />
+          <StatCard label="Terhuni (Skema Komplit)" value={stats.occupied} tone="green" />
+          <StatCard label="Kosong (Skema Basic)" value={stats.vacant} tone="amber" />
           <StatCard label="Blok" value={stats.blocks} tone="gold" />
         </div>
       </section>
@@ -275,6 +283,7 @@ export default function Houses() {
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gold-400">Rumah</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gold-400">Owner</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gold-400">Penghuni</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gold-400">Skema IPL</th>
                 <th className="hidden px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gold-400 md:table-cell">Detail</th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gold-400">Status</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gold-400">Aksi</th>
@@ -283,7 +292,7 @@ export default function Houses() {
             <tbody className="divide-y divide-forest-100">
               {filteredUnits.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-forest-400">
+                  <td colSpan={7} className="px-4 py-10 text-center text-forest-400">
                     Tidak ada rumah yang cocok.
                   </td>
                 </tr>
@@ -291,6 +300,7 @@ export default function Houses() {
                 filteredUnits.map((unit) => {
                   const owner = getUnitOwner(unit.id);
                   const occupant = getUnitOccupant(unit.id);
+                  const schema = getIPLSchemaById(unit.ipl_schema_id);
                   return (
                     <tr key={unit.id} className="hover:bg-forest-50/80">
                       <td className="px-4 py-3">
@@ -311,6 +321,11 @@ export default function Houses() {
                       </td>
                       <td className="px-4 py-3 text-forest-700">
                         {occupant?.full_name || <span className="text-forest-400">Kosong</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-forest-50 border border-forest-200 text-forest-800">
+                          {schema?.name || 'IPL Basic'}
+                        </span>
                       </td>
                       <td className="hidden px-4 py-3 text-forest-500 md:table-cell">
                         Lt. {unit.floor || '-'} / {unit.size || 0}m2
@@ -379,6 +394,7 @@ export default function Houses() {
         <UnitFormModal
           unit={formUnit}
           owners={mockProfiles.filter((profile) => profile.role !== 'admin')}
+          canEditSchema={isBendaharaOrAbove(role)}
           onClose={() => setFormUnit(null)}
           onSave={handleSave}
         />
@@ -411,6 +427,8 @@ function UnitDetailModal({ unit, onClose, onEdit, onDelete }) {
   const occupant = getUnitOccupant(unit.id);
   const profiles = mockProfiles.filter((profile) => profile.unit_id === unit.id);
   const bills = mockIPLBills.filter((bill) => bill.unit_id === unit.id);
+  const schema = getIPLSchemaById(unit.ipl_schema_id);
+  const schemaAmount = computeSchemaAmount(schema);
 
   return (
     <Modal open onClose={onClose} title={`Rumah ${unit.block}/${unit.unit_number}`}>
@@ -418,6 +436,10 @@ function UnitDetailModal({ unit, onClose, onEdit, onDelete }) {
         <InfoRow label="Owner" value={owner?.full_name || 'Belum ada'} />
         <InfoRow label="Penghuni Aktif" value={occupant?.full_name || 'Kosong'} />
         <InfoRow label="Status" value={unit.is_occupied ? 'Terhuni' : 'Kosong / Nonaktif'} />
+        <InfoRow
+          label="Skema Biaya IPL"
+          value={`${schema?.name || 'IPL Basic'} (${formatRupiah(schemaAmount)}/bln)`}
+        />
         <InfoRow label="Lantai" value={unit.floor || '-'} />
         <InfoRow label="Luas" value={`${unit.size || 0}m2`} />
         <InfoRow label="Relasi Warga" value={`${profiles.length} profil`} />
@@ -436,7 +458,7 @@ function UnitDetailModal({ unit, onClose, onEdit, onDelete }) {
   );
 }
 
-function UnitFormModal({ unit, owners, onClose, onSave }) {
+function UnitFormModal({ unit, owners, canEditSchema, onClose, onSave }) {
   const isEdit = Boolean(unit.id);
   const [form, setForm] = useState(unit);
 
@@ -450,7 +472,7 @@ function UnitFormModal({ unit, owners, onClose, onSave }) {
   };
 
   return (
-    <Modal open onClose={onClose} title={isEdit ? 'Edit Rumah' : 'Tambah Rumah'}>
+    <Modal open onClose={onClose} title={isEdit ? 'Edit Rumah & Skema IPL' : 'Tambah Rumah Baru'}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Blok" required>
@@ -511,17 +533,51 @@ function UnitFormModal({ unit, owners, onClose, onSave }) {
           </select>
         </Field>
 
-        <label className="flex items-start gap-3 rounded-lg border border-forest-200 p-3 text-sm hover:bg-forest-50">
+        {/* Pilihan Profil Skema Biaya IPL */}
+        <div className="p-3 bg-forest-50/70 border border-forest-200 rounded-lg space-y-2">
+          <Field label="Profil Skema Biaya IPL">
+            <select
+              value={form.ipl_schema_id || 'schema-basic'}
+              onChange={(event) => updateField('ipl_schema_id', event.target.value)}
+              disabled={!canEditSchema}
+              className="pv-input disabled:bg-forest-100/60 disabled:text-forest-600 disabled:cursor-not-allowed font-semibold"
+            >
+              {getIPLSchemas().map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} — ({formatRupiah(computeSchemaAmount(s))} / bln)
+                </option>
+              ))}
+            </select>
+          </Field>
+          {!canEditSchema ? (
+            <p className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 flex items-center gap-1.5">
+              <span>🔒</span>
+              <span>Hak akses ubah skema IPL dibatasi khusus untuk <b>Bendahara & Admin</b>.</span>
+            </p>
+          ) : (
+            <p className="text-[11px] text-forest-500">
+              Menentukan besaran tarif bulanan yang dibebankan kepada unit ini.
+            </p>
+          )}
+        </div>
+
+        <label className="flex items-start gap-3 rounded-lg border border-forest-200 p-3 text-sm hover:bg-forest-50 cursor-pointer">
           <input
             type="checkbox"
             checked={Boolean(form.is_occupied)}
-            onChange={(event) => updateField('is_occupied', event.target.checked)}
+            onChange={(event) => {
+              const checked = event.target.checked;
+              updateField('is_occupied', checked);
+              if (canEditSchema) {
+                updateField('ipl_schema_id', checked ? 'schema-komplit' : 'schema-basic');
+              }
+            }}
             className="mt-1 accent-gold-500"
           />
           <span>
             <span className="font-medium text-forest-800">Rumah sedang terhuni</span>
             <span className="block text-xs text-forest-500">
-              Matikan jika rumah kosong, belum aktif, atau tidak ikut penagihan sementara.
+              Matikan jika rumah kosong atau tidak dihuni. {canEditSchema ? 'Otomatis mengubah skema IPL di atas.' : ''}
             </span>
           </span>
         </label>
@@ -540,7 +596,7 @@ function UnitFormModal({ unit, owners, onClose, onSave }) {
             Batal
           </button>
           <button type="submit" className="pv-btn-primary flex-1 text-sm">
-            {isEdit ? 'Simpan' : 'Tambah'}
+            {isEdit ? 'Simpan Perubahan' : 'Tambah Rumah'}
           </button>
         </div>
       </form>
@@ -567,3 +623,4 @@ function InfoRow({ label, value }) {
     </div>
   );
 }
+

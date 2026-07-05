@@ -26,9 +26,10 @@ import {
   verifyPayment,
   rejectPayment,
   revisePayment,
-  cancelPayment,
   billStatusLabel,
   billStatusColor,
+  downloadDigitalReceipt,
+  sendEmailReceipt,
 } from '../services/mockData';
 import { compressImage } from '../utils/imageCompressor';
 
@@ -49,8 +50,9 @@ export default function PaymentMatrix() {
   // Semua role bisa LIHAT semua unit. Interaksi (bayar) di-gate per baris.
   const isStaff = isStaffRole(role);
   const myUnitId = profile?.unit_id;
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const matrix = useMemo(() => getBillMatrix(year), [year]);
+  const matrix = useMemo(() => getBillMatrix(year), [year, refreshKey]);
 
   // Unit yang sedang "aktif" = unit dari tagihan pertama yang terpilih.
   // Selama ada seleksi, sel unit lain DIKUNCI (tidak bisa diklik) supaya
@@ -217,6 +219,7 @@ export default function PaymentMatrix() {
     );
     setSelected({});
     setPayModal(null);
+    setRefreshKey(k => k + 1);
   };
 
   // ── Catat pembayaran multi-bulan oleh staff (cash/transfer) ──────
@@ -260,6 +263,7 @@ export default function PaymentMatrix() {
     toast.success(`${count} pembayaran ${methodLabel} berhasil dicatat.`);
     setSelected({});
     setManualModal(null);
+    setRefreshKey(k => k + 1);
   };
 
   if (!IS_DEMO_MODE) {
@@ -382,11 +386,17 @@ export default function PaymentMatrix() {
                           )}
                         </p>
                         <p className="text-[10px] text-forest-400 truncate max-w-[160px]">
-                          {row.resident?.full_name || '— kosong —'}
+                          {row.resident?.full_name ? row.resident.full_name : '— Belum Ada Pemilik —'}
                         </p>
-                        {row.resident?.occupancy_status && (
-                          <span className={`mt-0.5 inline-flex items-center rounded px-1 py-px text-[8px] font-semibold leading-none ${occupancyStatusColor(row.resident.occupancy_status)}`}>
-                            {occupancyStatusLabel(row.resident.occupancy_status)}
+                        {row.unit.is_occupied ? (
+                          row.resident?.occupancy_status && (
+                            <span className={`mt-0.5 inline-flex items-center rounded px-1 py-px text-[8px] font-semibold leading-none ${occupancyStatusColor(row.resident.occupancy_status)}`}>
+                              {occupancyStatusLabel(row.resident.occupancy_status)}
+                            </span>
+                          )
+                        ) : (
+                          <span className="mt-0.5 inline-flex items-center rounded px-1.5 py-0.5 text-[8px] font-bold leading-none bg-amber-100 text-amber-800 border border-amber-300">
+                            Rumah Kosong (IPL Basic)
                           </span>
                         )}
                       </td>
@@ -1187,6 +1197,33 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, onClose }) {
 
         {/* Tombol Aksi */}
         <div className="pt-2 flex flex-col gap-2">
+          {(bill.status === 'paid' || payment?.status === 'verified') && (
+            <div className="grid grid-cols-2 gap-2 pb-1 border-b border-forest-100">
+              <button
+                type="button"
+                onClick={() => {
+                  const u = getUnitById(bill.unit_id);
+                  downloadDigitalReceipt({ bill, unit: u });
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-forest-300 bg-white px-3 py-2 text-xs font-semibold text-forest-800 shadow-sm hover:bg-forest-50 transition-colors"
+              >
+                📥 Download Kuitansi
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const u = getUnitById(bill.unit_id);
+                  toast.info('Mengirim kuitansi digital ke email...');
+                  const res = await sendEmailReceipt({ bill, unit: u });
+                  toast.success(res.message);
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gold-300 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 shadow-sm hover:bg-gold-100 transition-colors"
+              >
+                📧 Kirim ke Email
+              </button>
+            </div>
+          )}
+
           {payment?.status === 'pending_verification' && canVerify && (
             <div className="flex gap-2">
               <button type="button" onClick={handleVerify} className="pv-btn-primary flex-1 bg-emerald-600 hover:bg-emerald-700">

@@ -119,7 +119,7 @@ Tabel utama (semua dengan RLS policy per role):
 |---|---|---|
 | **0 — Migrasi & Fondasi** | Buat project Supabase; definisikan skema tabel + RLS; arsip backend Express lama ke `legacy-backend/`; perbaiki config frontend rusak (`vite.config.js`, `postcss.config.js`, `index.css`, path logo, hapus import mati); install deps (`@supabase/supabase-js`, `react-query`, `react-icons`); pecah `App.jsx` → `pages/`,`components/`,`services/`,`hooks/`,`context/`; setup Supabase client + AuthContext. | Repo bersih, frontend bisa jalan (halaman welcome + nav), Supabase siap. |
 | **1 — MVP: Auth + Penghuni + Tagihan/QRIS** | Halaman Login/Logout (Supabase Auth); proteksi route berbasis role; halaman Daftar Penghuni (tabel, search, filter, export CSV); halaman Tagihan (list, filter status); Edge Function generate QRIS Mayar; tombol Bayar + tampilkan QR + polling status; workflow n8n Webhook Mayar + cron tagihan + denda + notifikasi WA/Email; seed data penghuni via CSV. | **MVP siap diuji & dipakai warga.** |
-| **2 — Kalender & Forum** | Model + RLS `events`/`rsvp`; halaman Kalender (FullCalendar) + RSVP; model + RLS forum (kategori/thread/post nested); halaman Forum + moderasi (pin/lock/hapus) untuk admin/RT; notifikasi balasan via n8n. | Fitur lengkap. |
+| **2 — Fitur Esensial Warga** | Model + RLS `announcements`, `helpdesk_tickets`, `events`/`rsvp`; Papan Pengumuman RT (broadcast WA/Email); Helpdesk Lapor RT (pengaduan & tracking status); Kalender Acara (FullCalendar + RSVP); Forum silaturahmi warga. | Fitur esensial lingkungan lengkap & interaktif. |
 | **3 — Polish, Deploy & Launch** | Hardening (rate-limit, validasi, UU PDP review, RBAC test menyeluruh); unit/integration test critical path (auth, pembayaran, RLS); deploy frontend ke Vercel/Netlify + custom domain + HTTPS; dokumentasi (README, panduan warga & admin); soft launch 1 RT → kumpulkan feedback → perbaiki → peluncuran resmi + monitoring. | Sistem produksi stabil. |
 
 ---
@@ -149,11 +149,12 @@ Tabel utama (semua dengan RLS policy per role):
 - **T16**: Workflow n8n #4 (notifikasi WA + Email) untuk jatuh tempo, sukses bayar, denda.
 - **T17**: Struk/riwayat pembayaran (download PDF).
 
-### Phase 2 — Kalender & Forum
+### Phase 2 — Fitur Esensial Warga (Pengumuman, Lapor RT, Kalender)
 
-- **T18**: Skema + RLS `events` + `rsvp`; halaman Kalender (FullCalendar) + RSVP; export `.ics`; CRUD acara (admin/RT).
-- **T19**: Skema + RLS forum (`categories`/`threads`/`posts` nested); halaman Forum + buat thread + komentar nested.
-- **T20**: Moderasi forum (pin/lock/hapus) untuk admin/RT; notifikasi balasan via n8n.
+- **T18**: **Papan Pengumuman RT (Broadcast Info Lingkungan)** — Skema + RLS `announcements`; halaman Berita & Pengumuman; kemampuan Admin & Pengurus RT membuat pengumuman penting (tag: Darurat, Kegiatan, Keuangan) dengan pin di dashboard utama & broadcast notifikasi via n8n (WA/Email).
+- **T19**: **Helpdesk / Lapor RT (Pengaduan & Aspirasi Warga)** — Skema + RLS `helpdesk_tickets`; halaman Lapor RT untuk warga mengajukan keluhan (kebersihan, keamanan, lampu jalan mati, fasilitas umum); tracking status tiket (Open, In Progress, Resolved) & balasan diskusi antar warga dengan Pengurus RT/Admin.
+- **T20**: **Kalender Acara & RSVP Kegiatan** — Skema + RLS `events` + `rsvp`; halaman Kalender Kegiatan (FullCalendar) untuk agenda kerja bakti, rapat RT, posyandu, dan perayaan; fitur RSVP partisipasi warga & export agenda ke `.ics` / Google Calendar.
+- **T21 (opsional)**: **Forum Komunitas Warga** — Skema + RLS forum (`categories`/`threads`/`posts` nested); wadah diskusi silaturahmi antar warga dengan moderasi (pin/lock/hapus) untuk Admin/RT.
 
 ### Phase 3 — Polish, Deploy & Launch
 

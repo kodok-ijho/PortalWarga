@@ -15,6 +15,8 @@ import {
   formatPeriod,
   billStatusLabel,
   billStatusColor,
+  downloadDigitalReceipt,
+  sendEmailReceipt,
 } from '../services/mockData';
 import { AiOutlineCheck, AiOutlineClose, AiOutlineEye, AiOutlineClockCircle } from 'react-icons/ai';
 import { useToast } from '../hooks/useToast';
@@ -317,26 +319,54 @@ export default function PaymentVerification() {
               )}
             </div>
 
-            <div className="flex gap-2 mt-6">
-              {selectedPayment.status === 'pending_verification' && (
-                <>
+            <div className="flex flex-col gap-2 mt-6">
+              {selectedPayment.status === 'verified' && (
+                <div className="grid grid-cols-2 gap-2 pb-2 border-b border-forest-100">
                   <button
-                    onClick={() => handleVerify(selectedPayment)}
-                    className="flex-1 pv-btn-primary py-2.5 rounded-lg text-sm"
+                    onClick={() => {
+                      const bill = mockIPLBills.find((b) => b.id === selectedPayment.bill_id) || { id: selectedPayment.bill_id, period: selectedPayment.period || '2026-01', amount: selectedPayment.amount };
+                      const unit = getUnitById(selectedPayment.unit_id || bill.unit_id);
+                      downloadDigitalReceipt({ bill, unit });
+                    }}
+                    className="inline-flex items-center justify-center gap-1 rounded-lg border border-forest-300 bg-white px-3 py-2 text-xs font-semibold text-forest-800 shadow-sm hover:bg-forest-50 transition-colors"
                   >
-                    ✅ Verifikasi
+                    📥 Download Kuitansi
                   </button>
                   <button
-                    onClick={() => { setModalMode('reject'); setRejectReason(''); }}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 py-2.5 text-sm font-medium hover:bg-red-100 transition-colors"
+                    onClick={async () => {
+                      const bill = mockIPLBills.find((b) => b.id === selectedPayment.bill_id) || { id: selectedPayment.bill_id, period: selectedPayment.period || '2026-01', amount: selectedPayment.amount };
+                      const unit = getUnitById(selectedPayment.unit_id || bill.unit_id);
+                      toast.info('Mengirim kuitansi digital ke email...');
+                      const res = await sendEmailReceipt({ bill, unit });
+                      toast.success(res.message);
+                    }}
+                    className="inline-flex items-center justify-center gap-1 rounded-lg border border-gold-300 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 shadow-sm hover:bg-gold-100 transition-colors"
                   >
-                    ❌ Tolak
+                    📧 Kirim ke Email
                   </button>
-                </>
+                </div>
               )}
-              <button onClick={closeModal} className="pv-btn-ghost py-2.5 px-4 rounded-lg text-sm">
-                Tutup
-              </button>
+              <div className="flex gap-2">
+                {selectedPayment.status === 'pending_verification' && (
+                  <>
+                    <button
+                      onClick={() => handleVerify(selectedPayment)}
+                      className="flex-1 pv-btn-primary py-2.5 rounded-lg text-sm"
+                    >
+                      ✅ Verifikasi
+                    </button>
+                    <button
+                      onClick={() => { setModalMode('reject'); setRejectReason(''); }}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 py-2.5 text-sm font-medium hover:bg-red-100 transition-colors"
+                    >
+                      ❌ Tolak
+                    </button>
+                  </>
+                )}
+                <button onClick={closeModal} className="pv-btn-ghost py-2.5 px-4 rounded-lg text-sm flex-1">
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
         </div>
