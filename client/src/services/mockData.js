@@ -1226,18 +1226,41 @@ export function getApprovalHistory() {
 export function approveRegistration(userId, data = {}) {
   const idx = mockProfiles.findIndex((p) => p.id === userId);
   if (idx === -1) return null;
+  
+  const unitId = data.unit_id !== undefined ? Number(data.unit_id) : mockProfiles[idx].unit_id;
+  const occupancyStatus = data.occupancy_status || mockProfiles[idx].occupancy_status;
+  
   mockProfiles[idx] = {
     ...mockProfiles[idx],
     approval_status: 'approved',
     is_active: true,
     full_name: data.full_name || mockProfiles[idx].full_name,
-    unit_id: data.unit_id !== undefined ? Number(data.unit_id) : mockProfiles[idx].unit_id,
-    occupancy_status: data.occupancy_status || mockProfiles[idx].occupancy_status,
+    unit_id: unitId,
+    occupancy_status: occupancyStatus,
     role: data.role || mockProfiles[idx].role,
     phone: data.phone || mockProfiles[idx].phone,
     approved_by: data.approved_by || 'System',
     approved_at: new Date().toISOString(),
   };
+
+  // Link unit
+  if (unitId) {
+    const unit = mockUnits.find((u) => u.id === unitId);
+    if (unit) {
+      const isOccupied = occupancyStatus !== 'owner_vacant';
+      unit.is_occupied = isOccupied;
+      if (isOccupied) {
+        unit.ipl_schema_id = 'schema-komplit';
+      } else {
+        unit.ipl_schema_id = 'schema-basic';
+      }
+      
+      if (occupancyStatus && occupancyStatus.startsWith('owner_')) {
+        unit.owner_id = mockProfiles[idx].id;
+      }
+    }
+  }
+
   return mockProfiles[idx];
 }
 
