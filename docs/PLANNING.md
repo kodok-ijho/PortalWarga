@@ -172,12 +172,13 @@ Mengubah role dari `admin | rt_rw | resident` menjadi **4 level** yang lebih gra
 
 ## 6. Definisi Selesai (Definition of Done)
 
-- [ ] Role 4 level berfungsi: login sebagai warga/pengurus/bendahara/admin menampilkan menu & akses yang benar
-- [ ] Laporan keuangan menampilkan running balance dari Januari 2025 sampai bulan terkini
-- [ ] Saldo akhir bulan N = saldo awal bulan N+1 (tervalidasi di semua bulan)
-- [ ] Warga hanya bisa bayar rumahnya sendiri via QRIS/transfer
-- [ ] Pengurus bisa catat IPL semua warga via transfer + lihat pengeluaran & laporan (view only)
-- [ ] Bendahara bisa catat IPL via tunai + CRUD pengeluaran
-- [ ] Admin bisa edit settings + manage user (Gmail) + akses log
-- [ ] Bukti bayar (QRIS/transfer/tunai) bisa dilihat di detail matriks bayar
-- [ ] Semua fitur berjalan di demo mode tanpa Supabase
+- [x] Role 4 level berfungsi: login sebagai warga/pengurus/bendahara/admin menampilkan menu & akses yang benar
+- [x] Laporan keuangan menampilkan running balance dari Januari 2025 sampai bulan terkini
+- [x] Saldo akhir bulan N = saldo awal bulan N+1 (tervalidasi di semua bulan)
+- [x] Warga hanya bisa bayar rumahnya sendiri via QRIS/transfer
+- [x] Pengurus bisa catat IPL semua warga via transfer + lihat pengeluaran & laporan (view only)
+- [x] Bendahara bisa catat IPL via tunai + CRUD pengeluaran
+- [x] Admin bisa edit settings + manage user (Gmail) + akses log
+- [x] Bukti bayar (QRIS/transfer/tunai) bisa dilihat di detail matriks bayar
+- [x] Semua fitur berjalan di demo mode tanpa Supabase
+- [x] **Inovasi Phase 5 Selesai**: Mobile menu solid 100% dengan React Portal, edit profil mandiri, verifikasi transfer dengan zoom & client-side image compression (<500 KB), alur approval warga baru, notifikasi proaktif, dan arsitektur login Google JWT n8n.

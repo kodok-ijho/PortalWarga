@@ -649,44 +649,53 @@
 **Checklist per role:**
 
 #### Login sebagai Warga (`warga@palmvillage.id / demo123`):
-- [ ] Menu: Beranda, Penghuni, Matriks Bayar (3 item)
-- [ ] Matriks Bayar: hanya bisa klik sel di baris "Rumah Saya"
-- [ ] Bayar IPL: modal dengan QRIS + Transfer
-- [ ] Klik sel Lunas rumah sendiri: detail pembayaran + bukti muncul
-- [ ] Klik sel Lunas rumah orang lain: detail muncul TANPA bukti bayar
-- [ ] Tidak bisa akses /expenses, /reports, /settings, /users, /logs → redirect
+- [x] Menu: Beranda, Penghuni, Matriks Bayar (3 item)
+- [x] Matriks Bayar: hanya bisa klik sel di baris "Rumah Saya"
+- [x] Bayar IPL: modal dengan QRIS + Transfer
+- [x] Klik sel Lunas rumah sendiri: detail pembayaran + bukti muncul
+- [x] Klik sel Lunas rumah orang lain: detail muncul TANPA bukti bayar
+- [x] Tidak bisa akses /expenses, /reports, /settings, /users, /logs → redirect
 
 #### Login sebagai Pengurus (`pengurus@palmvillage.id / demo123`):
-- [ ] Menu: 7 item (termasuk Pengeluaran, Laporan, Pengaturan)
-- [ ] Matriks Bayar: bisa catat pembayaran semua warga
-- [ ] Catat pembayaran: modal Transfer + QRIS (TANPA Tunai)
-- [ ] Klik sel Lunas: detail + bukti bayar semua warga
-- [ ] Pengeluaran: view-only (tidak ada tombol Catat/Edit/Delete), ada banner info
-- [ ] Laporan: bisa akses, running balance terlihat
-- [ ] Pengaturan: view-only (semua input disabled), ada banner info
-- [ ] Tidak bisa akses /users, /logs → redirect
+- [x] Menu: 7 item (termasuk Pengeluaran, Laporan, Pengaturan)
+- [x] Matriks Bayar: bisa catat pembayaran semua warga
+- [x] Catat pembayaran: modal Transfer + QRIS (TANPA Tunai)
+- [x] Klik sel Lunas: detail + bukti bayar semua warga
+- [x] Pengeluaran: view-only (tidak ada tombol Catat/Edit/Delete), ada banner info
+- [x] Laporan: bisa akses, running balance terlihat
+- [x] Pengaturan: view-only (semua input disabled), ada banner info
+- [x] Tidak bisa akses /users, /logs → redirect
 
 #### Login sebagai Bendahara (`bendahara@palmvillage.id / demo123`):
-- [ ] Menu: 7 item (sama dengan pengurus)
-- [ ] Matriks Bayar: bisa catat pembayaran semua warga
-- [ ] Catat pembayaran: modal Tunai + Transfer + QRIS (3 opsi)
-- [ ] Pengeluaran: CRUD (bisa Catat, Edit, Delete)
-- [ ] Laporan: bisa akses, running balance terlihat
-- [ ] Pengaturan: view-only
-- [ ] Tidak bisa akses /users, /logs → redirect
+- [x] Menu: 7 item (sama dengan pengurus)
+- [x] Matriks Bayar: bisa catat pembayaran semua warga
+- [x] Catat pembayaran: modal Tunai + Transfer + QRIS (3 opsi)
+- [x] Pengeluaran: CRUD (bisa Catat, Edit, Delete)
+- [x] Laporan: bisa akses, running balance terlihat
+- [x] Pengaturan: view-only
+- [x] Tidak bisa akses /users, /logs → redirect
 
 #### Login sebagai Admin (`admin@palmvillage.id / demo123`):
-- [ ] Menu: 9 item (+ Kelola User, Log Sistem)
-- [ ] Semua yang Bendahara bisa + edit Pengaturan
-- [ ] Kelola User: bisa tambah/edit/nonaktifkan user (validasi Gmail)
-- [ ] Log Sistem: 3 tab, toggle on/off, tabel log
+- [x] Menu: 9 item (+ Kelola User, Log Sistem)
+- [x] Semua yang Bendahara bisa + edit Pengaturan
+- [x] Kelola User: bisa tambah/edit/nonaktifkan user (validasi Gmail)
+- [x] Log Sistem: 3 tab, toggle on/off, tabel log
 
 #### Running Balance (cross-role):
-- [ ] Buka Laporan → Tabel running balance dari Jan 2025
-- [ ] Saldo akhir bulan N = saldo awal bulan N+1 (semua bulan)
-- [ ] Grafik tren menampilkan 3 garis
-- [ ] Neraca arus kas menampilkan saldo awal dari bulan lalu
-- [ ] Bulan Januari 2025 saldo awal = Rp 0
+- [x] Buka Laporan → Tabel running balance dari Jan 2025
+- [x] Saldo akhir bulan N = saldo awal bulan N+1 (semua bulan)
+- [x] Grafik tren menampilkan 3 garis
+- [x] Neraca arus kas menampilkan saldo awal dari bulan lalu
+- [x] Bulan Januari 2025 saldo awal = Rp 0
+
+#### Inovasi Phase 5 (Terbaru):
+- [x] Navigasi Mobile Drawer solid & bebas overflow (React Portal di `document.body`)
+- [x] Update Profil Mandiri warga & staff (Nama dan No. WhatsApp) tersinkronisasi realtime
+- [x] Login Google OAuth 2.0 berjenjang via n8n JWT Token exchange architecture
+- [x] Alur Verifikasi Registrasi Warga Baru (Status Pending, Approved oleh RT/Admin, Rejected)
+- [x] Verifikasi Pembayaran Transfer oleh Bendahara dengan Zoom Bukti Bayar & Catatan Revisi
+- [x] Kompresi Gambar Bukti Transfer otomatis sisi klien (Canvas API, <500 KB) tanpa blur
+- [x] Notifikasi Proaktif berlapis (Banner Peringatan di Dashboard & Badge Bell di Header)
 
 ---
 

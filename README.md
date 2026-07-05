@@ -67,6 +67,45 @@ Besaran IPL = **penjumlahan komponen** (Kebersihan, Keamanan, dll). Atur denda k
 
 ---
 
+## 🚀 Inovasi & Fitur Unggulan Phase 5 (Terbaru)
+
+Portal Warga Palm Village telah dilengkapi dengan inovasi arsitektur mutakhir untuk kenyamanan, transparansi, dan keamanan maksimal:
+
+<div align="center">
+  <table>
+    <tr>
+      <td width="33%" valign="top" align="center">
+        <h3>✨ 100% Solid Mobile Drawer</h3>
+        <p>Menggunakan arsitektur <b>React Portal</b> (<code>document.body</code>) dengan rendering terisolasi. Navigasi drawer mobile bebas dari interferensi CSS transform/overflow container, menghasilkan animasi geser yang mulus, solid, dan tidak tembus pandang di semua perangkat HP.</p>
+      </td>
+      <td width="33%" valign="top" align="center">
+        <h3>🔐 Google Auth & n8n JWT</h3>
+        <p>Integrasi arsitektur pertukaran token <b>Google OAuth 2.0</b> dengan webhook automation n8n untuk menghasilkan klaim JWT berstandar Supabase. Login satu klik (One-Tap Sign-In) yang ultra-cepat dan aman dengan sinkronisasi profil otomatis.</p>
+      </td>
+      <td width="33%" valign="top" align="center">
+        <h3>🛡️ Registration Approval</h3>
+        <p>Sistem keamanan alur pendaftaran berjenjang. Setiap warga baru yang mendaftar via HP masuk dalam status <b>Pending Approval</b> dan wajib diverifikasi oleh Ketua RT/Pengurus sebelum memperoleh hak akses data lingkungan.</p>
+      </td>
+    </tr>
+    <tr>
+      <td width="33%" valign="top" align="center">
+        <h3>💸 Verifikasi Transfer & Zoom</h3>
+        <p>Modul verifikasi pembayaran transfer oleh Bendahara dilengkapi <b>High-Res Zoom Modal</b> untuk memeriksa bukti bayar, opsi Approve/Reject dengan catatan revisi, dan <b>Client-Side Image Compression</b> (&lt;500 KB) otomatis tanpa blur.</p>
+      </td>
+      <td width="33%" valign="top" align="center">
+        <h3>📈 Running Balance System</h3>
+        <p>Transformasi laporan keuangan menjadi neraca kumulatif berkelanjutan dengan <b>carry-forward</b> saldo awal dari bulan sebelumnya secara real-time dari Jan 2025. Dilengkapi grafik arus kas 3 garis dan ekspor CSV siap audit.</p>
+      </td>
+      <td width="33%" valign="top" align="center">
+        <h3>🔔 Proactive Notifications</h3>
+        <p>Sistem peringatan cerdas berlapis via <b>Interactive Banner</b> di Dashboard dan <b>Bell Badge Notification</b> di Header yang aktif memberi tahu warga jika terdapat tagihan IPL tertunggak atau status verifikasi pembayaran.</p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+---
+
 ## 📋 Status Fitur
 
 | Fitur | Status | Detail |

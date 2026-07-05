@@ -6,10 +6,11 @@
 
 1. **Stack backend diganti total**: Express/MongoDB → **Supabase (Postgres + Auth + RLS)** + **n8n** untuk otomasi. Backend Node yang lama akan di-deprecate (diarsipkan, bukan dihapus).
 2. **Peluncuran bertahap (MVP)**: Phase 1 = Login + Daftar Penghuni + Tagihan/QRIS. Kalender & Forum menyusul di Phase 2.
-3. **RBAC 3 level**: `admin`, `rt_rw`, `resident`.
-4. **Notifikasi WhatsApp + Email** via n8n.
-5. **Frontend diperbaiki** (bukan rebuild): struktur dipecah, import/config yang rusak diperbaiki, integrasi `@supabase/supabase-js` + React Query.
+3. **RBAC 4 level**: `admin`, `bendahara`, `pengurus`, `warga` (diperluas dari 3 level untuk pemisahan hak akses pengeluaran dan verifikasi kas).
+4. **Notifikasi WhatsApp + Email** via n8n & Proactive Notifications Alert di UI (banner & bell badge).
+5. **Frontend diperbaiki & di-enhance**: struktur dipecah, mobile menu 100% solid dengan React Portal, update profil mandiri via modal, integrasi `@supabase/supabase-js` + React Query.
 6. Penambahan: kepatuhan **UU PDP No.27/2022**, denda keterlambatan, generasi tagihan otomatis tiap bulan.
+7. **Inovasi Phase 5**: Alur verifikasi pendaftaran warga baru, kompresi gambar bukti transfer otomatis sisi klien (<500 KB), verifikasi pembayaran transfer dengan high-res zoom, dan neraca kumulatif Running Balance real-time.
 
 ---
 
