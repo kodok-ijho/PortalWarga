@@ -49,6 +49,8 @@ export const mockProfiles = [
     occupancy_status: null,
     is_active: true,
     email: 'admin@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-01T00:00:00Z',
   },
   {
     id: 'demo-bendahara',
@@ -59,6 +61,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'bendahara@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-01T00:00:00Z',
   },
   {
     id: 'demo-pengurus',
@@ -69,6 +73,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'pengurus@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-01T00:00:00Z',
   },
   {
     id: 'demo-warga',
@@ -79,6 +85,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'warga@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-01T00:00:00Z',
   },
   {
     id: 'p-4',
@@ -89,6 +97,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_rented', // pemilik unit 3, dikontrakkan ke p-4b
     is_active: true,
     email: 'ahmad.h@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-02T00:00:00Z',
   },
   {
     // Contoh TENANT: menempati unit 3 milik Ahmad Hidayat (p-4)
@@ -100,6 +110,8 @@ export const mockProfiles = [
     occupancy_status: 'tenant',
     is_active: true,
     email: 'eko.p@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-03T00:00:00Z',
   },
   {
     id: 'p-5',
@@ -110,6 +122,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'dewi.l@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-04T00:00:00Z',
   },
   {
     id: 'p-6',
@@ -120,6 +134,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'rudi.p@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-05T00:00:00Z',
   },
   {
     id: 'p-7',
@@ -130,6 +146,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'lina.k@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-06T00:00:00Z',
   },
   {
     id: 'p-8',
@@ -140,6 +158,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_rented', // pemilik unit 8, dikontrakkan ke p-8b
     is_active: false, // sudah pindah
     email: 'agus.w@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-07T00:00:00Z',
   },
   {
     // Contoh TENANT: menempati unit 8 milik Agus Wijaya (p-8)
@@ -151,6 +171,8 @@ export const mockProfiles = [
     occupancy_status: 'tenant',
     is_active: true,
     email: 'maya.s@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-08T00:00:00Z',
   },
   {
     id: 'p-9',
@@ -161,6 +183,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'rina.w@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-09T00:00:00Z',
   },
   {
     id: 'p-10',
@@ -171,6 +195,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'dian.p@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-10T00:00:00Z',
   },
   {
     id: 'p-11',
@@ -181,6 +207,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'fajar.s@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-11T00:00:00Z',
   },
   {
     id: 'p-12',
@@ -191,6 +219,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'maya.a@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-12T00:00:00Z',
   },
   {
     id: 'p-13',
@@ -201,6 +231,8 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'doni.c@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-13T00:00:00Z',
   },
   {
     id: 'p-14',
@@ -211,6 +243,45 @@ export const mockProfiles = [
     occupancy_status: 'owner_occupied',
     is_active: true,
     email: 'nurul.f@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-14T00:00:00Z',
+  },
+  // ── Pending registrations (menunggu approval) ──────────────────
+  {
+    id: 'pending-1',
+    full_name: 'Bambang Supriadi',
+    phone: '0857-9999-1234',
+    role: 'warga',
+    unit_id: null,
+    occupancy_status: null,
+    is_active: false,
+    email: 'bambang.supriadi@gmail.com',
+    approval_status: 'pending',
+    registered_at: '2026-07-04T14:30:00Z',
+  },
+  {
+    id: 'pending-2',
+    full_name: 'Wati Kusumawati',
+    phone: '0878-8888-5678',
+    role: 'warga',
+    unit_id: null,
+    occupancy_status: null,
+    is_active: false,
+    email: 'wati.kusuma@gmail.com',
+    approval_status: 'pending',
+    registered_at: '2026-07-05T09:15:00Z',
+  },
+  {
+    id: 'pending-3',
+    full_name: 'Haris Munandar',
+    phone: '0812-7777-9012',
+    role: 'warga',
+    unit_id: null,
+    occupancy_status: null,
+    is_active: false,
+    email: 'haris.munandar@gmail.com',
+    approval_status: 'pending',
+    registered_at: '2026-07-05T11:00:00Z',
   },
 ];
 
@@ -351,6 +422,34 @@ export const mockPayments = mockIPLBills
     paid_at: b.due_date, // bayar sebelum/tepat jatuh tempo
   }));
 
+// Demo: beberapa pembayaran menunggu verifikasi (transfer oleh warga)
+(function addDemoPendingPayments() {
+  // Find 2 overdue/pending bills to mark as pending_verification
+  const demoBills = mockIPLBills.filter(
+    (b) => (b.status === 'overdue' || b.status === 'pending') && b.unit_id === 2
+  ).slice(0, 2);
+  demoBills.forEach((bill, i) => {
+    bill.status = 'pending_verification';
+    const payment = {
+      id: `pay-pending-${i + 1}`,
+      ipl_bill_id: bill.id,
+      resident_id: 'demo-warga',
+      amount: bill.amount,
+      method: 'bank_transfer',
+      transaction_id: `TRF-pending-${i + 1}`,
+      status: 'pending_verification',
+      paid_at: new Date().toISOString().split('T')[0],
+      receipt_file: `bukti-transfer-${bill.period}.jpg`,
+      metadata: {
+        note: 'Transfer via BCA Mobile',
+        payer: 'Siti Rahayu',
+      },
+    };
+    bill.payment_id = payment.id;
+    mockPayments.push(payment);
+  });
+})();
+
 // ── HELPERS ─────────────────────────────────────────────────────
 
 /** Ambil unit berdasarkan ID */
@@ -458,6 +557,7 @@ export function billStatusLabel(status) {
     paid: 'Lunas',
     overdue: 'Terlambat',
     cancelled: 'Dibatalkan',
+    pending_verification: 'Menunggu Verifikasi',
   };
   return map[status] || status;
 }
@@ -469,6 +569,7 @@ export function billStatusColor(status) {
     paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     overdue: 'bg-red-50 text-red-700 border-red-200',
     cancelled: 'bg-gray-100 text-gray-500 border-gray-200',
+    pending_verification: 'bg-orange-50 text-orange-700 border-orange-200',
   };
   return map[status] || 'bg-gray-100 text-gray-600 border-gray-200';
 }
@@ -945,12 +1046,15 @@ export function getPaymentForBill(billId) {
  * @param {string} billId
  * @param {object} opts - { method, paidAt, recordedBy, note, receiptFile }
  */
-export function recordManualPayment(billId, { method, paidAt, recordedBy, note, receiptFile }) {
+export function recordManualPayment(billId, { method, paidAt, recordedBy, note, receiptFile, recorderRole }) {
   const bill = mockIPLBills.find((b) => b.id === billId);
   if (!bill) return null;
   const paymentId = `pay-manual-${Date.now()}`;
-  bill.status = 'paid';
-  bill.late_fee = 0;
+
+  // Bendahara/admin langsung paid; pengurus/warga perlu verifikasi
+  const directPaid = recorderRole && (ROLE_LEVEL[recorderRole] || 0) >= 3;
+  bill.status = directPaid ? 'paid' : 'pending_verification';
+  bill.late_fee = directPaid ? 0 : bill.late_fee;
   bill.payment_id = paymentId;
   const payment = {
     id: paymentId,
@@ -959,7 +1063,7 @@ export function recordManualPayment(billId, { method, paidAt, recordedBy, note, 
     amount: bill.amount,
     method,
     transaction_id: `MANUAL-${paymentId}`,
-    status: 'completed',
+    status: directPaid ? 'completed' : 'pending_verification',
     paid_at: paidAt,
     receipt_file: receiptFile || null,
     metadata: { recorded_by: recordedBy || 'staff', note: note || '' },
@@ -976,12 +1080,14 @@ export function recordManualPayment(billId, { method, paidAt, recordedBy, note, 
 export function recordResidentPayment(billIds, { method, receiptFile = null, note = '', payerName = '' } = {}) {
   let count = 0;
   const paidAt = new Date().toISOString().split('T')[0];
+  // QRIS langsung paid; bank_transfer perlu verifikasi bendahara/admin
+  const isQris = method === 'qris';
   for (const billId of billIds) {
     const bill = mockIPLBills.find((b) => b.id === billId);
     if (!bill || bill.status === 'paid') continue;
     const paymentId = `pay-resident-${Date.now()}-${count}`;
-    bill.status = 'paid';
-    bill.late_fee = 0;
+    bill.status = isQris ? 'paid' : 'pending_verification';
+    bill.late_fee = isQris ? 0 : bill.late_fee;
     bill.payment_id = paymentId;
     mockPayments.push({
       id: paymentId,
@@ -989,8 +1095,8 @@ export function recordResidentPayment(billIds, { method, receiptFile = null, not
       resident_id: bill.resident_id,
       amount: bill.amount,
       method,
-      transaction_id: `${method === 'qris' ? 'TXN' : 'MANUAL'}-${paymentId}`,
-      status: 'completed',
+      transaction_id: `${isQris ? 'TXN' : 'TRF'}-${paymentId}`,
+      status: isQris ? 'completed' : 'pending_verification',
       paid_at: paidAt,
       receipt_file: receiptFile || null,
       metadata: { note: note || '', payer: payerName || '' },
@@ -1022,6 +1128,8 @@ export function addMockUser(data) {
     occupancy_status: data.occupancy_status || null,
     is_active: true,
     email: data.email,
+    approval_status: data.approval_status || 'approved',
+    registered_at: data.registered_at || new Date().toISOString(),
   };
   mockProfiles.push(newUser);
   return newUser;
@@ -1047,6 +1155,158 @@ export function deactivateMockUser(id) {
     return mockProfiles[idx];
   }
   return null;
+}
+
+// ── APPROVAL WORKFLOW ────────────────────────────────────────────
+// Registrasi user baru butuh approval dari pengurus, bendahara, atau admin.
+
+/** Daftar user yang menunggu persetujuan */
+export function getPendingRegistrations() {
+  return mockProfiles.filter((p) => p.approval_status === 'pending');
+}
+
+/** Daftar riwayat approval (approved + rejected) */
+export function getApprovalHistory() {
+  return mockProfiles.filter(
+    (p) => p.approval_status === 'approved' && p.registered_at > '2026-01-01'
+  ).concat(
+    mockProfiles.filter((p) => p.approval_status === 'rejected')
+  );
+}
+
+/**
+ * Approve registrasi user.
+ * @param {string} userId
+ * @param {{ unit_id?: number, occupancy_status?: string, role?: string, phone?: string, approved_by?: string }} data
+ */
+export function approveRegistration(userId, data = {}) {
+  const idx = mockProfiles.findIndex((p) => p.id === userId);
+  if (idx === -1) return null;
+  mockProfiles[idx] = {
+    ...mockProfiles[idx],
+    approval_status: 'approved',
+    is_active: true,
+    unit_id: data.unit_id !== undefined ? Number(data.unit_id) : mockProfiles[idx].unit_id,
+    occupancy_status: data.occupancy_status || mockProfiles[idx].occupancy_status,
+    role: data.role || mockProfiles[idx].role,
+    phone: data.phone || mockProfiles[idx].phone,
+    approved_by: data.approved_by || 'System',
+    approved_at: new Date().toISOString(),
+  };
+  return mockProfiles[idx];
+}
+
+/**
+ * Tolak registrasi user.
+ * @param {string} userId
+ * @param {string} reason
+ * @param {string} [rejectedBy]
+ */
+export function rejectRegistration(userId, reason, rejectedBy) {
+  const idx = mockProfiles.findIndex((p) => p.id === userId);
+  if (idx === -1) return null;
+  mockProfiles[idx] = {
+    ...mockProfiles[idx],
+    approval_status: 'rejected',
+    is_active: false,
+    rejection_reason: reason,
+    rejected_by: rejectedBy || 'System',
+    rejected_at: new Date().toISOString(),
+  };
+  return mockProfiles[idx];
+}
+
+// ── VERIFIKASI PEMBAYARAN ────────────────────────────────────────
+// Pembayaran transfer oleh warga & pengurus perlu verifikasi bendahara/admin.
+// Pembayaran QRIS langsung verified. Pencatatan oleh bendahara/admin langsung paid.
+
+/** Daftar pembayaran menunggu verifikasi */
+export function getPendingPayments() {
+  return mockPayments.filter((p) => p.status === 'pending_verification');
+}
+
+/**
+ * Verifikasi pembayaran — ubah status payment → verified, bill → paid.
+ * @param {string} paymentId
+ * @param {{ verifiedBy: string }} opts
+ */
+export function verifyPayment(paymentId, opts = {}) {
+  const payment = mockPayments.find((p) => p.id === paymentId);
+  if (!payment || payment.status !== 'pending_verification') return null;
+  payment.status = 'verified';
+  payment.verified_by = opts.verifiedBy || 'Bendahara';
+  payment.verified_at = new Date().toISOString();
+  // Update bill status ke paid
+  const bill = mockIPLBills.find((b) => b.id === payment.ipl_bill_id);
+  if (bill) {
+    bill.status = 'paid';
+  }
+  return payment;
+}
+
+/**
+ * Tolak pembayaran — ubah payment → rejected, bill kembali pending/overdue.
+ * @param {string} paymentId
+ * @param {{ rejectedBy: string, reason: string }} opts
+ */
+export function rejectPayment(paymentId, opts = {}) {
+  const payment = mockPayments.find((p) => p.id === paymentId);
+  if (!payment || payment.status !== 'pending_verification') return null;
+  payment.status = 'rejected';
+  payment.rejected_by = opts.rejectedBy || 'Bendahara';
+  payment.rejected_at = new Date().toISOString();
+  payment.rejection_reason = opts.reason || '';
+  // Bill kembali ke pending/overdue
+  const bill = mockIPLBills.find((b) => b.id === payment.ipl_bill_id);
+  if (bill) {
+    const dueDate = new Date(bill.due_date);
+    const today = new Date();
+    bill.status = today > dueDate ? 'overdue' : 'pending';
+    bill.payment_id = null;
+  }
+  return payment;
+}
+
+/**
+ * Revisi bukti pembayaran — warga upload ulang bukti transfer.
+ * @param {string} paymentId
+ * @param {{ receiptFile: string, note?: string }} opts
+ */
+export function revisePayment(paymentId, opts = {}) {
+  const payment = mockPayments.find((p) => p.id === paymentId);
+  if (!payment || payment.status !== 'rejected') return null;
+  payment.status = 'pending_verification';
+  payment.receipt_file = opts.receiptFile || payment.receipt_file;
+  if (opts.note) payment.metadata = { ...payment.metadata, note: opts.note };
+  payment.revised_at = new Date().toISOString();
+  // Bill kembali ke pending_verification
+  const bill = mockIPLBills.find((b) => b.id === payment.ipl_bill_id);
+  if (bill) {
+    bill.status = 'pending_verification';
+    bill.payment_id = payment.id;
+  }
+  return payment;
+}
+
+/**
+ * Batalkan pembayaran — warga hapus pembayaran yang ditolak.
+ * @param {string} paymentId
+ */
+export function cancelPayment(paymentId) {
+  const payment = mockPayments.find((p) => p.id === paymentId);
+  if (!payment || (payment.status !== 'rejected' && payment.status !== 'pending_verification')) return null;
+  // Hapus payment dari array
+  const idx = mockPayments.findIndex((p) => p.id === paymentId);
+  if (idx !== -1) mockPayments.splice(idx, 1);
+  // Bill kembali ke pending/overdue
+  const bill = mockIPLBills.find((b) => b.id === payment.ipl_bill_id);
+  if (bill) {
+    const dueDate = new Date(bill.due_date);
+    const today = new Date();
+    bill.status = today > dueDate ? 'overdue' : 'pending';
+    bill.payment_id = null;
+  }
+  return payment;
 }
 
 // Mock System Logs

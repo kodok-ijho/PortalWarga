@@ -28,7 +28,7 @@ Kelola data warga, tagihan IPL (Iuran Pemeliharaan Lingkungan), pembayaran QRIS,
 ![Supabase](https://img.shields.io/badge/Supabase-2.39-3ECF8E?logo=supabase&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-5A0FC8?logo=pwa&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-gold)
-![Status](https://img.shields.io/badge/Status-Phase%201%20%E2%9C%85-success)
+![Status](https://img.shields.io/badge/Status-Phase%205%20%E2%9C%85-success)
 
 </div>
 
@@ -610,13 +610,17 @@ Didesain mengikuti logo Palm Village — nuansa **hijau hutan** yang menenangkan
 
 ## 🗺️ Roadmap
 
-### ✅ Phase 1 — Core (Current)
-- [x] Autentikasi dual-mode (Demo + Supabase)
-- [x] Manajemen warga + CSV
-- [x] Matriks pembayaran multi-tahun
-- [x] Laporan keuangan + neraca
-- [x] Pengeluaran + kwitansi
-- [x] Pengaturan IPL (komponen-based)
+### ✅ Phase 1 & Phase 5 — Core & Advanced RBAC (Current)
+- [x] Autentikasi dual-mode (Demo + Supabase) & Registrasi Mandiri (HP)
+- [x] 4-Tier RBAC (Warga, Pengurus, Bendahara, Admin) & Kontrol UI/UX per Role
+- [x] Workflow Approval User baru oleh Pengurus
+- [x] Workflow Verifikasi Bukti Pembayaran Transfer oleh Bendahara (Revisi & Batal)
+- [x] Kompresi Gambar otomatis sisi klien (Canvas API, <500 KB)
+- [x] Manajemen warga + CSV & Kelola User oleh Admin
+- [x] Matriks pembayaran multi-tahun & status pending verifikasi
+- [x] Laporan keuangan Running Balance & Neraca Alur Kas
+- [x] Pengeluaran + kwitansi & Audit Log Sistem (Login, Akses, Transaksi)
+- [x] Pengaturan IPL (komponen-based) & Dasbor Proaktif dengan Banner/Badge
 - [x] PWA (installable, offline-ready)
 
 ### 🚧 Phase 2 — Integrasi & Komunitas

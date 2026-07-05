@@ -23,7 +23,14 @@ import {
   mockPayments,
   isStaffRole,
   isBendaharaOrAbove,
+  verifyPayment,
+  rejectPayment,
+  revisePayment,
+  cancelPayment,
+  billStatusLabel,
+  billStatusColor,
 } from '../services/mockData';
+import { compressImage } from '../utils/imageCompressor';
 
 export default function PaymentMatrix() {
   const { profile, role } = useAuth();
@@ -296,10 +303,13 @@ export default function PaymentMatrix() {
           <span className="h-3 w-3 rounded bg-emerald-100 border border-emerald-300"></span> Lunas (nominal + tgl)
         </span>
         <span className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded bg-orange-100 border border-orange-400"></span> Menunggu Verifikasi
+        </span>
+        <span className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded bg-amber-50 border border-amber-300"></span> Belum Bayar
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded bg-red-50 border border-red-300"></span> Terlambat
+          <span className="h-3 w-3 rounded bg-red-50 border border-red-300"></span> Terlambat / Ditolak
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded bg-forest-800 border border-forest-800"></span> Dipilih
@@ -392,7 +402,7 @@ export default function PaymentMatrix() {
                               canInteract={canInteract}
                               isLockedOtherUnit={isLockedOtherUnit}
                               onClick={() => {
-                                if (cell?.status === 'paid') {
+                                if (cell?.status === 'paid' || cell?.status === 'pending_verification' || cell?.status === 'rejected') {
                                   const payment = getPaymentForBill(cell.bill.id);
                                   setDetailModal({ bill: cell.bill, payment });
                                   return;
@@ -500,25 +510,35 @@ function Cell({ cell, unitId, isSelected, isStaff, canInteract, isLockedOtherUni
   const isPaid = status === 'paid';
   const isOverdue = status === 'overdue';
   const isPending = status === 'pending';
+  const isPendingVerif = status === 'pending_verification';
+  const isRejected = status === 'rejected';
   // Sel non-interaktif (warga lihat unit lain): view-only, tidak bisa diklik
   const isViewOnly = !canInteract;
 
-  // Sel LUNAS → tampilkan nominal + tanggal (semua role bisa lihat info ini)
-  if (isPaid) {
+  // Sel LUNAS / PENDING VERIF / REJECTED → tampilkan info & klik buka detail
+  if (isPaid || isPendingVerif || isRejected) {
+    const bgClass = isPaid
+      ? 'bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-700'
+      : isPendingVerif
+      ? 'bg-orange-100 border border-orange-400 hover:bg-orange-200 text-orange-800'
+      : 'bg-red-100 border border-red-400 hover:bg-red-200 text-red-800';
+    
+    const label = isPaid
+      ? 'Lunas'
+      : isPendingVerif
+      ? '⏳ Verif'
+      : '✕ Ditolak';
+
     return (
       <span
         onClick={onClick}
-        className="block h-12 rounded bg-emerald-50 border border-emerald-200 flex flex-col items-center justify-center px-0.5 cursor-pointer hover:bg-emerald-100 transition-colors"
-        title={`Lunas ${formatRupiah(bill.amount)}${payment ? ' · ' + formatDate(payment.paid_at) : ''}${
-          payment?.method && payment.method !== 'qris' ? ' · ' + payment.method : ''
-        }`}
+        className={`block h-12 rounded ${bgClass} flex flex-col items-center justify-center px-0.5 cursor-pointer transition-colors`}
+        title={`${billStatusLabel(status)} ${formatRupiah(bill.amount)}${payment ? ' · ' + formatDate(payment.paid_at) : ''}`}
       >
-        <span className="text-[9px] font-bold text-emerald-700 leading-none">{formatShort(bill.amount)}</span>
-        {payment?.paid_at && (
-          <span className="text-[8px] text-emerald-500 leading-none mt-0.5">
-            {new Date(payment.paid_at).getDate()}/{new Date(payment.paid_at).getMonth() + 1}
-          </span>
-        )}
+        <span className="text-[9px] font-bold leading-none">{formatShort(bill.amount)}</span>
+        <span className="text-[8px] leading-none mt-0.5 font-medium">
+          {label}
+        </span>
       </span>
     );
   }
@@ -604,7 +624,7 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
   const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
   const isMulti = bills.length > 1;
 
-  const handleFile = (e) => {
+  const handleFile = async (e) => {
     setUploadError('');
     const file = e.target.files?.[0];
     if (!file) {
@@ -623,7 +643,12 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
       e.target.value = '';
       return;
     }
-    setReceiptFile(file);
+    try {
+      const compressed = await compressImage(file);
+      setReceiptFile(compressed);
+    } catch (err) {
+      setReceiptFile(file);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -786,7 +811,7 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
   // QRIS tidak butuh bukti upload (otomatis terverifikasi). Tunai & Transfer wajib.
   const needsReceipt = method !== 'qris';
 
-  const handleFile = (e) => {
+  const handleFile = async (e) => {
     setUploadError('');
     const file = e.target.files?.[0];
     if (!file) {
@@ -805,7 +830,12 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
       e.target.value = '';
       return;
     }
-    setReceiptFile(file);
+    try {
+      const compressed = await compressImage(file);
+      setReceiptFile(compressed);
+    } catch (err) {
+      setReceiptFile(file);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -960,89 +990,226 @@ function formatPeriodShort(period) {
 }
 
 // Modal Detail Pembayaran Lunas
+// Modal Detail / Verifikasi / Revisi Pembayaran
 function PaymentDetailModal({ bill, payment, role, myUnitId, onClose }) {
+  const toast = useToast();
   const isMyUnit = bill.unit_id === myUnitId;
   const canViewReceipt = isStaffRole(role) || isMyUnit;
+  const canVerify = isBendaharaOrAbove(role);
+
+  const [isRevising, setIsRevising] = useState(false);
+  const [newReceipt, setNewReceipt] = useState(null);
+  const [reviseNote, setReviseNote] = useState(payment?.metadata?.note || '');
+  const [uploadError, setUploadError] = useState('');
+
+  const handleVerify = () => {
+    if (!payment) return;
+    verifyPayment(payment.id, { verifiedBy: roleLabel(role) });
+    toast.success('Pembayaran berhasil diverifikasi & status tagihan menjadi Lunas!');
+    onClose();
+  };
+
+  const handleReject = () => {
+    if (!payment) return;
+    const reason = prompt('Masukkan alasan penolakan bukti pembayaran:');
+    if (reason === null) return;
+    rejectPayment(payment.id, { rejectedBy: roleLabel(role), reason: reason || 'Bukti transfer tidak valid/blur' });
+    toast.warning('Pembayaran ditolak. Warga dapat mengunggah ulang bukti transfer.');
+    onClose();
+  };
+
+  const handleCancel = () => {
+    if (!payment) return;
+    if (!confirm('Yakin ingin membatalkan transaksi ini? Tagihan akan kembali belum dibayar.')) return;
+    cancelPayment(payment.id);
+    toast.info('Transaksi pembayaran berhasil dibatalkan.');
+    onClose();
+  };
+
+  const handleFileChange = async (e) => {
+    setUploadError('');
+    const file = e.target.files?.[0];
+    if (!file) { setNewReceipt(null); return; }
+    if (file.size > 3 * 1024 * 1024) {
+      setUploadError('Ukuran file maksimal 3 MB.');
+      setNewReceipt(null);
+      return;
+    }
+    try {
+      const compressed = await compressImage(file);
+      setNewReceipt(compressed);
+    } catch (err) {
+      setNewReceipt(file);
+    }
+  };
+
+  const submitRevision = (e) => {
+    e.preventDefault();
+    if (!newReceipt && !payment?.receipt_file) {
+      setUploadError('Wajib memilih file bukti transfer baru.');
+      return;
+    }
+    revisePayment(payment.id, {
+      receiptFile: newReceipt ? newReceipt.name : payment.receipt_file,
+      note: reviseNote,
+    });
+    toast.success('Bukti pembayaran berhasil diperbarui & dikirim ulang untuk verifikasi!');
+    onClose();
+  };
 
   return (
     <Modal open onClose={onClose} title="Detail Bukti Pembayaran IPL" size="md">
       <div className="space-y-4 text-sm text-forest-900">
-        <div className="grid grid-cols-2 gap-4 rounded-lg bg-forest-50 p-3">
-          <div>
-            <p className="text-xs text-forest-500 font-medium">Rumah / Unit</p>
-            <p className="font-semibold text-forest-800">
-              {(() => {
-                const u = getUnitById(bill.unit_id);
-                return u ? `Blok ${u.block}/${u.unit_number}` : '-';
-              })()}
-            </p>
+        {/* Banner Status */}
+        {payment?.status === 'pending_verification' && (
+          <div className="rounded-lg bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800 flex items-center gap-2">
+            <span className="text-lg">⏳</span>
+            <div>
+              <p className="font-bold">Menunggu Verifikasi Bendahara</p>
+              <p>Bukti transfer telah dikirim dan sedang dalam proses pemeriksaan.</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-forest-500 font-medium">Periode IPL</p>
-            <p className="font-semibold text-forest-800">{formatPeriod(bill.period)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-forest-500 font-medium">Jumlah Tagihan</p>
-            <p className="font-bold text-forest-900">{formatRupiah(bill.amount)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-forest-500 font-medium">Tanggal Bayar</p>
-            <p className="font-semibold text-forest-800">{payment ? formatDate(payment.paid_at) : '-'}</p>
-          </div>
-        </div>
-
-        <div>
-          <p className="text-xs text-forest-500 font-medium mb-1">Metode Pembayaran</p>
-          <span className="pv-badge bg-forest-100 text-forest-700 font-medium">
-            {payment?.method === 'qris' ? '📱 QRIS' : payment?.method === 'cash' ? '💵 Tunai' : '🏦 Transfer Bank'}
-          </span>
-        </div>
-
-        {payment?.metadata?.recorded_by && (
-          <div>
-            <p className="text-xs text-forest-500 font-medium mb-0.5">Dicatat Oleh</p>
-            <p className="text-forest-700">{payment.metadata.recorded_by}</p>
+        )}
+        {payment?.status === 'rejected' && (
+          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-800 space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">✕</span>
+              <p className="font-bold">Pembayaran Ditolak</p>
+            </div>
+            {payment?.rejection_reason && (
+              <p className="italic bg-red-100/60 p-2 rounded">"Alasan: {payment.rejection_reason}"</p>
+            )}
+            <p>Silakan revisi dengan mengunggah ulang bukti transfer yang benar atau batalkan transaksi.</p>
           </div>
         )}
 
-        {payment?.metadata?.note && (
-          <div>
-            <p className="text-xs text-forest-500 font-medium mb-0.5">Catatan</p>
-            <p className="text-forest-700 italic">"{payment.metadata.note}"</p>
-          </div>
-        )}
-
-        {/* Lampiran Bukti Bayar */}
-        <div>
-          <p className="text-xs text-forest-500 font-medium mb-1.5">Bukti Bayar</p>
-          {canViewReceipt ? (
-            payment?.receipt_file ? (
-              <div className="rounded-lg border border-forest-200 bg-white p-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xl">📎</span>
-                  <span className="truncate text-xs font-medium text-forest-700">{payment.receipt_file}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => alert(`Mengunduh file: ${payment.receipt_file}`)}
-                  className="text-xs font-semibold text-forest-800 hover:text-gold-600 transition-colors"
-                >
-                  Unduh
-                </button>
+        {isRevising ? (
+          <form onSubmit={submitRevision} className="space-y-3 bg-forest-50 p-3 rounded-lg border border-forest-200">
+            <h4 className="font-semibold text-xs text-forest-800 uppercase tracking-wide">Revisi Bukti Transfer</h4>
+            <div>
+              <label className="block text-xs font-medium text-forest-700 mb-1">File Bukti Baru</label>
+              <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="text-xs w-full" />
+              {newReceipt && <p className="text-[11px] text-emerald-600 mt-1">✓ File siap diunggah: {newReceipt.name}</p>}
+              {uploadError && <p className="text-[11px] text-red-500 mt-1">{uploadError}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-forest-700 mb-1">Catatan Tambahan</label>
+              <input
+                type="text"
+                value={reviseNote}
+                onChange={(e) => setReviseNote(e.target.value)}
+                placeholder="Mis: Transfer dari rekening atas nama Budi..."
+                className="pv-input text-xs"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button type="submit" className="pv-btn-primary flex-1 text-xs py-1.5">Kirim Revisi</button>
+              <button type="button" onClick={() => setIsRevising(false)} className="pv-btn-ghost text-xs py-1.5">Batal</button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-4 rounded-lg bg-forest-50 p-3">
+              <div>
+                <p className="text-xs text-forest-500 font-medium">Rumah / Unit</p>
+                <p className="font-semibold text-forest-800">
+                  {(() => {
+                    const u = getUnitById(bill.unit_id);
+                    return u ? `Blok ${u.block}/${u.unit_number}` : '-';
+                  })()}
+                </p>
               </div>
-            ) : (
-              <p className="text-xs text-forest-400 italic">Tidak ada file bukti (pembayaran otomatis QRIS).</p>
-            )
-          ) : (
-            <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-red-700 text-xs flex items-center gap-2">
-              <span>🔒</span>
-              <span>Anda tidak memiliki izin untuk melihat bukti pembayaran unit lain.</span>
+              <div>
+                <p className="text-xs text-forest-500 font-medium">Periode IPL</p>
+                <p className="font-semibold text-forest-800">{formatPeriod(bill.period)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-forest-500 font-medium">Jumlah Tagihan</p>
+                <p className="font-bold text-forest-900">{formatRupiah(bill.amount)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-forest-500 font-medium">Tanggal Bayar</p>
+                <p className="font-semibold text-forest-800">{payment ? formatDate(payment.paid_at) : '-'}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs text-forest-500 font-medium mb-1">Metode Pembayaran</p>
+              <span className="pv-badge bg-forest-100 text-forest-700 font-medium">
+                {payment?.method === 'qris' ? '📱 QRIS' : payment?.method === 'cash' ? '💵 Tunai' : '🏦 Transfer Bank'}
+              </span>
+            </div>
+
+            {payment?.metadata?.recorded_by && (
+              <div>
+                <p className="text-xs text-forest-500 font-medium mb-0.5">Dicatat Oleh</p>
+                <p className="text-forest-700">{payment.metadata.recorded_by}</p>
+              </div>
+            )}
+
+            {payment?.metadata?.note && (
+              <div>
+                <p className="text-xs text-forest-500 font-medium mb-0.5">Catatan</p>
+                <p className="text-forest-700 italic">"{payment.metadata.note}"</p>
+              </div>
+            )}
+
+            {/* Lampiran Bukti Bayar */}
+            <div>
+              <p className="text-xs text-forest-500 font-medium mb-1.5">Bukti Bayar</p>
+              {canViewReceipt ? (
+                payment?.receipt_file ? (
+                  <div className="rounded-lg border border-forest-200 bg-white p-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xl">📎</span>
+                      <span className="truncate text-xs font-medium text-forest-700">{payment.receipt_file}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => alert(`Mengunduh file: ${payment.receipt_file}`)}
+                      className="text-xs font-semibold text-forest-800 hover:text-gold-600 transition-colors"
+                    >
+                      Unduh
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-forest-400 italic">Tidak ada file bukti (pembayaran otomatis QRIS).</p>
+                )
+              ) : (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-red-700 text-xs flex items-center gap-2">
+                  <span>🔒</span>
+                  <span>Anda tidak memiliki izin untuk melihat bukti pembayaran unit lain.</span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Tombol Aksi */}
+        <div className="pt-2 flex flex-col gap-2">
+          {payment?.status === 'pending_verification' && canVerify && (
+            <div className="flex gap-2">
+              <button type="button" onClick={handleVerify} className="pv-btn-primary flex-1 bg-emerald-600 hover:bg-emerald-700">
+                ✓ Verifikasi Lunas
+              </button>
+              <button type="button" onClick={handleReject} className="pv-btn-ghost flex-1 border-red-300 text-red-600 hover:bg-red-50">
+                ✕ Tolak Bukti
+              </button>
             </div>
           )}
-        </div>
 
-        <div className="pt-2">
-          <button type="button" onClick={onClose} className="pv-btn-primary w-full text-sm">
+          {payment?.status === 'rejected' && (isMyUnit || isStaffRole(role)) && !isRevising && (
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setIsRevising(true)} className="pv-btn-primary flex-1 text-xs">
+                🔄 Revisi & Upload Ulang
+              </button>
+              <button type="button" onClick={handleCancel} className="pv-btn-ghost flex-1 text-xs border-red-300 text-red-600 hover:bg-red-50">
+                🗑 Batalkan
+              </button>
+            </div>
+          )}
+
+          <button type="button" onClick={onClose} className="pv-btn-ghost w-full text-sm">
             Tutup
           </button>
         </div>

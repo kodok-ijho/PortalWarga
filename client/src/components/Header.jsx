@@ -9,9 +9,16 @@ import {
   AiOutlineLogout,
   AiOutlineTeam,
   AiOutlineFileText,
+  AiOutlineUserAdd,
+  AiOutlineCheckCircle,
 } from 'react-icons/ai';
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
-import { isStaffRole } from '../services/mockData';
+import {
+  isStaffRole,
+  isBendaharaOrAbove,
+  getPendingRegistrations,
+  getPendingPayments,
+} from '../services/mockData';
 
 // Menu utama (semua role)
 const wargaNav = [
@@ -22,10 +29,16 @@ const wargaNav = [
 
 // Menu staff-only (pengurus, bendahara, admin)
 const staffNav = [
+  { to: '/user-approval', label: 'Approval User', icon: AiOutlineUserAdd, badgeKey: 'reg' },
   { to: '/houses', label: 'Rumah', icon: AiOutlineHome },
   { to: '/expenses', label: 'Pengeluaran', icon: AiOutlineWallet },
   { to: '/reports', label: 'Laporan', icon: AiOutlineBarChart },
   { to: '/settings', label: 'Pengaturan', icon: AiOutlineSetting },
+];
+
+// Menu bendahara & admin
+const bendaharaNav = [
+  { to: '/payment-verification', label: 'Verifikasi Bayar', icon: AiOutlineCheckCircle, badgeKey: 'pay' },
 ];
 
 // Menu khusus admin
@@ -37,14 +50,21 @@ const adminNav = [
 export default function Header() {
   const { isAuthenticated, profile, role, signOut } = useAuth();
   
+  const pendingRegCount = getPendingRegistrations().length;
+  const pendingPayCount = getPendingPayments().length;
+
   const getNavItems = () => {
-    if (role === 'admin') {
-      return [...wargaNav, ...staffNav, ...adminNav];
-    }
+    let items = [...wargaNav];
     if (isStaffRole(role)) {
-      return [...wargaNav, ...staffNav];
+      items = [...items, ...staffNav];
     }
-    return wargaNav;
+    if (isBendaharaOrAbove(role)) {
+      items = [...items, ...bendaharaNav];
+    }
+    if (role === 'admin') {
+      items = [...items, ...adminNav];
+    }
+    return items;
   };
 
   const items = getNavItems();
@@ -93,22 +113,36 @@ export default function Header() {
       {/* Navigasi */}
       <nav className="border-t border-forest-700 bg-forest-800">
         <div className="max-w-6xl mx-auto px-4 flex gap-0.5 overflow-x-auto">
-          {items.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                `inline-flex items-center gap-1.5 px-4 py-3 text-sm whitespace-nowrap border-b-2 transition-colors ${
-                  isActive
-                    ? 'border-gold-500 text-gold-400 font-semibold'
-                    : 'border-transparent text-forest-300 hover:text-white hover:border-forest-500'
-                }`
-              }
-            >
-              <Icon /> {label}
-            </NavLink>
-          ))}
+          {items.map(({ to, label, icon: Icon, end, badgeKey }) => {
+            const count =
+              badgeKey === 'reg'
+                ? pendingRegCount
+                : badgeKey === 'pay'
+                ? pendingPayCount
+                : 0;
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  `inline-flex items-center gap-1.5 px-4 py-3 text-sm whitespace-nowrap border-b-2 transition-colors ${
+                    isActive
+                      ? 'border-gold-500 text-gold-400 font-semibold'
+                      : 'border-transparent text-forest-300 hover:text-white hover:border-forest-500'
+                  }`
+                }
+              >
+                <Icon /> 
+                <span>{label}</span>
+                {count > 0 && (
+                  <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                    {count}
+                  </span>
+                )}
+              </NavLink>
+            );
+          })}
         </div>
       </nav>
     </header>

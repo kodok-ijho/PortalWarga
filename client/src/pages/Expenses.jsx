@@ -22,6 +22,7 @@ import {
   hasMinRole,
   isBendaharaOrAbove,
 } from '../services/mockData';
+import { compressImage } from '../utils/imageCompressor';
 
 export default function Expenses() {
   const { role, profile } = useAuth();
@@ -249,13 +250,17 @@ function ExpenseFormModal({ expense, onSave, onClose }) {
   });
   const [fileName, setFileName] = useState(expense?.receipt_file || '');
 
-  const handleFile = (e) => {
+  const handleFile = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setFileName(file.name);
-      // Saat Supabase terhubung: upload ke Storage, simpan path-nya.
-      // Sementara: simpan nama file saja.
-      setForm({ ...form, receipt_file: file.name });
+      try {
+        const compressed = await compressImage(file);
+        setFileName(compressed.name);
+        setForm({ ...form, receipt_file: compressed.name });
+      } catch (err) {
+        setFileName(file.name);
+        setForm({ ...form, receipt_file: file.name });
+      }
     }
   };
 

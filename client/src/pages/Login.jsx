@@ -12,11 +12,13 @@ export default function Login() {
 
   const [mode, setMode] = useState('login');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [pendingSuccess, setPendingSuccess] = useState(null); // { message }
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-forest-500">Memuat...</div>;
@@ -32,10 +34,16 @@ export default function Login() {
     try {
       if (mode === 'login') {
         await signIn(email, password);
+        navigate(from, { replace: true });
       } else {
-        await signUp(email, password, fullName);
+        const result = await signUp(email, password, fullName, phone);
+        if (result?.pending) {
+          // Registrasi berhasil tapi perlu approval — jangan navigate
+          setPendingSuccess({ message: result.message });
+        } else {
+          navigate(from, { replace: true });
+        }
       }
-      navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || 'Terjadi kesalahan.');
     } finally {
@@ -64,6 +72,28 @@ export default function Login() {
           </h1>
           <p className="mt-1 text-sm text-forest-500">Masuk ke akun Anda</p>
         </div>
+
+        {/* Tampilan Menunggu Persetujuan setelah registrasi sukses */}
+        {pendingSuccess && (
+          <div className="pv-card p-6 text-center mb-6">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-amber-100 flex items-center justify-center">
+              <span className="text-3xl animate-bounce">⏳</span>
+            </div>
+            <h2 className="text-lg font-bold text-forest-900 mb-2">Menunggu Persetujuan</h2>
+            <p className="text-sm text-forest-600 mb-4">{pendingSuccess.message}</p>
+            <p className="text-xs text-forest-400 mb-4">
+              Pengurus RT/Bendahara akan memverifikasi data Anda dan menetapkan nomor rumah.
+              Anda akan bisa login setelah akun disetujui.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setPendingSuccess(null); setMode('login'); setError(''); }}
+              className="pv-btn-ghost text-sm"
+            >
+              ← Kembali ke Login
+            </button>
+          </div>
+        )}
 
         <div className="pv-card p-6">
           {/* Tab login/register */}
@@ -94,17 +124,30 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'register' && (
-              <div>
-                <label className="block text-sm font-medium text-forest-700 mb-1">Nama Lengkap</label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 placeholder:text-forest-400 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
-                  placeholder="Nama lengkap Anda"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-forest-700 mb-1">Nama Lengkap</label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 placeholder:text-forest-400 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
+                    placeholder="Nama lengkap Anda"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-forest-700 mb-1">Nomor HP</label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 placeholder:text-forest-400 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all"
+                    placeholder="08xx-xxxx-xxxx"
+                  />
+                </div>
+              </>
             )}
 
             <div>

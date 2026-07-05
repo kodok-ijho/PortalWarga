@@ -8,6 +8,8 @@ import {
   AiOutlineTeam,
   AiOutlineFileText,
   AiOutlineWallet,
+  AiOutlineUserAdd,
+  AiOutlineCheckCircle,
 } from 'react-icons/ai';
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
 import {
@@ -17,13 +19,20 @@ import {
   formatRupiah,
   MONTHS_LONG,
   isStaffRole,
+  isBendaharaOrAbove,
   roleLabel,
   roleColor,
+  getPendingRegistrations,
+  getPendingPayments,
 } from '../services/mockData';
 
 export default function Home() {
   const { profile, role } = useAuth();
   const isStaff = isStaffRole(role);
+  const isBendahara = isBendaharaOrAbove(role);
+
+  const pendingRegCount = isStaff ? getPendingRegistrations().length : 0;
+  const pendingPayCount = isBendahara ? getPendingPayments().length : 0;
 
   // Stats untuk bulan berjalan
   const now = new Date();
@@ -37,6 +46,8 @@ export default function Home() {
     ];
     if (role === 'admin') {
       return [
+        { to: '/user-approval', icon: AiOutlineUserAdd, title: 'Approval User', desc: 'Verifikasi pendaftaran warga baru.', badge: pendingRegCount },
+        { to: '/payment-verification', icon: AiOutlineCheckCircle, title: 'Verifikasi Bayar', desc: 'Verifikasi bukti transfer IPL.', badge: pendingPayCount },
         { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
         { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
         { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Pantau status pembayaran IPL semua unit.' },
@@ -47,8 +58,21 @@ export default function Home() {
         { to: '/logs', icon: AiOutlineFileText, title: 'Log Sistem', desc: 'Audit log login, akses halaman, dan transaksi.' },
       ];
     }
-    if (isStaffRole(role)) {
+    if (isBendahara) {
       return [
+        { to: '/user-approval', icon: AiOutlineUserAdd, title: 'Approval User', desc: 'Verifikasi pendaftaran warga baru.', badge: pendingRegCount },
+        { to: '/payment-verification', icon: AiOutlineCheckCircle, title: 'Verifikasi Bayar', desc: 'Verifikasi bukti transfer IPL.', badge: pendingPayCount },
+        { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
+        { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
+        { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Pantau status pembayaran IPL semua unit.' },
+        { to: '/expenses', icon: AiOutlineWallet, title: 'Pengeluaran', desc: 'Lihat & kelola biaya operasional perumahan.' },
+        { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
+        { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
+      ];
+    }
+    if (isStaff) {
+      return [
+        { to: '/user-approval', icon: AiOutlineUserAdd, title: 'Approval User', desc: 'Verifikasi pendaftaran warga baru.', badge: pendingRegCount },
         { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
         { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
         { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Pantau status pembayaran IPL semua unit.' },
@@ -108,17 +132,64 @@ export default function Home() {
         </section>
       )}
 
+      {/* Pending Actions Notification Banner */}
+      {(pendingRegCount > 0 || pendingPayCount > 0) && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {pendingRegCount > 0 && (
+            <Link
+              to="/user-approval"
+              className="flex items-center justify-between rounded-xl bg-amber-50 border border-amber-200 p-4 hover:bg-amber-100 transition-colors shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">⏳</span>
+                <div>
+                  <h4 className="text-sm font-bold text-amber-900">Pendaftaran User Baru</h4>
+                  <p className="text-xs text-amber-700">Ada {pendingRegCount} warga menunggu persetujuan akun.</p>
+                </div>
+              </div>
+              <span className="text-xs font-bold bg-amber-600 text-white px-3 py-1.5 rounded-lg shadow-sm">
+                Proses Sekarang →
+              </span>
+            </Link>
+          )}
+          {pendingPayCount > 0 && (
+            <Link
+              to="/payment-verification"
+              className="flex items-center justify-between rounded-xl bg-orange-50 border border-orange-200 p-4 hover:bg-orange-100 transition-colors shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🔍</span>
+                <div>
+                  <h4 className="text-sm font-bold text-orange-900">Verifikasi Pembayaran</h4>
+                  <p className="text-xs text-orange-700">Ada {pendingPayCount} transfer IPL menunggu verifikasi.</p>
+                </div>
+              </div>
+              <span className="text-xs font-bold bg-orange-600 text-white px-3 py-1.5 rounded-lg shadow-sm">
+                Verifikasi →
+              </span>
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* Feature cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {features.map(({ to, icon: Icon, title, desc }) => (
+        {features.map(({ to, icon: Icon, title, desc, badge }) => (
           <Link
             key={to}
             to={to}
-            className="pv-card p-5 group hover:border-gold-400/50 hover:shadow-elevated transition-all duration-200"
+            className="pv-card p-5 group hover:border-gold-400/50 hover:shadow-elevated transition-all duration-200 relative"
           >
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-forest-800 text-gold-400 group-hover:bg-forest-700 transition-colors">
-              <Icon size={22} />
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-forest-800 text-gold-400 group-hover:bg-forest-700 transition-colors">
+                <Icon size={22} />
+              </span>
+              {badge > 0 && (
+                <span className="inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white shadow-sm animate-pulse">
+                  {badge} Baru
+                </span>
+              )}
+            </div>
             <h3 className="mt-4 font-semibold text-forest-900 text-sm">{title}</h3>
             <p className="mt-1.5 text-xs text-forest-600 leading-relaxed">{desc}</p>
           </Link>

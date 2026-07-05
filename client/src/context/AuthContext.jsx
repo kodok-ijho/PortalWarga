@@ -83,23 +83,66 @@ function useDemoAuth() {
   };
 
   const signIn = useCallback(async (email, password) => {
-    const acc = DEMO_ACCOUNTS[email.toLowerCase()];
-    if (!acc || acc.password !== password) {
-      throw new Error('Email atau password demo salah. Coba admin@palmvillage.id / demo123');
+    const emailLower = email.toLowerCase();
+    // 1. Coba cari di DEMO_ACCOUNTS (akun demo bawaan)
+    const acc = DEMO_ACCOUNTS[emailLower];
+    if (acc) {
+      if (acc.password !== password) {
+        throw new Error('Email atau password demo salah. Coba admin@palmvillage.id / demo123');
+      }
+      persist(acc.profile);
+      return;
     }
-    persist(acc.profile);
+    // 2. Cari di mockProfiles (user hasil registrasi / dynamic)
+    const { mockProfiles } = await import('../services/mockData');
+    const found = mockProfiles.find(
+      (p) => p.email?.toLowerCase() === emailLower
+    );
+    if (!found) {
+      throw new Error('Email atau password salah.');
+    }
+    // Cek approval status
+    if (found.approval_status === 'pending') {
+      throw new Error('Akun Anda belum disetujui oleh pengurus. Silakan tunggu proses verifikasi.');
+    }
+    if (found.approval_status === 'rejected') {
+      throw new Error('Pendaftaran Anda ditolak oleh pengurus. Silakan hubungi pengelola.');
+    }
+    if (!found.is_active) {
+      throw new Error('Akun Anda telah dinonaktifkan. Silakan hubungi pengelola.');
+    }
+    // Password check untuk non-demo accounts (demo: semua pakai 'demo123')
+    if (password !== 'demo123') {
+      throw new Error('Password salah.');
+    }
+    persist(found);
   }, []);
 
-  const signUp = useCallback(async (email, _password, fullName) => {
-    persist({
-      id: 'demo-' + Date.now(),
+  const signUp = useCallback(async (email, _password, fullName, phone) => {
+    // Cek apakah email sudah terdaftar
+    const { mockProfiles } = await import('../services/mockData');
+    const exists = mockProfiles.find(
+      (p) => p.email?.toLowerCase() === email.toLowerCase()
+    );
+    if (exists) {
+      throw new Error('Email sudah terdaftar. Silakan gunakan email lain.');
+    }
+    // Buat profil pending (TIDAK auto-login)
+    const newProfile = {
+      id: 'reg-' + Date.now(),
       full_name: fullName || email.split('@')[0],
-      phone: null,
+      phone: phone || null,
+      email: email.toLowerCase(),
       role: 'warga',
       unit_id: null,
       occupancy_status: null,
-      is_active: true,
-    });
+      is_active: false,
+      approval_status: 'pending',
+      registered_at: new Date().toISOString(),
+    };
+    mockProfiles.push(newProfile);
+    // Return khusus: jangan persist session, kembalikan info pending
+    return { pending: true, message: 'Pendaftaran berhasil! Silakan tunggu persetujuan dari pengurus RT.' };
   }, []);
 
   const signOut = useCallback(async () => persist(null), []);
