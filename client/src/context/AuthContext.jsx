@@ -145,6 +145,18 @@ function useDemoAuth() {
     return { pending: true, message: 'Pendaftaran berhasil! Silakan tunggu persetujuan dari pengurus RT.' };
   }, []);
 
+  const updateProfile = useCallback(async (newProps) => {
+    const { updateMockUser } = await import('../services/mockData');
+    if (profile) {
+      const updated = updateMockUser(profile.id, newProps);
+      if (updated) {
+        persist(updated);
+        return updated;
+      }
+    }
+    return null;
+  }, [profile]);
+
   const signOut = useCallback(async () => persist(null), []);
 
   return {
@@ -157,6 +169,7 @@ function useDemoAuth() {
     signIn,
     signUp,
     signOut,
+    updateProfile,
   };
 }
 
@@ -227,6 +240,19 @@ function useSupabaseAuth() {
     setProfile(null);
   }, []);
 
+  const updateProfile = useCallback(async (newProps) => {
+    if (!profile?.id) return null;
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(newProps)
+      .eq('id', profile.id)
+      .select()
+      .single();
+    if (error) throw error;
+    setProfile((prev) => ({ ...prev, ...data }));
+    return data;
+  }, [profile]);
+
   return {
     session,
     user: session?.user ?? null,
@@ -237,6 +263,7 @@ function useSupabaseAuth() {
     signIn,
     signUp,
     signOut,
+    updateProfile,
   };
 }
 

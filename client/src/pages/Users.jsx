@@ -11,7 +11,7 @@ import {
   mockUnits,
   roleLabel,
   roleColor,
-  isAdminRole,
+  isStaffRole,
 } from '../services/mockData';
 import { AiOutlinePlus, AiOutlineEdit, AiOutlineUserDelete } from 'react-icons/ai';
 
@@ -48,8 +48,8 @@ export default function Users() {
     });
   }, [users, search, filterRole]);
 
-  // Guard: Admin-only
-  if (!isAdminRole(role)) {
+  // Guard: Staff-only (pengurus, bendahara, admin)
+  if (!isStaffRole(role)) {
     return <Navigate to="/" replace />;
   }
 
@@ -296,9 +296,9 @@ export default function Users() {
               <label className="block text-sm font-medium text-forest-700 mb-1">Role Akses</label>
               <select value={userRole} onChange={(e) => setUserRole(e.target.value)} className="pv-input">
                 <option value="warga">Warga</option>
-                <option value="pengurus">Pengurus</option>
-                <option value="bendahara">Bendahara</option>
-                <option value="admin">Admin</option>
+                {(role === 'bendahara' || role === 'admin') && <option value="pengurus">Pengurus</option>}
+                {role === 'admin' && <option value="bendahara">Bendahara</option>}
+                {role === 'admin' && <option value="admin">Admin</option>}
               </select>
             </div>
             <div>
@@ -368,9 +368,9 @@ export default function Users() {
               <label className="block text-sm font-medium text-forest-700 mb-1">Role Akses</label>
               <select value={userRole} onChange={(e) => setUserRole(e.target.value)} className="pv-input">
                 <option value="warga">Warga</option>
-                <option value="pengurus">Pengurus</option>
-                <option value="bendahara">Bendahara</option>
-                <option value="admin">Admin</option>
+                {(role === 'bendahara' || role === 'admin') && <option value="pengurus">Pengurus</option>}
+                {role === 'admin' && <option value="bendahara">Bendahara</option>}
+                {role === 'admin' && <option value="admin">Admin</option>}
               </select>
             </div>
             <div>

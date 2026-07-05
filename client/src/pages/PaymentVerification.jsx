@@ -7,6 +7,7 @@ import {
   verifyPayment,
   rejectPayment,
   mockPayments,
+  mockIPLBills,
   getUnitById,
   getProfileById,
   formatRupiah,
@@ -103,8 +104,6 @@ export default function PaymentVerification() {
   };
 
   function getBillPeriod(payment) {
-    // Extract period from bill
-    const { mockIPLBills } = require('../services/mockData');
     const bill = mockIPLBills.find((b) => b.id === payment.ipl_bill_id);
     return bill?.period || '';
   }
@@ -177,7 +176,6 @@ export default function PaymentVerification() {
         <div className="space-y-3">
           {currentList.map((payment) => {
             const unit = getUnitById(payment.unit_id || (() => {
-              const { mockIPLBills } = require('../services/mockData');
               const bill = mockIPLBills.find((b) => b.id === payment.ipl_bill_id);
               return bill?.unit_id;
             })());

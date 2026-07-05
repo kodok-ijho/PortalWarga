@@ -28,6 +28,8 @@ export default function UserApproval() {
   const [unitId, setUnitId] = useState('');
   const [occupancyStatus, setOccupancyStatus] = useState('owner_occupied');
   const [assignRole, setAssignRole] = useState('warga');
+  const [editFullName, setEditFullName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
   const [rejectReason, setRejectReason] = useState('');
 
   const pendingUsers = useMemo(
@@ -60,6 +62,8 @@ export default function UserApproval() {
     setUnitId('');
     setOccupancyStatus('owner_occupied');
     setAssignRole('warga');
+    setEditFullName(user.full_name || '');
+    setEditPhone(user.phone || '');
   };
 
   const openRejectModal = (user) => {
@@ -79,12 +83,14 @@ export default function UserApproval() {
       return;
     }
     approveRegistration(selectedUser.id, {
+      full_name: editFullName,
+      phone: editPhone,
       unit_id: Number(unitId),
       occupancy_status: occupancyStatus,
       role: assignRole,
       approved_by: profile.full_name,
     });
-    toast.success(`${selectedUser.full_name} berhasil disetujui sebagai ${roleLabel(assignRole)}.`);
+    toast.success(`${editFullName || selectedUser.full_name} berhasil disetujui sebagai ${roleLabel(assignRole)}.`);
     closeModal();
     setRefreshKey((k) => k + 1);
   };
@@ -177,6 +183,28 @@ export default function UserApproval() {
             </p>
 
             <div className="space-y-4">
+              {/* Nama Lengkap */}
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Nama Lengkap</label>
+                <input
+                  type="text"
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none"
+                />
+              </div>
+
+              {/* Nomor HP */}
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Nomor HP / WA</label>
+                <input
+                  type="text"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none"
+                />
+              </div>
+
               {/* Nomor Rumah */}
               <div>
                 <label className="block text-sm font-medium text-forest-700 mb-1">Nomor Rumah *</label>
@@ -229,17 +257,6 @@ export default function UserApproval() {
                     Sebagai Pengurus, Anda hanya dapat menetapkan role Warga.
                   </p>
                 )}
-              </div>
-
-              {/* Nomor HP */}
-              <div>
-                <label className="block text-sm font-medium text-forest-700 mb-1">Nomor HP</label>
-                <input
-                  type="text"
-                  value={selectedUser.phone || ''}
-                  disabled
-                  className="w-full rounded-lg border border-forest-200 bg-forest-50 px-3 py-2.5 text-sm text-forest-600"
-                />
               </div>
             </div>
 

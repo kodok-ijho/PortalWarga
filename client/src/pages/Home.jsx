@@ -68,6 +68,7 @@ export default function Home() {
         { to: '/expenses', icon: AiOutlineWallet, title: 'Pengeluaran', desc: 'Lihat & kelola biaya operasional perumahan.' },
         { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
         { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
+        { to: '/users', icon: AiOutlineTeam, title: 'Kelola User', desc: 'Kelola akun Gmail warga dan hak akses role.' },
       ];
     }
     if (isStaff) {
@@ -79,6 +80,7 @@ export default function Home() {
         { to: '/expenses', icon: AiOutlineWallet, title: 'Pengeluaran', desc: 'Lihat & kelola biaya operasional perumahan.' },
         { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
         { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
+        { to: '/users', icon: AiOutlineTeam, title: 'Kelola User', desc: 'Kelola akun Gmail warga dan hak akses role.' },
       ];
     }
     return base;

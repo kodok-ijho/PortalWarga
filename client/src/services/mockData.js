@@ -1186,6 +1186,7 @@ export function approveRegistration(userId, data = {}) {
     ...mockProfiles[idx],
     approval_status: 'approved',
     is_active: true,
+    full_name: data.full_name || mockProfiles[idx].full_name,
     unit_id: data.unit_id !== undefined ? Number(data.unit_id) : mockProfiles[idx].unit_id,
     occupancy_status: data.occupancy_status || mockProfiles[idx].occupancy_status,
     role: data.role || mockProfiles[idx].role,

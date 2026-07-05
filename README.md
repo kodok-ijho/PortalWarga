@@ -71,8 +71,9 @@ Besaran IPL = **penjumlahan komponen** (Kebersihan, Keamanan, dll). Atur denda k
 
 | Fitur | Status | Detail |
 |:------|:------:|:-------|
-| 🔐 Autentikasi (Login/Register) | ✅ | Dual-mode: Demo mock + Supabase Auth, 3 role |
-| 🏠 Dashboard | ✅ | Statistik real-time, kartu navigasi role-based |
+| 🔐 Autentikasi (Login/Register) | ✅ | Google OAuth 2.0 + Supabase JWT (n8n API ready), 4 role hierarki |
+| 🏠 Dashboard & Menu Terkelompok | ✅ | Statistik real-time, navigasi terkelompok rapi & mobile drawer 100% solid |
+| ✏️ Update Profil Mandiri | ✅ | Warga & staff dapat merubah Nama dan No. HP/WhatsApp secara langsung via modal |
 | 👥 Manajemen Warga | ✅ | CRUD, CSV import/export, search, multi-filter |
 | 💳 Matriks Pembayaran | ✅ | Multi-tahun, multi-bulan, validasi sequential |
 | 📋 Daftar Tagihan IPL | ✅ | Filter periode/status, detail modal, bukti bayar |
@@ -565,7 +566,7 @@ Didesain mengikuti logo Palm Village — nuansa **hijau hutan** yang menenangkan
 | Aspek | Implementasi |
 |:------|:-------------|
 | 🔒 **Data Access** | RLS di semua 9 tabel — warga hanya akses data sendiri |
-| 🔑 **Authentication** | Supabase Auth (Email/OTP) dengan session persist |
+| 🔑 **Authentication** | Google Account OAuth 2.0 via Supabase Auth + JWT Bearer Token (n8n backend ready) |
 | 🛡️ **Route Protection** | `ProtectedLayout` guard + per-page role check |
 | 🔁 **Session** | Auto-refresh token, persist via HttpOnly cookie |
 | 🚫 **Sequential Payment** | `canPayBill()` — cegit bayar bulan yang belum wajib |
