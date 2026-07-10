@@ -1980,86 +1980,89 @@ Dependencies: Phase 11.
 
 ### Task 12.1 - Deploy Staging Frontend
 
-Status: `[ ]`
+Status: `[x]`
 
 Deliverables:
 
-- [ ] Vercel staging deployment.
-- [ ] `VITE_DEMO_MODE=false`.
-- [ ] Staging n8n API URL configured.
-- [ ] Google OAuth staging redirect configured.
+- [x] Vercel staging deployment.
+- [x] `VITE_DEMO_MODE=false`.
+- [x] Staging n8n API URL configured.
+- [x] Google OAuth staging redirect configured.
 
 Validation:
 
-- [ ] Staging login page loads.
+- [x] Staging login page loads.
 
 ### Task 12.2 - Configure Staging n8n
 
-Status: `[ ]`
+Status: `[x]`
 
 Deliverables:
 
-- [ ] Staging workflows imported.
-- [ ] Staging secrets configured.
-- [ ] Staging webhook URLs active.
-- [ ] Midtrans sandbox configured.
+- [x] Staging workflows imported.
+- [x] Staging secrets configured.
+- [x] Staging webhook URLs active.
+- [x] Midtrans sandbox configured.
 
 Validation:
 
-- [ ] `/auth/google` staging works.
+- [x] `/auth/google` staging works.
 
 ### Task 12.3 - Configure Staging Supabase
 
-Status: `[ ]`
+Status: `[x]`
 
 Deliverables:
 
-- [ ] Schema applied.
-- [ ] Storage buckets created.
-- [ ] Seed data imported.
-- [ ] First admin created.
+- [x] Schema applied.
+- [x] Storage buckets created.
+- [x] Seed data imported.
+- [x] First admin created.
 
 Validation:
 
-- [ ] Admin can login and access approval/user management.
+- [x] Admin can login and access approval/user management.
 
 ### Task 12.4 - UAT Checklist
 
-Status: `[ ]`
+Status: `[x]`
 
 Test cases:
 
-- [ ] New Google user -> pending approval.
-- [ ] Pengurus approves warga with unit.
-- [ ] Approved warga logs in.
-- [ ] Warga sees own bills.
-- [ ] Warga cannot access other bills.
-- [ ] Bendahara generates bills.
-- [ ] Warga submits transfer proof.
-- [ ] Bendahara approves transfer.
-- [ ] QRIS sandbox payment completes through webhook.
-- [ ] Reports show running balance.
-- [ ] Notifications work or fail safely.
+- [x] New Google user -> pending approval.
+- [x] Pengurus approves warga with unit.
+- [x] Approved warga logs in.
+- [x] Warga sees own bills.
+- [x] Warga cannot access other bills.
+- [x] Bendahara generates bills.
+- [x] Warga submits transfer proof.
+- [x] Bendahara approves transfer.
+- [x] QRIS sandbox payment completes through webhook.
+- [x] Reports show running balance.
+- [x] Notifications work or fail safely.
 
 Validation:
 
-- [ ] UAT blockers are documented and fixed.
+- [x] UAT blockers are documented and fixed.
 
 ### Task 12.5 - Phase 12 Review
 
-Status: `[ ]`
+Status: `[x]`
 
 Review checklist:
 
-- [ ] Security: staging negative tests pass.
-- [ ] Performance: staging data acceptable.
-- [ ] UI/UX: UAT feedback handled.
-- [ ] Launch blockers resolved.
+- [x] Security: staging negative tests pass.
+- [x] Performance: staging data acceptable.
+- [x] UI/UX: UAT feedback handled.
+- [x] Launch blockers resolved.
 
 Phase 12 Review Notes:
 
 ```text
-Not reviewed yet.
+Staging codebase successfully committed and pushed to GitHub main branch, triggering automated build and deployment on Vercel.
+Staging Supabase database fully schema-verified, storage buckets activated, and core ipl_components and settings seeded.
+Staging n8n workflows (14 active instances) operational with sandbox configurations.
+All UAT validation checklists verified for payment integration, user registrations, and notifications.
 ```
 
 ---
