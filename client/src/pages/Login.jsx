@@ -1,15 +1,33 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth, IS_DEMO_MODE, DEMO_ACCOUNT_LIST } from '../hooks/useAuth';
+import {
+  useAuth,
+  IS_DEMO_MODE,
+  DEMO_ACCOUNT_LIST,
+  GOOGLE_AUTH_READY,
+  GOOGLE_OAUTH_CLIENT_ID,
+} from '../hooks/useAuth';
 import { roleLabel, roleColor } from '../services/mockData';
 import { AiOutlineSafetyCertificate, AiOutlineCloudSync } from 'react-icons/ai';
+import { FcGoogle } from 'react-icons/fc';
+
+const GOOGLE_SCRIPT_ID = 'google-identity-services';
 
 export default function Login() {
-  const { signIn, signUp, isAuthenticated, loading } = useAuth();
+  const {
+    signIn,
+    signUp,
+    signInWithGoogle,
+    isAuthenticated,
+    loading,
+    accountStatus,
+    authError,
+  } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
 
+  const googleButtonRef = useRef(null);
   const [mode, setMode] = useState('login'); // 'login' | 'register_google'
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -17,6 +35,82 @@ export default function Login() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [pendingSuccess, setPendingSuccess] = useState(null);
+  const [googleButtonReady, setGoogleButtonReady] = useState(false);
+
+  const handleGoogleCredential = useCallback(async (credential) => {
+    if (!credential) {
+      setError('Token Google tidak diterima. Silakan coba lagi.');
+      return;
+    }
+
+    setError('');
+    setSubmitting(true);
+    try {
+      const result = await signInWithGoogle(credential);
+      if (result?.pending) {
+        setPendingSuccess({ message: result.message });
+        return;
+      }
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err.message || 'Login Google belum berhasil.');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [from, navigate, signInWithGoogle]);
+
+  useEffect(() => {
+    if (IS_DEMO_MODE || !GOOGLE_AUTH_READY) return;
+
+    let cancelled = false;
+    const initializeGoogle = () => {
+      if (cancelled || !window.google?.accounts?.id || !googleButtonRef.current) return;
+
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_OAUTH_CLIENT_ID,
+        callback: (response) => handleGoogleCredential(response?.credential),
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+
+      googleButtonRef.current.innerHTML = '';
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        type: 'standard',
+        text: 'signin_with',
+        shape: 'rectangular',
+        logo_alignment: 'left',
+        width: Math.min(360, googleButtonRef.current.offsetWidth || 360),
+      });
+      setGoogleButtonReady(true);
+    };
+
+    const existingScript = document.getElementById(GOOGLE_SCRIPT_ID);
+    if (existingScript) {
+      initializeGoogle();
+      existingScript.addEventListener('load', initializeGoogle, { once: true });
+      return () => {
+        cancelled = true;
+        existingScript.removeEventListener('load', initializeGoogle);
+      };
+    }
+
+    const script = document.createElement('script');
+    script.id = GOOGLE_SCRIPT_ID;
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = initializeGoogle;
+    script.onerror = () => {
+      if (!cancelled) setError('Google login tidak dapat dimuat. Coba refresh halaman.');
+    };
+    document.head.appendChild(script);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [handleGoogleCredential]);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-forest-500">Memuat sesi keamanan JWT...</div>;
@@ -25,13 +119,20 @@ export default function Login() {
     return <Navigate to={from} replace />;
   }
 
-  // Simulasi login Google OAuth -> JWT Token -> Supabase Auth
+  const contextualError = pendingSuccess ? error : (error || authError);
+  const statusTitle = {
+    pending_approval: 'Akun menunggu persetujuan',
+    rejected: 'Pendaftaran ditolak',
+    suspended: 'Akun tidak aktif',
+    invalid_session: 'Sesi berakhir',
+    session_check_failed: 'Sesi perlu diverifikasi ulang',
+  }[accountStatus] || 'Login belum berhasil';
+
+  // Simulasi login Google untuk demo mode tanpa backend production.
   const handleGoogleLoginDemo = async (emailToUse) => {
     setError('');
     setSubmitting(true);
     try {
-      // Dalam produksi sejati, ini adalah: await supabase.auth.signInWithOAuth({ provider: 'google' })
-      // Untuk demo, kita simulasikan penerimaan JWT token dari email google
       await signIn(emailToUse || 'warga@palmvillage.id', 'demo123');
       navigate(from, { replace: true });
     } catch (err) {
@@ -85,97 +186,108 @@ export default function Login() {
         {pendingSuccess && (
           <div className="bg-forest-900 border border-gold-500/50 rounded-2xl p-6 text-center mb-6 shadow-2xl text-white">
             <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/40">
-              <span className="text-3xl animate-bounce">⏳</span>
+              <AiOutlineSafetyCertificate className="text-3xl" />
             </div>
             <h2 className="text-lg font-bold text-gold-400 mb-2">Pendaftaran Google Berhasil!</h2>
             <p className="text-sm text-forest-200 mb-3">{pendingSuccess.message}</p>
             <div className="bg-forest-950 p-3 rounded-xl text-xs text-forest-300 text-left space-y-1 mb-5 border border-forest-800">
-              <p>📌 <strong>Status:</strong> Menunggu persetujuan Pengurus/Bendahara</p>
-              <p>🔐 <strong>Auth Provider:</strong> Google OAuth 2.0 + Supabase JWT</p>
-              <p>🏠 <strong>Alokasi Unit:</strong> Ditentukan saat verifikasi</p>
+              <p><strong>Status:</strong> Menunggu persetujuan Pengurus/Bendahara</p>
+              <p><strong>Auth Provider:</strong> Google OAuth 2.0 + App JWT</p>
+              <p><strong>Alokasi Unit:</strong> Ditentukan saat verifikasi</p>
             </div>
             <button
               type="button"
               onClick={() => { setPendingSuccess(null); setMode('login'); setError(''); }}
               className="w-full py-2.5 bg-forest-800 hover:bg-forest-700 text-gold-400 font-semibold rounded-xl border border-forest-700 transition-colors text-sm"
             >
-              ← Kembali ke Layar Masuk
+              Kembali ke Layar Masuk
             </button>
           </div>
         )}
 
         <div className="bg-forest-900/90 border border-forest-700/80 rounded-2xl p-6 shadow-2xl backdrop-blur-xl text-white">
           {/* Tab Mode */}
-          <div className="flex gap-1 p-1 bg-forest-950 rounded-xl mb-6 border border-forest-800">
-            <button
-              type="button"
-              onClick={() => { setMode('login'); setError(''); }}
-              className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
-                mode === 'login'
-                  ? 'bg-gold-500 text-forest-950 shadow-md'
-                  : 'text-forest-400 hover:text-white'
-              }`}
-            >
-              Masuk Google
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode('register_google'); setError(''); }}
-              className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
-                mode === 'register_google'
-                  ? 'bg-gold-500 text-forest-950 shadow-md'
-                  : 'text-forest-400 hover:text-white'
-              }`}
-            >
-              Daftar Akun Baru
-            </button>
-          </div>
-
-          {mode === 'login' ? (
-            <div className="space-y-5">
-              {/* Tombol Utama Google OAuth */}
+          {IS_DEMO_MODE && (
+            <div className="flex gap-1 p-1 bg-forest-950 rounded-xl mb-6 border border-forest-800">
               <button
                 type="button"
-                onClick={() => handleGoogleLoginDemo('warga@palmvillage.id')}
-                disabled={submitting}
-                className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-white hover:bg-gray-100 text-gray-800 font-bold rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 group border border-gray-200"
+                onClick={() => { setMode('login'); setError(''); }}
+                className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+                  mode === 'login'
+                    ? 'bg-gold-500 text-forest-950 shadow-md'
+                    : 'text-forest-400 hover:text-white'
+                }`}
               >
-                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M23.745 12.27c0-.79-.07-1.54-.19-2.27h-11.3v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82Z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12.255 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96h-3.98v3.09C3.515 21.3 7.565 24 12.255 24Z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.525 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62h-3.98a11.86 11.86 0 0 0 0 10.76l3.98-3.09Z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12.255 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C18.205 1.19 15.495 0 12.255 0 7.565 0 3.515 2.7 1.545 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96Z"
-                  />
-                </svg>
-                <span className="text-sm">Masuk dengan Akun Google</span>
+                Masuk Demo
               </button>
+              <button
+                type="button"
+                onClick={() => { setMode('register_google'); setError(''); }}
+                className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
+                  mode === 'register_google'
+                    ? 'bg-gold-500 text-forest-950 shadow-md'
+                    : 'text-forest-400 hover:text-white'
+                }`}
+              >
+                Daftar Demo
+              </button>
+            </div>
+          )}
+
+          {!IS_DEMO_MODE || mode === 'login' ? (
+            <div className="space-y-5">
+              {/* Tombol Utama Google OAuth */}
+              {IS_DEMO_MODE ? (
+                <button
+                  type="button"
+                  onClick={() => handleGoogleLoginDemo('warga@palmvillage.id')}
+                  disabled={submitting}
+                  className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-white hover:bg-gray-100 text-gray-800 font-bold rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 group border border-gray-200"
+                >
+                  <FcGoogle className="w-5 h-5 shrink-0" />
+                  <span className="text-sm">Masuk sebagai Warga Demo</span>
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  {!GOOGLE_AUTH_READY ? (
+                    <div className="rounded-xl border border-amber-500/50 bg-amber-950/30 p-3.5 text-xs text-amber-100">
+                      Konfigurasi VITE_GOOGLE_CLIENT_ID atau VITE_N8N_API_BASE_URL belum tersedia.
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-white p-2 shadow-lg">
+                      <div ref={googleButtonRef} className="min-h-[44px] w-full flex items-center justify-center" />
+                      {!googleButtonReady && (
+                        <button
+                          type="button"
+                          disabled
+                          className="w-full flex items-center justify-center gap-3 py-3 px-4 text-sm font-semibold text-gray-500"
+                        >
+                          <FcGoogle className="text-xl" />
+                          Memuat Google...
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Info Keamanan JWT & Supabase */}
               <div className="bg-forest-950/80 border border-forest-800 rounded-xl p-3.5 text-xs text-forest-300 space-y-2">
                 <div className="flex items-center gap-2 text-gold-400 font-semibold">
                   <AiOutlineSafetyCertificate className="text-base shrink-0" />
-                  <span>Keamanan JWT &amp; Otentikasi Supabase</span>
+                  <span>{IS_DEMO_MODE ? 'Mode Demo' : 'Google OAuth dan App JWT'}</span>
                 </div>
                 <p className="text-[11px] leading-relaxed text-forest-400">
-                  Sistem hanya menerima login dari Akun Google terverifikasi. Token keamanan <strong className="text-forest-200">JWT (JSON Web Token)</strong> dienkripsi untuk otorisasi komunikasi backend API yang dikelola oleh <strong className="text-forest-200">n8n Workflow</strong> &amp; database <strong className="text-forest-200">Supabase</strong>.
+                  {IS_DEMO_MODE
+                    ? 'Akun demo tidak memakai Google asli dan tidak menghubungi backend production.'
+                    : 'Setelah Google berhasil, portal memakai App JWT dari n8n untuk akses API warga.'}
                 </p>
               </div>
             </div>
           ) : (
             <form onSubmit={handleGoogleRegisterSubmit} className="space-y-4">
               <div className="bg-forest-950/60 p-3 rounded-xl border border-forest-800 text-xs text-forest-300 mb-2">
-                <p>💡 Pendaftaran warga baru menggunakan otentikasi Google. Pastikan email Google Anda aktif.</p>
+                <p>Pendaftaran demo warga baru akan masuk status menunggu persetujuan.</p>
               </div>
 
               <div>
@@ -230,9 +342,10 @@ export default function Login() {
             </form>
           )}
 
-          {error && (
+          {contextualError && (
             <div className="mt-4 rounded-xl bg-red-900/50 border border-red-500/50 p-3.5 text-xs text-red-200 text-center animate-fadeIn">
-              ⚠️ {error}
+              <strong className="block text-red-100 mb-1">{statusTitle}</strong>
+              {contextualError}
             </div>
           )}
 
@@ -280,7 +393,7 @@ export default function Login() {
         {/* Footer info Arsitektur */}
         <div className="mt-6 text-center space-y-1">
           <p className="text-[11px] text-forest-400">
-            🔒 Protected by 256-bit SSL &amp; Google OAuth 2.0 Security
+            Protected by Google OAuth 2.0 and App JWT
           </p>
           <p className="text-[10px] text-forest-500">
             Backend orchestrated via n8n workflows &bull; Database by Supabase PostgreSQL

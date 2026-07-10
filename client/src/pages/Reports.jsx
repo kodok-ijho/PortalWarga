@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -7,51 +7,91 @@ import {
 } from 'recharts';
 import { AiOutlinePrinter, AiOutlineDownload } from 'react-icons/ai';
 import Papa from 'papaparse';
-import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
-import Placeholder from '../components/Placeholder';
 import {
-  computeReport,
-  getAvailableYears,
-  getBillsForYear,
-  getExpensesForPeriod,
-  getPaymentsByMonth,
   MONTHS_LONG,
   formatRupiah,
   formatDate,
   billStatusLabel,
   hasMinRole,
-  computeRunningBalance,
-  getMonthBalance
-} from '../services/mockData';
+} from '../services/dataHelpers';
+import {
+  fetchRunningBalance,
+  fetchMonthlyFinance
+} from '../services/dataService';
 
 const PIE_COLORS = ['#1a3d2e', '#d4af37', '#e2c462'];
 
 export default function Reports() {
-  const { role } = useAuth();
+  const { role, session } = useAuth();
   const toast = useToast();
 
-  const years = getAvailableYears();
-  const [year, setYear] = useState(years[0] || new Date().getFullYear());
+  const years = [2025, 2026];
+  const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  // States to hold reports data
+  const [report, setReport] = useState(null);
+  const [expenses, setExpenses] = useState([]);
+  const [cashPayments, setCashPayments] = useState([]);
+  const [runningChain, setRunningChain] = useState([]);
 
   const period = `${year}-${String(month).padStart(2, '0')}`;
-  const report = useMemo(() => computeReport(period), [period]);
-  const expenses = useMemo(() => getExpensesForPeriod(period), [period]);
-  
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError('');
+    try {
+      // 1. Fetch monthly finance report
+      const finRes = await fetchMonthlyFinance(session?.access_token, { year, month });
+      const finData = finRes.data || finRes;
+      setReport(finData.report);
+      setExpenses(finData.expenses || []);
+      setCashPayments(finData.cashPayments || []);
+
+      // 2. Fetch running balance chain
+      const balRes = await fetchRunningBalance(session?.access_token, { year, month });
+      const balData = balRes.data || balRes;
+      setRunningChain(balData.chain || []);
+    } catch (err) {
+      setLoadError(err.message || 'Gagal memuat data laporan keuangan.');
+      toast.error(err.message || 'Gagal memuat data laporan keuangan.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [session?.access_token, year, month, toast]);
+
+  useEffect(() => {
+    if (hasMinRole(role, 'pengurus')) {
+      loadData();
+    }
+  }, [loadData, role]);
+
   // Running Balance dan Rincian untuk bulan terpilih
-  const monthlyBalance = useMemo(() => getMonthBalance(year, month), [year, month]);
+  const monthlyBalance = useMemo(() => {
+    const periodStr = `${year}-${String(month).padStart(2, '0')}`;
+    const matched = runningChain.find(item => item.period === periodStr);
+    return matched || {
+      period: periodStr,
+      year,
+      month,
+      openingBalance: 15000000,
+      totalIncome: 0,
+      totalExpense: 0,
+      closingBalance: 15000000,
+      incomeCount: 0,
+      expenseCount: 0,
+    };
+  }, [runningChain, year, month]);
+
   const totalCashIn = monthlyBalance.totalIncome;
   const totalExpenses = monthlyBalance.totalExpense;
   const netBalance = totalCashIn - totalExpenses;
   const openingBalance = monthlyBalance.openingBalance;
   const closingBalance = monthlyBalance.closingBalance;
-
-  // Laporan B: kas masuk IPL berdasarkan TANGGAL PEMBAYARAN
-  const cashPayments = useMemo(() => getPaymentsByMonth(year, month), [year, month]);
-
-  // Seluruh run untuk grafik tren dan tabel kumulatif (dari Jan 2025 sampai bulan terpilih)
-  const runningChain = useMemo(() => computeRunningBalance(year, month), [year, month]);
 
   // Data tren untuk AreaChart
   const trenData = useMemo(() => {
@@ -68,25 +108,26 @@ export default function Reports() {
   }, [runningChain]);
 
   // Data untuk bar chart per blok
-  const blockData = report.byBlock.map((b) => ({
-    name: `Blok ${b.block}`,
-    Terkumpul: b.collected,
-    Tunggakan: b.billed - b.collected,
-  }));
+  const blockData = useMemo(() => {
+    if (!report || !report.byBlock) return [];
+    return report.byBlock.map((b) => ({
+      name: `Blok ${b.block}`,
+      Terkumpul: b.collected,
+      Tunggakan: b.billed - b.collected,
+    }));
+  }, [report]);
 
   // Data untuk pie chart lunas/belum
-  const pieData = [
-    { name: 'Lunas', value: report.paidCount, color: '#1a3d2e' },
-    { name: 'Belum/Tunggakan', value: report.billCount - report.paidCount, color: '#d4af37' },
-  ];
+  const pieData = useMemo(() => {
+    if (!report) return [];
+    return [
+      { name: 'Lunas', value: report.paidCount, color: '#1a3d2e' },
+      { name: 'Belum/Tunggakan', value: report.billCount - report.paidCount, color: '#d4af37' },
+    ];
+  }, [report]);
 
-  // Daftar bulan yang ada data-nya di tahun terpilih
-  const availableMonths = useMemo(() => {
-    const set = new Set(
-      getBillsForYear(year).map((b) => parseInt(b.period.split('-')[1], 10))
-    );
-    return [...set].sort((a, b) => a - b);
-  }, [year]);
+  // Daftar bulan: tampilkan 12 bulan penuh
+  const availableMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
   // Staff-only (pengurus, bendahara, admin)
   if (!hasMinRole(role, 'pengurus')) {
@@ -94,6 +135,7 @@ export default function Reports() {
   }
 
   const handleExportCSV = () => {
+    if (!report) return;
     const header = ['Unit', 'Blok', 'Penghuni', 'Jumlah', 'Status', 'Tanggal Bayar'];
     const rows = report.details.map((d) => [
       d.unitNumber, d.block, d.residentName, d.amount, billStatusLabel(d.status), d.paidAt ? formatDate(d.paidAt) : '-',
@@ -125,13 +167,31 @@ export default function Reports() {
     setTimeout(() => window.print(), 300);
   };
 
-  if (!IS_DEMO_MODE) {
+  if (isLoading) {
     return (
-      <Placeholder
-        title="Laporan Keuangan IPL"
-        description="Hubungkan ke Supabase untuk melihat laporan keuangan real."
-        phase="Phase 1 — MVP"
-      />
+      <div className="flex flex-col items-center justify-center p-20 space-y-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-forest-800 border-t-transparent"></div>
+        <p className="text-sm text-forest-600 font-medium">Memuat data laporan keuangan...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="pv-card p-8 text-center space-y-4">
+        <p className="text-sm text-red-600 font-semibold">{loadError}</p>
+        <button onClick={loadData} className="pv-btn-primary mx-auto text-xs font-semibold px-4 py-2">
+          🔄 Coba Lagi
+        </button>
+      </div>
+    );
+  }
+
+  if (!report) {
+    return (
+      <div className="pv-card p-8 text-center text-forest-500 text-sm">
+        Tidak ada data laporan keuangan untuk periode ini.
+      </div>
     );
   }
 

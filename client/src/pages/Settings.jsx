@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   AiOutlinePlus,
@@ -8,42 +8,64 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import {
-  mockSettings,
-  getIPLSchemas,
-  computeSchemaAmount,
   formatRupiah,
   hasMinRole,
   isAdminRole,
   isBendaharaOrAbove,
-} from '../services/mockData';
+} from '../services/dataHelpers';
+import { fetchSettings, updateSettings } from '../services/dataService';
 
-/**
- * Halaman Settings IPL — staff only (admin & rt_rw).
- * Konfigurasi: Profil Skema IPL (IPL Komplit, IPL Basic, dll), denda, dan penerima tagihan.
- *
- * Besaran IPL per bulan kini ditentukan oleh Profil Skema Biaya yang ditempelkan
- * pada masing-masing unit rumah.
- */
+function computeSchemaAmount(schema) {
+  if (!schema || !schema.components) return 0;
+  return schema.components.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+}
+
 export default function Settings() {
-  const { role } = useAuth();
+  const { role, session } = useAuth();
   const toast = useToast();
 
-  // Local state (in-memory), init dari mockSettings
-  const [dueDay, setDueDay] = useState(mockSettings.due_day);
-  const [lateFeeEnabled, setLateFeeEnabled] = useState(mockSettings.late_fee_enabled);
-  const [lateFeeType, setLateFeeType] = useState(mockSettings.late_fee_type);
-  const [lateFeeValue, setLateFeeValue] = useState(mockSettings.late_fee_value);
-  const [billRecipient, setBillRecipient] = useState(
-    mockSettings.bill_recipient || 'occupant'
-  );
-  
-  // State untuk Profil Skema IPL
-  const [schemas, setSchemas] = useState(() =>
-    getIPLSchemas().map((s) => ({
-      ...s,
-      components: s.components.map((c) => ({ ...c })),
-    }))
-  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
+
+  // Local state for settings form fields
+  const [dueDay, setDueDay] = useState(10);
+  const [lateFeeEnabled, setLateFeeEnabled] = useState(true);
+  const [lateFeeType, setLateFeeType] = useState('percent');
+  const [lateFeeValue, setLateFeeValue] = useState(5);
+  const [billRecipient, setBillRecipient] = useState('occupant');
+  const [schemas, setSchemas] = useState([]);
+
+  const loadSettings = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError('');
+    try {
+      const data = await fetchSettings(session?.access_token);
+      setDueDay(data.due_day);
+      setLateFeeEnabled(data.late_fee_enabled);
+      setLateFeeType(data.late_fee_type);
+      setLateFeeValue(data.late_fee_value);
+      setBillRecipient(data.bill_recipient || 'occupant');
+      setSchemas(
+        (data.ipl_schemas || []).map((s) => ({
+          ...s,
+          components: (s.components || []).map((c) => ({ ...c })),
+        }))
+      );
+    } catch (err) {
+      const msg = err.message || 'Gagal memuat pengaturan IPL.';
+      setLoadError(msg);
+      toast.error(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [session?.access_token, toast]);
+
+  useEffect(() => {
+    if (hasMinRole(role, 'pengurus')) {
+      loadSettings();
+    }
+  }, [loadSettings, role]);
 
   // Staff-only guard (pengurus, bendahara, admin)
   if (!hasMinRole(role, 'pengurus')) {
@@ -122,7 +144,7 @@ export default function Settings() {
     );
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (!canEdit && !canEditSchema) {
       toast.error('Anda tidak memiliki hak untuk mengubah pengaturan ini.');
@@ -157,29 +179,57 @@ export default function Settings() {
       }
     }
 
-    // Apply ke mockSettings
-    if (canEdit) {
-      mockSettings.due_day = Number(dueDay);
-      mockSettings.late_fee_enabled = lateFeeEnabled;
-      mockSettings.late_fee_type = lateFeeType;
-      mockSettings.late_fee_value = Number(lateFeeValue);
-      mockSettings.bill_recipient = billRecipient;
-    }
-    
-    if (canEditSchema) {
-      mockSettings.ipl_schemas = schemas.map((s) => ({
-        id: s.id,
-        name: s.name.trim(),
-        description: s.description.trim(),
-        components: s.components.map((c) => ({
-          name: c.name.trim(),
-          amount: Number(c.amount) || 0,
-        })),
-      }));
-    }
+    setIsSaving(true);
+    try {
+      const payload = {};
+      if (canEdit) {
+        payload.due_day = Number(dueDay);
+        payload.late_fee_enabled = lateFeeEnabled;
+        payload.late_fee_type = lateFeeType;
+        payload.late_fee_value = Number(lateFeeValue);
+        payload.bill_recipient = billRecipient;
+      }
+      if (canEditSchema) {
+        payload.ipl_schemas = schemas.map((s) => ({
+          id: s.id,
+          name: s.name.trim(),
+          description: s.description.trim(),
+          components: s.components.map((c) => ({
+            name: c.name.trim(),
+            amount: Number(c.amount) || 0,
+          })),
+        }));
+      }
 
-    toast.success('Pengaturan Profil Skema IPL & sistem berhasil disimpan.');
+      await updateSettings(session?.access_token, payload);
+      toast.success('Pengaturan Profil Skema IPL & sistem berhasil disimpan.');
+      loadSettings();
+    } catch (err) {
+      toast.error(err.message || 'Gagal menyimpan pengaturan.');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="pv-card p-10 text-center max-w-4xl">
+        <div className="mx-auto mb-4 h-12 w-12 rounded-full border-4 border-forest-100 border-t-gold-500 animate-spin" />
+        <p className="text-sm text-forest-500">Memuat pengaturan sistem...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="pv-card p-8 text-center max-w-4xl bg-red-50 border border-red-200">
+        <p className="text-sm text-red-600 font-medium mb-4">{loadError}</p>
+        <button onClick={loadSettings} className="pv-btn-primary px-4 py-2 text-xs">
+          Coba Lagi
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -485,12 +535,146 @@ export default function Settings() {
         {/* Save Button */}
         {(canEdit || canEditSchema) && (
           <div className="flex justify-end gap-2 pt-2">
-            <button type="submit" className="pv-btn-primary px-6 py-3 text-sm font-bold shadow-lg shadow-gold-500/20">
-              <AiOutlineSave size={18} /> Simpan Perubahan Pengaturan
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="pv-btn-primary px-6 py-3 text-sm font-bold shadow-lg shadow-gold-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <AiOutlineSave size={18} /> {isSaving ? 'Menyimpan...' : 'Simpan Perubahan Pengaturan'}
             </button>
           </div>
         )}
       </form>
+
+      {/* Generasi Tagihan Bulanan (Staff Only - Bendahara & Admin) */}
+      {isBendaharaOrAbove(role) && (
+        <div className="pv-card p-6 mt-8 border-t-4 border-t-forest-800">
+          <h3 className="text-base font-bold text-forest-900 mb-1">Generasi Tagihan IPL Massal</h3>
+          <p className="text-xs text-forest-500 mb-5">
+            Jalankan pembuatan tagihan IPL massal secara otomatis untuk seluruh unit rumah pada periode tertentu.
+          </p>
+
+          <BillingGenerator session={session} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Inner helper component to keep Settings component clean
+function BillingGenerator({ session }) {
+  const toast = useToast();
+  const now = new Date();
+  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  
+  const [period, setPeriod] = useState(currentPeriod);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleRun = async (dryRun) => {
+    setLoading(true);
+    try {
+      const data = await import('../services/dataService').then(m => m.generateBills(session?.access_token, {
+        period,
+        dry_run: dryRun,
+      }));
+      setResult(data);
+      if (dryRun) {
+        toast.info(`Dry run selesai: ${data.total_preview} tagihan siap dibuat, ${data.skipped_count} dilewati.`);
+      } else {
+        toast.success(`Berhasil membuat ${data.generated_count} tagihan IPL untuk periode ${period}!`);
+        setResult(null); // Reset preview on successful commit
+      }
+    } catch (err) {
+      toast.error(err.message || 'Gagal menjalankan generasi tagihan.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row items-end gap-3 max-w-md">
+        <div className="flex-1">
+          <label className="block text-xs font-semibold text-forest-700 mb-1">Pilih Periode Tagihan</label>
+          <input
+            type="month"
+            value={period}
+            onChange={(e) => {
+              setPeriod(e.target.value);
+              setResult(null);
+            }}
+            className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2 text-sm text-forest-900 focus:border-gold-500 outline-none"
+          />
+        </div>
+        <button
+          type="button"
+          disabled={loading || !period}
+          onClick={() => handleRun(true)}
+          className="px-4 py-2 bg-forest-50 hover:bg-forest-100 border border-forest-200 text-forest-700 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+        >
+          Cek Preview (Dry Run)
+        </button>
+      </div>
+
+      {loading && (
+        <div className="text-xs text-forest-500 py-2 flex items-center gap-2">
+          <div className="h-4 w-4 border-2 border-forest-200 border-t-gold-500 rounded-full animate-spin" />
+          <span>Sedang memproses...</span>
+        </div>
+      )}
+
+      {result && (
+        <div className="bg-forest-50/50 rounded-lg border border-forest-100 p-4 space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+            <div className="bg-white p-2 rounded border border-forest-100">
+              <span className="block text-[10px] uppercase text-forest-400 font-bold">Periode</span>
+              <span className="text-sm font-bold text-forest-800">{result.period}</span>
+            </div>
+            <div className="bg-white p-2 rounded border border-forest-100">
+              <span className="block text-[10px] uppercase text-forest-400 font-bold">Siap Dibuat</span>
+              <span className="text-sm font-bold text-emerald-600">{result.total_preview ?? result.generated_count} unit</span>
+            </div>
+            <div className="bg-white p-2 rounded border border-forest-100">
+              <span className="block text-[10px] uppercase text-forest-400 font-bold">Dilewati</span>
+              <span className="text-sm font-bold text-amber-600">{result.skipped_count} unit</span>
+            </div>
+            <div className="bg-white p-2 rounded border border-forest-100">
+              <span className="block text-[10px] uppercase text-forest-400 font-bold">Total Nominal</span>
+              <span className="text-sm font-bold text-forest-800">
+                {formatRupiah((result.preview || []).reduce((sum, b) => sum + b.amount, 0))}
+              </span>
+            </div>
+          </div>
+
+          {result.skipped_count > 0 && (
+            <div className="text-[11px] text-amber-600 bg-amber-50 rounded p-2 border border-amber-100">
+              💡 {result.skipped_count} unit tidak digenerate karena sudah memiliki tagihan untuk periode ini.
+            </div>
+          )}
+
+          <div className="max-h-48 overflow-y-auto border border-forest-100 rounded bg-white text-xs divide-y divide-forest-50">
+            {(result.preview || []).map((b, idx) => (
+              <div key={idx} className="p-2 flex justify-between items-center hover:bg-forest-50/30">
+                <span className="font-semibold text-forest-800">{b.unit_info || `Unit ID: ${b.unit_id}`}</span>
+                <span className="text-forest-500">{b.resident_name || 'Kosong'}</span>
+                <span className="font-bold text-emerald-600">{formatRupiah(b.amount)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              disabled={loading || (result.total_preview ?? 0) === 0}
+              onClick={() => handleRun(false)}
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg shadow transition-colors disabled:opacity-50"
+            >
+              🚀 Konfirmasi & Buat Tagihan Sekarang
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AiOutlineUser,
@@ -11,33 +12,48 @@ import {
   AiOutlineUserAdd,
   AiOutlineCheckCircle,
 } from 'react-icons/ai';
-import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth';
 import {
-  mockProfiles,
-  mockIPLBills,
-  computeReport,
   formatRupiah,
   MONTHS_LONG,
   isStaffRole,
   isBendaharaOrAbove,
   roleLabel,
   roleColor,
-  getPendingRegistrations,
-  getPendingPayments,
-} from '../services/mockData';
+} from '../services/dataHelpers';
+import { fetchDashboardData, IS_DEMO } from '../services/dataService';
 
 export default function Home() {
-  const { profile, role } = useAuth();
+  const { profile, role, session } = useAuth();
   const isStaff = isStaffRole(role);
   const isBendahara = isBendaharaOrAbove(role);
 
-  const pendingRegCount = isStaff ? getPendingRegistrations().length : 0;
-  const pendingPayCount = isBendahara ? getPendingPayments().length : 0;
+  const [dashData, setDashData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Stats untuk bulan berjalan
   const now = new Date();
   const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const report = IS_DEMO_MODE ? computeReport(currentPeriod) : null;
+
+  const loadDashboard = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await fetchDashboardData(session?.access_token, { role, period: currentPeriod });
+      setDashData(data);
+    } catch {
+      // Dashboard should not crash — just show zeros
+      setDashData({ report: null, pendingRegistrationCount: 0, pendingPaymentCount: 0 });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [session?.access_token, role, currentPeriod]);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  const pendingRegCount = dashData?.pendingRegistrationCount || 0;
+  const pendingPayCount = dashData?.pendingPaymentCount || 0;
+  const report = dashData?.report || null;
 
   const getFeatures = () => {
     const base = [
@@ -118,7 +134,12 @@ export default function Home() {
       </section>
 
       {/* Stats bulan berjalan */}
-      {IS_DEMO_MODE && report && report.billCount > 0 && (
+      {isLoading ? (
+        <section className="pv-card p-8 text-center">
+          <div className="mx-auto mb-3 h-10 w-10 rounded-full border-4 border-forest-100 border-t-gold-500 animate-spin" />
+          <p className="text-sm text-forest-500">Memuat data dashboard...</p>
+        </section>
+      ) : report && report.billCount > 0 ? (
         <section className="pv-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-forest-800">
@@ -132,7 +153,7 @@ export default function Home() {
             <StatBox label="% Koleksi" value={`${report.collectionRate.toFixed(0)}%`} color="text-gold-600" />
           </div>
         </section>
-      )}
+      ) : null}
 
       {/* Pending Actions Notification Banner */}
       {(pendingRegCount > 0 || pendingPayCount > 0) && (
@@ -235,7 +256,7 @@ export default function Home() {
       </section>
 
       {/* Demo notice */}
-      {IS_DEMO_MODE && (
+      {IS_DEMO && (
         <div className="rounded-lg bg-gold-50 border border-gold-200 px-4 py-3 text-xs text-gold-800">
           🔧 <strong>Mode Demo</strong> aktif — data yang ditampilkan adalah simulasi. Untuk data real,
           hubungkan ke project Supabase dan set{' '}

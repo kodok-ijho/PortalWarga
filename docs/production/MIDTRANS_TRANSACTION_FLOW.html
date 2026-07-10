@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dokumen Flow Transaksi Pembayaran IPL dengan Midtrans</title>
+  <style>
+    body {
+      margin: 0;
+      background: #eef4f1;
+      color: #163225;
+      font-family: Arial, sans-serif;
+      line-height: 1.55;
+    }
+    main {
+      width: min(980px, calc(100% - 48px));
+      margin: 32px auto;
+      background: #fff;
+      border: 1px solid #d8e2dc;
+      border-radius: 10px;
+      padding: 40px;
+    }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin-top: 34px; font-size: 20px; border-top: 1px solid #d8e2dc; padding-top: 22px; }
+    h3 { margin-top: 26px; font-size: 17px; }
+    .meta { color: #587066; margin-bottom: 24px; }
+    .note {
+      background: #fff8e5;
+      border: 1px solid #efd27a;
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: #5b4614;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 20px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #d8e2dc;
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f3f7f5; }
+    img {
+      display: block;
+      width: 100%;
+      border: 1px solid #d8e2dc;
+      border-radius: 8px;
+      margin: 12px 0 22px;
+    }
+    code {
+      background: #f3f7f5;
+      border: 1px solid #d8e2dc;
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-family: Consolas, monospace;
+      font-size: 90%;
+    }
+    ol, ul { padding-left: 22px; }
+    @media print {
+      body { background: #fff; }
+      main {
+        width: auto;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+        padding: 20px;
+      }
+      h2, h3, img { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Dokumen Flow Transaksi Pembayaran IPL dengan Midtrans</h1>
+    <p class="meta">Portal Warga Palm Village<br>Tanggal dokumen: 8 Juli 2026</p>
+
+    <h2>Tujuan Dokumen</h2>
+    <p>Dokumen ini menjelaskan alur transaksi pembayaran IPL dari tahap pemesanan/tagihan di Portal Warga Palm Village sampai proses checkout pembayaran melalui Midtrans.</p>
+    <p>Dokumen ini disiapkan sebagai lampiran data tambahan onboarding Midtrans. Surat penunjukan PIC merchant disiapkan sebagai dokumen terpisah.</p>
+
+    <h2>Ringkasan Alur</h2>
+    <ol>
+      <li>Warga login ke Portal Warga Palm Village.</li>
+      <li>Warga membuka menu <code>Keuangan &amp; IPL</code> lalu memilih <code>Matriks Pembayaran IPL</code>.</li>
+      <li>Sistem menampilkan daftar tagihan IPL per unit dan periode.</li>
+      <li>Warga memilih tagihan yang akan dibayar.</li>
+      <li>Sistem menampilkan ringkasan tagihan dan total pembayaran.</li>
+      <li>Warga memilih metode pembayaran <code>QRIS</code>.</li>
+      <li>Sistem membuat transaksi pembayaran dan mengarahkan warga ke checkout Midtrans.</li>
+      <li>Warga menyelesaikan pembayaran di halaman checkout Midtrans.</li>
+      <li>Midtrans mengirim notifikasi/webhook ke backend.</li>
+      <li>Backend memverifikasi notifikasi Midtrans, lalu memperbarui status pembayaran menjadi <code>Lunas</code>.</li>
+    </ol>
+
+    <h2>Catatan Implementasi</h2>
+    <p class="note">Saat dokumen ini dibuat, UI demo Portal Warga Palm Village sudah memiliki alur pemilihan tagihan dan konfirmasi pembayaran QRIS. Screenshot checkout Midtrans menggunakan tampilan sandbox/mock untuk menggambarkan target checkout sampai integrasi Midtrans production tersambung ke backend.</p>
+
+    <h2>Data Contoh Transaksi</h2>
+    <table>
+      <tr><th>Field</th><th>Nilai contoh</th></tr>
+      <tr><td>Merchant</td><td>Portal Warga Palm Village</td></tr>
+      <tr><td>Pengguna</td><td>Ahmad Hidayat</td></tr>
+      <tr><td>Unit</td><td>Blok A/03</td></tr>
+      <tr><td>Produk/tagihan</td><td>Tagihan IPL November 2025</td></tr>
+      <tr><td>Metode</td><td>QRIS via Midtrans</td></tr>
+      <tr><td>Nominal</td><td>Rp140.000</td></tr>
+      <tr><td>Contoh order ID</td><td>PV-IPL-202607-A03-0001</td></tr>
+    </table>
+
+    <h2>Step-by-Step Flow dengan Screenshot</h2>
+
+    <h3>1. Warga membuka dashboard portal</h3>
+    <p>Setelah login, warga masuk ke dashboard Portal Warga Palm Village. Dari dashboard, warga dapat mengakses menu <code>Keuangan &amp; IPL</code>.</p>
+    <img src="midtrans-flow/screenshots/01-dashboard-warga.png" alt="Dashboard warga">
+
+    <h3>2. Warga memilih tagihan IPL</h3>
+    <p>Pada halaman <code>Matriks Pembayaran IPL</code>, sistem menampilkan status tagihan per bulan. Warga memilih tagihan yang masih belum dibayar untuk unitnya sendiri.</p>
+    <img src="midtrans-flow/screenshots/02-pilih-tagihan.png" alt="Pilih tagihan IPL">
+
+    <h3>3. Sistem menampilkan konfirmasi pembayaran</h3>
+    <p>Setelah tagihan dipilih, sistem menampilkan ringkasan transaksi berisi periode tagihan, total nominal, dan pilihan metode pembayaran. Warga memilih <code>QRIS</code>, lalu melanjutkan ke checkout Midtrans.</p>
+    <img src="midtrans-flow/screenshots/03-konfirmasi-pembayaran.png" alt="Konfirmasi pembayaran IPL">
+
+    <h3>4. Warga menyelesaikan pembayaran di checkout Midtrans</h3>
+    <p>Backend membuat transaksi Midtrans dengan <code>order_id</code> unik, nominal transaksi, detail customer, dan item tagihan. Setelah token/checkout URL diterima, warga diarahkan ke checkout Midtrans untuk menyelesaikan pembayaran QRIS.</p>
+    <img src="midtrans-flow/screenshots/04-midtrans-checkout-qris.png" alt="Checkout Midtrans QRIS">
+
+    <h3>5. Status tagihan diperbarui menjadi lunas</h3>
+    <p>Setelah pembayaran berhasil, Midtrans mengirim notifikasi/webhook ke backend. Backend memverifikasi signature dan status transaksi, lalu memperbarui status payment dan tagihan di database. Portal kemudian menampilkan tagihan sebagai <code>Lunas</code>.</p>
+    <img src="midtrans-flow/screenshots/05-status-lunas.png" alt="Status pembayaran lunas">
+
+    <h2>Kontrol Keamanan dan Validasi</h2>
+    <ul>
+      <li><code>order_id</code> dibuat unik untuk setiap transaksi.</li>
+      <li>Frontend tidak menyimpan Midtrans Server Key.</li>
+      <li>Payment hanya dibuat melalui backend yang memvalidasi JWT dan kepemilikan unit.</li>
+      <li>Status <code>Lunas</code> tidak dipercaya dari frontend atau return page saja.</li>
+      <li>Status <code>Lunas</code> hanya ditetapkan setelah webhook Midtrans diverifikasi backend.</li>
+      <li>Webhook Midtrans diproses secara idempotent agar notifikasi ganda tidak menggandakan pembayaran.</li>
+      <li>Semua aksi penting dicatat pada audit log.</li>
+    </ul>
+
+    <h2>Endpoint Production yang Direncanakan</h2>
+    <table>
+      <tr><th>Endpoint</th><th>Fungsi</th></tr>
+      <tr><td><code>POST /portal-v1/payments/qris/create</code></td><td>Membuat transaksi QRIS Midtrans untuk tagihan IPL.</td></tr>
+      <tr><td><code>POST /portal-v1/payments/midtrans/webhook</code></td><td>Menerima dan memverifikasi notifikasi pembayaran Midtrans.</td></tr>
+      <tr><td><code>GET/POST /portal-v1/bills/list</code></td><td>Mengambil daftar tagihan dan status pembayaran terbaru.</td></tr>
+    </table>
+  </main>
+</body>
+</html>

@@ -1,10 +1,15 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { supabase } from '../services/supabaseClient';
+import { registerUnauthorizedHandler, portalApiPost } from '../services/apiClient';
 
 const AuthContext = createContext(null);
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 const DEMO_STORAGE_KEY = 'pv_demo_session';
+const APP_TOKEN_STORAGE_KEY = 'pv_app_jwt';
+const APP_USER_STORAGE_KEY = 'pv_current_user';
+const APP_TOKEN_EXPIRES_AT_STORAGE_KEY = 'pv_app_jwt_expires_at';
+const N8N_API_BASE_URL = (import.meta.env.VITE_N8N_API_BASE_URL || '').replace(/\/+$/, '');
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 // Akun demo untuk preview UI tanpa project Supabase.
 // (hanya aktif saat VITE_DEMO_MODE=true)
@@ -173,85 +178,255 @@ function useDemoAuth() {
   };
 }
 
-// ====== Supabase auth (production) ======
-function useSupabaseAuth() {
+
+
+function extractCurrentUser(data) {
+  return data?.currentUser || data?.profile || data?.user || null;
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const decoded = atob(padded);
+    return JSON.parse(decoded);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function resolveTokenExpiry(token, expiresAt) {
+  if (expiresAt) return expiresAt;
+  const payload = decodeJwtPayload(token);
+  return payload?.exp ? new Date(payload.exp * 1000).toISOString() : null;
+}
+
+function hasExpired(expiresAt) {
+  if (!expiresAt) return false;
+  const time = Date.parse(expiresAt);
+  return Number.isFinite(time) && time <= Date.now();
+}
+
+function mapAuthError(error) {
+  switch (error?.code) {
+    case 'PENDING_APPROVAL':
+      return {
+        status: 'pending_approval',
+        message: error.message || 'Akun masih menunggu verifikasi pengurus.',
+      };
+    case 'ACCOUNT_REJECTED':
+      return {
+        status: 'rejected',
+        message: error.message || 'Pendaftaran Anda ditolak. Silakan hubungi pengurus.',
+      };
+    case 'SUSPENDED_USER':
+      return {
+        status: 'suspended',
+        message: error.message || 'Akun tidak aktif. Hubungi pengurus.',
+      };
+    case 'UNAUTHORIZED':
+    case 'INVALID_TOKEN':
+    case 'TOKEN_EXPIRED':
+      return {
+        status: 'invalid_session',
+        message: error.message || 'Sesi berakhir. Silakan login ulang.',
+      };
+    default:
+      return {
+        status: error?.status === 403 ? 'forbidden' : 'session_check_failed',
+        message: error?.message || 'Sesi tidak dapat diverifikasi. Silakan login ulang.',
+      };
+  }
+}
+
+// ====== n8n App JWT auth (production) ======
+function useProductionAuth() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [accountStatus, setAccountStatus] = useState(null);
+  const [authError, setAuthError] = useState(null);
+  const [tokenExpiresAt, setTokenExpiresAt] = useState(null);
 
-  const fetchProfile = useCallback(async (userId) => {
-    if (!userId) {
-      setProfile(null);
+  const persist = useCallback((token, currentUser, expiresAt) => {
+    if (token && currentUser) {
+      const resolvedExpiresAt = resolveTokenExpiry(token, expiresAt);
+      localStorage.setItem(APP_TOKEN_STORAGE_KEY, token);
+      localStorage.setItem(APP_USER_STORAGE_KEY, JSON.stringify(currentUser));
+      if (resolvedExpiresAt) {
+        localStorage.setItem(APP_TOKEN_EXPIRES_AT_STORAGE_KEY, resolvedExpiresAt);
+      } else {
+        localStorage.removeItem(APP_TOKEN_EXPIRES_AT_STORAGE_KEY);
+      }
+      setSession({ access_token: token, user: { id: currentUser.id, email: currentUser.email } });
+      setProfile(currentUser);
+      setAccountStatus(currentUser.approval_status || 'approved');
+      setAuthError(null);
+      setTokenExpiresAt(resolvedExpiresAt);
       return;
     }
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, phone, role, unit_id, is_active')
-      .eq('id', userId)
-      .maybeSingle();
 
-    if (error) {
-      // eslint-disable-next-line no-console
-      console.error('[auth] gagal memuat profil:', error.message);
-      setProfile(null);
-      return;
-    }
-    setProfile(data);
+    localStorage.removeItem(APP_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(APP_USER_STORAGE_KEY);
+    localStorage.removeItem(APP_TOKEN_EXPIRES_AT_STORAGE_KEY);
+    setSession(null);
+    setProfile(null);
+    setTokenExpiresAt(null);
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      if (session?.user?.id) await fetchProfile(session.user.id);
-      setLoading(false);
-    });
+    let cancelled = false;
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        setSession(newSession);
-        if (newSession?.user?.id) await fetchProfile(newSession.user.id);
-        else setProfile(null);
-        setLoading(false);
+    const restoreSession = async () => {
+      const token = localStorage.getItem(APP_TOKEN_STORAGE_KEY);
+      const savedUser = localStorage.getItem(APP_USER_STORAGE_KEY);
+      const savedExpiresAt = localStorage.getItem(APP_TOKEN_EXPIRES_AT_STORAGE_KEY);
+
+      if (!token) {
+        persist(null, null);
+        if (!cancelled) setLoading(false);
+        return;
       }
-    );
 
-    return () => listener.subscription.unsubscribe();
-  }, [fetchProfile]);
+      if (hasExpired(savedExpiresAt)) {
+        persist(null, null);
+        if (!cancelled) {
+          setAccountStatus('invalid_session');
+          setAuthError('Sesi berakhir. Silakan login ulang.');
+          setLoading(false);
+        }
+        return;
+      }
 
-  const signIn = useCallback(async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    return data;
+      try {
+        if (savedUser) {
+          const currentUser = JSON.parse(savedUser);
+          if (!cancelled) {
+            setSession({ access_token: token, user: { id: currentUser.id, email: currentUser.email } });
+            setProfile(currentUser);
+            setAccountStatus(currentUser.approval_status || 'approved');
+            setTokenExpiresAt(savedExpiresAt || resolveTokenExpiry(token, null));
+          }
+        }
+
+        const data = await portalApiPost('/auth/me', { token });
+        if (cancelled) return;
+
+        const currentUser = extractCurrentUser(data);
+        if (!currentUser) {
+          throw new Error('Profil sesi tidak diterima dari server.');
+        }
+
+        persist(token, currentUser, savedExpiresAt || resolveTokenExpiry(token, null));
+      } catch (error) {
+        const authState = mapAuthError(error);
+        persist(null, null);
+        if (!cancelled) {
+          setAccountStatus(authState.status);
+          setAuthError(authState.message);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [persist]);
+
+  const signInWithGoogle = useCallback(async (idToken) => {
+    let data;
+    setAuthError(null);
+    setAccountStatus(null);
+    try {
+      data = await portalApiPost('/auth/google', {
+        body: { id_token: idToken },
+      });
+    } catch (error) {
+      const authState = mapAuthError(error);
+      persist(null, null);
+      setAccountStatus(authState.status);
+      setAuthError(authState.message);
+      throw error;
+    }
+
+    const currentUser = extractCurrentUser(data);
+    const approvalStatus = data?.approval_status || currentUser?.approval_status || data?.status || null;
+
+    if (approvalStatus === 'pending_approval' || approvalStatus === 'pending') {
+      persist(null, null);
+      setAccountStatus('pending_approval');
+      setAuthError(data?.message || 'Akun Anda menunggu persetujuan pengurus.');
+      return {
+        pending: true,
+        message: data?.message || 'Akun Anda menunggu persetujuan pengurus.',
+        currentUser,
+      };
+    }
+
+    if (approvalStatus === 'rejected' || approvalStatus === 'suspended') {
+      persist(null, null);
+      setAccountStatus(approvalStatus);
+      setAuthError(
+        approvalStatus === 'suspended'
+          ? 'Akun Anda sedang dinonaktifkan. Silakan hubungi pengurus.'
+          : 'Pendaftaran Anda ditolak. Silakan hubungi pengurus.'
+      );
+      throw new Error(
+        approvalStatus === 'suspended'
+          ? 'Akun Anda sedang dinonaktifkan. Silakan hubungi pengurus.'
+          : 'Pendaftaran Anda ditolak. Silakan hubungi pengurus.'
+      );
+    }
+
+    const appToken = data?.app_jwt || data?.appJwt || data?.token || data?.access_token;
+    if (!appToken || !currentUser) {
+      throw new Error('Login Google berhasil, tetapi App JWT belum diterima.');
+    }
+
+    persist(appToken, currentUser, data?.expires_at || data?.expiresAt);
+    return { currentUser };
+  }, [persist]);
+
+  const signIn = useCallback(async () => {
+    throw new Error('Production mode hanya mendukung login Google.');
   }, []);
 
-  const signUp = useCallback(async (email, password, fullName) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName } },
-    });
-    if (error) throw error;
-    return data;
+  const signUp = useCallback(async () => {
+    throw new Error('Pendaftaran production dilakukan melalui login Google.');
   }, []);
 
   const signOut = useCallback(async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setProfile(null);
-  }, []);
+    persist(null, null);
+    setAccountStatus(null);
+    setAuthError(null);
+    if (window.google?.accounts?.id?.disableAutoSelect) {
+      window.google.accounts.id.disableAutoSelect();
+    }
+  }, [persist]);
+
+  useEffect(() => {
+    registerUnauthorizedHandler(() => {
+      signOut();
+    });
+  }, [signOut]);
 
   const updateProfile = useCallback(async (newProps) => {
-    if (!profile?.id) return null;
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(newProps)
-      .eq('id', profile.id)
-      .select()
-      .single();
-    if (error) throw error;
-    setProfile((prev) => ({ ...prev, ...data }));
-    return data;
-  }, [profile]);
+    if (!profile) return null;
+    const editableProps = {
+      ...(Object.prototype.hasOwnProperty.call(newProps, 'full_name') ? { full_name: newProps.full_name } : {}),
+      ...(Object.prototype.hasOwnProperty.call(newProps, 'phone') ? { phone: newProps.phone } : {}),
+      ...(Object.prototype.hasOwnProperty.call(newProps, 'avatar_url') ? { avatar_url: newProps.avatar_url } : {}),
+    };
+    const updated = { ...profile, ...editableProps };
+    persist(session?.access_token, updated, tokenExpiresAt);
+    return updated;
+  }, [persist, profile, session?.access_token, tokenExpiresAt]);
 
   return {
     session,
@@ -260,15 +435,19 @@ function useSupabaseAuth() {
     role: profile?.role ?? null,
     isAuthenticated: !!session,
     loading,
+    accountStatus,
+    authError,
+    tokenExpiresAt,
     signIn,
     signUp,
+    signInWithGoogle,
     signOut,
     updateProfile,
   };
 }
 
 export function AuthProvider({ children }) {
-  const auth = DEMO_MODE ? useDemoAuth() : useSupabaseAuth();
+  const auth = DEMO_MODE ? useDemoAuth() : useProductionAuth();
   return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
 }
 
@@ -281,3 +460,6 @@ export function useAuth() {
 // Export konstanta untuk dipakai di komponen lain (mis. Login menampilkan info akun demo).
 export const IS_DEMO_MODE = DEMO_MODE;
 export const DEMO_ACCOUNT_LIST = DEMO_USERS;
+export const GOOGLE_AUTH_READY = Boolean(GOOGLE_CLIENT_ID && N8N_API_BASE_URL);
+export const GOOGLE_OAUTH_CLIENT_ID = GOOGLE_CLIENT_ID;
+export const PORTAL_API_BASE_URL = N8N_API_BASE_URL;

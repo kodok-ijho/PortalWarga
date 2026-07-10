@@ -1,0 +1,3 @@
+google_sub,email,full_name,phone,block,unit_number,role,approval_status,is_active,approval_note
+google-sub-from-verified-login,user@example.com,Example Resident,6281234567890,A,01,warga,approved,true,Example row only
+google-sub-from-verified-login-admin,admin@example.com,Example Admin,,,,admin,approved,true,Example admin row only

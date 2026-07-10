@@ -1,4 +1,14 @@
 -- =====================================================================
+-- LEGACY/REFERENCE ONLY
+-- ---------------------------------------------------------------------
+-- Production schema source of truth is now:
+-- supabase/migrations/202607080001_initial_production_schema.sql
+--
+-- This v1 file is kept as historical reference until the migration-based
+-- schema is fully adopted by local Supabase CLI workflows.
+-- =====================================================================
+
+-- =====================================================================
 -- Portal Warga Palm Village — Skema Database & RLS (v1)
 -- ---------------------------------------------------------------------
 -- Jalankan di Supabase SQL Editor (dashboard) atau via `supabase db push`.

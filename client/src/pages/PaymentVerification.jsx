@@ -1,15 +1,22 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import {
-  isBendaharaOrAbove,
+  fetchPayments,
+  fetchUnits,
+  fetchResidents,
+  approveManualPayment,
+  rejectManualPayment,
+  IS_DEMO,
+} from '../services/dataService';
+import {
+  getUnitById,
+  getProfileById,
+  mockIPLBills,
   getPendingPayments,
   verifyPayment,
   rejectPayment,
   mockPayments,
-  mockIPLBills,
-  getUnitById,
-  getProfileById,
   formatRupiah,
   formatDate,
   formatPeriod,
@@ -28,7 +35,7 @@ const TABS = [
 ];
 
 export default function PaymentVerification() {
-  const { role, profile } = useAuth();
+  const { role, profile, session } = useAuth();
   const toast = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState('pending');
@@ -36,22 +43,66 @@ export default function PaymentVerification() {
   const [modalMode, setModalMode] = useState(null); // 'detail' | 'reject'
   const [rejectReason, setRejectReason] = useState('');
 
+  const [payments, setPayments] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [residents, setResidents] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        if (IS_DEMO) {
+          // Demo mode uses mock data directly
+          const mockPay = getPendingPayments(); // Just to load mockData module
+          setPayments(mockPayments);
+          setUnits([]);
+          setResidents([]);
+        } else {
+          // Prod mode fetches from API & Supabase
+          const [payData, unitData, resData] = await Promise.all([
+            fetchPayments(session?.access_token),
+            fetchUnits(session?.access_token),
+            fetchResidents(session?.access_token),
+          ]);
+          if (active) {
+            setPayments(payData);
+            setUnits(unitData);
+            setResidents(resData);
+          }
+        }
+      } catch (err) {
+        toast.error('Gagal mengambil data verifikasi.');
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+    loadData();
+    return () => { active = false; };
+  }, [refreshKey, session?.access_token]);
+
+  const getUnit = (unitId) => {
+    return units.find(u => u.id === unitId) || getUnitById(unitId);
+  };
+
+  const getResident = (residentId) => {
+    return residents.find(r => r.id === residentId) || getProfileById(residentId);
+  };
+
   const pendingPayments = useMemo(
-    () => getPendingPayments(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refreshKey]
+    () => payments.filter((p) => p.status === 'pending_verification'),
+    [payments]
   );
 
   const verifiedPayments = useMemo(
-    () => mockPayments.filter((p) => p.status === 'verified'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refreshKey]
+    () => payments.filter((p) => p.status === 'verified'),
+    [payments]
   );
 
   const rejectedPayments = useMemo(
-    () => mockPayments.filter((p) => p.status === 'rejected'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refreshKey]
+    () => payments.filter((p) => p.status === 'rejected'),
+    [payments]
   );
 
   // Guard: Bendahara+ only
@@ -66,12 +117,20 @@ export default function PaymentVerification() {
       ? verifiedPayments
       : rejectedPayments;
 
-  const handleVerify = (payment) => {
-    verifyPayment(payment.id, { verifiedBy: profile.full_name });
-    toast.success(`Pembayaran ${formatPeriod(getBillPeriod(payment))} berhasil diverifikasi.`);
-    setRefreshKey((k) => k + 1);
-    setSelectedPayment(null);
-    setModalMode(null);
+  const handleVerify = async (payment) => {
+    try {
+      if (IS_DEMO) {
+        verifyPayment(payment.id, { verifiedBy: profile.full_name });
+      } else {
+        await approveManualPayment(session?.access_token, { payment_id: payment.id });
+      }
+      toast.success('Pembayaran berhasil diverifikasi.');
+      setRefreshKey((k) => k + 1);
+      setSelectedPayment(null);
+      setModalMode(null);
+    } catch (err) {
+      toast.error(err.message || 'Gagal memverifikasi pembayaran.');
+    }
   };
 
   const openRejectModal = (payment) => {
@@ -80,19 +139,27 @@ export default function PaymentVerification() {
     setRejectReason('');
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!rejectReason.trim()) {
       toast.error('Silakan isi alasan penolakan.');
       return;
     }
-    rejectPayment(selectedPayment.id, {
-      rejectedBy: profile.full_name,
-      reason: rejectReason,
-    });
-    toast.error(`Pembayaran ditolak.`);
-    setRefreshKey((k) => k + 1);
-    setSelectedPayment(null);
-    setModalMode(null);
+    try {
+      if (IS_DEMO) {
+        rejectPayment(selectedPayment.id, {
+          rejectedBy: profile.full_name,
+          reason: rejectReason,
+        });
+      } else {
+        await rejectManualPayment(session?.access_token, { payment_id: selectedPayment.id, note: rejectReason });
+      }
+      toast.warning('Pembayaran ditolak.');
+      setRefreshKey((k) => k + 1);
+      setSelectedPayment(null);
+      setModalMode(null);
+    } catch (err) {
+      toast.error(err.message || 'Gagal menolak pembayaran.');
+    }
   };
 
   const openDetail = (payment) => {
@@ -164,7 +231,12 @@ export default function PaymentVerification() {
       </div>
 
       {/* Payment List */}
-      {currentList.length === 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center p-20 space-y-4">
+          <div className="h-10 w-10 border-4 border-forest-200 border-t-gold-500 rounded-full animate-spin" />
+          <p className="text-sm text-forest-500">Memuat data verifikasi pembayaran...</p>
+        </div>
+      ) : currentList.length === 0 ? (
         <div className="pv-card p-12 text-center">
           <p className="text-sm text-forest-500">
             {activeTab === 'pending'
@@ -177,12 +249,9 @@ export default function PaymentVerification() {
       ) : (
         <div className="space-y-3">
           {currentList.map((payment) => {
-            const unit = getUnitById(payment.unit_id || (() => {
-              const bill = mockIPLBills.find((b) => b.id === payment.ipl_bill_id);
-              return bill?.unit_id;
-            })());
-            const resident = getProfileById(payment.resident_id);
-            const period = getBillPeriod(payment);
+            const unit = getUnit(payment.unit_id || payment._bill?.unit_id);
+            const resident = payment._profile || getResident(payment.resident_id);
+            const period = payment.period || payment._bill?.period || getBillPeriod(payment);
 
             return (
               <div key={payment.id} className="pv-card p-4">
@@ -205,9 +274,24 @@ export default function PaymentVerification() {
                         Periode: <strong>{formatPeriod(period)}</strong> • {formatRupiah(payment.amount)}
                       </p>
                       <div className="flex items-center gap-3 mt-1.5 text-xs text-forest-400">
-                        <span>🏦 Transfer Bank</span>
+                        <span>{payment.method === 'cash' ? '💵 Tunai' : '🏦 Transfer Bank'}</span>
                         <span>📅 {formatDate(payment.paid_at)}</span>
-                        {payment.receipt_file && <span>📎 {payment.receipt_file}</span>}
+                        {(payment.proof_file_url || payment.receipt_file) && (
+                          <a
+                            href={payment.proof_file_url || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => {
+                              if (!payment.proof_file_url) {
+                                e.preventDefault();
+                                alert(`Mengunduh file: ${payment.receipt_file}`);
+                              }
+                            }}
+                            className="text-gold-600 hover:underline flex items-center gap-1"
+                          >
+                            📎 {payment.proof_file_name || payment.receipt_file || 'Bukti'} 🔗
+                          </a>
+                        )}
                       </div>
                       {payment.metadata?.note && (
                         <p className="text-xs text-forest-400 mt-1 italic">"{payment.metadata.note}"</p>
@@ -262,12 +346,14 @@ export default function PaymentVerification() {
               <div className="flex justify-between">
                 <span className="text-forest-500">Warga</span>
                 <span className="font-medium text-forest-900">
-                  {getProfileById(selectedPayment.resident_id)?.full_name || '-'}
+                  {(selectedPayment._profile || getResident(selectedPayment.resident_id))?.full_name || '-'}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-forest-500">Periode</span>
-                <span className="font-medium text-forest-900">{formatPeriod(getBillPeriod(selectedPayment))}</span>
+                <span className="font-medium text-forest-900">
+                  {formatPeriod(selectedPayment.period || selectedPayment._bill?.period || getBillPeriod(selectedPayment))}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-forest-500">Jumlah</span>
@@ -275,7 +361,9 @@ export default function PaymentVerification() {
               </div>
               <div className="flex justify-between">
                 <span className="text-forest-500">Metode</span>
-                <span className="font-medium">🏦 Transfer Bank</span>
+                <span className="font-medium">
+                  {selectedPayment.method === 'cash' ? '💵 Tunai' : selectedPayment.method === 'qris' ? '📱 QRIS' : '🏦 Transfer Bank'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-forest-500">Tanggal Bayar</span>
@@ -298,17 +386,32 @@ export default function PaymentVerification() {
                 </span>
               </div>
 
-              {/* Receipt preview placeholder */}
-              {selectedPayment.receipt_file && (
+              {/* Receipt preview link */}
+              {(selectedPayment.proof_file_url || selectedPayment.receipt_file) && (
                 <div className="mt-4 p-3 rounded-lg bg-forest-50 border border-forest-200">
                   <p className="text-xs font-medium text-forest-700 mb-2">📎 Bukti Transfer</p>
-                  <div className="h-40 rounded-lg bg-forest-100 flex items-center justify-center text-forest-400 text-sm">
-                    <div className="text-center">
-                      <p className="text-2xl mb-1">🖼️</p>
-                      <p className="text-xs">{selectedPayment.receipt_file}</p>
-                      <p className="text-[10px] text-forest-300 mt-1">(Preview tersedia saat Supabase Storage aktif)</p>
+                  <a
+                    href={selectedPayment.proof_file_url || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      if (!selectedPayment.proof_file_url) {
+                        e.preventDefault();
+                        alert(`Mengunduh file: ${selectedPayment.receipt_file}`);
+                      }
+                    }}
+                    className="block p-3 rounded-lg border border-forest-200 bg-white hover:bg-forest-50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-lg">🖼️</span>
+                        <span className="truncate text-xs font-medium text-forest-700">
+                          {selectedPayment.proof_file_name || selectedPayment.receipt_file || 'Lihat Bukti Lampiran'}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gold-600 font-semibold flex-shrink-0">Buka Lampiran 🔗</span>
                     </div>
-                  </div>
+                  </a>
                 </div>
               )}
 
@@ -325,7 +428,7 @@ export default function PaymentVerification() {
                   <button
                     onClick={() => {
                       const bill = mockIPLBills.find((b) => b.id === selectedPayment.bill_id) || { id: selectedPayment.bill_id, period: selectedPayment.period || '2026-01', amount: selectedPayment.amount };
-                      const unit = getUnitById(selectedPayment.unit_id || bill.unit_id);
+                      const unit = getUnit(selectedPayment.unit_id || bill.unit_id);
                       downloadDigitalReceipt({ bill, unit });
                     }}
                     className="inline-flex items-center justify-center gap-1 rounded-lg border border-forest-300 bg-white px-3 py-2 text-xs font-semibold text-forest-800 shadow-sm hover:bg-forest-50 transition-colors"
@@ -335,7 +438,7 @@ export default function PaymentVerification() {
                   <button
                     onClick={async () => {
                       const bill = mockIPLBills.find((b) => b.id === selectedPayment.bill_id) || { id: selectedPayment.bill_id, period: selectedPayment.period || '2026-01', amount: selectedPayment.amount };
-                      const unit = getUnitById(selectedPayment.unit_id || bill.unit_id);
+                      const unit = getUnit(selectedPayment.unit_id || bill.unit_id);
                       toast.info('Mengirim kuitansi digital ke email...');
                       const res = await sendEmailReceipt({ bill, unit });
                       toast.success(res.message);
@@ -378,7 +481,7 @@ export default function PaymentVerification() {
           <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
             <h2 className="text-lg font-bold text-red-700 mb-1">Tolak Pembayaran</h2>
             <p className="text-sm text-forest-500 mb-4">
-              Tolak bukti transfer dari <strong>{getProfileById(selectedPayment.resident_id)?.full_name}</strong>.
+              Tolak bukti transfer dari <strong>{(selectedPayment._profile || getResident(selectedPayment.resident_id))?.full_name}</strong>.
               Warga akan dapat mengirim ulang bukti baru atau membatalkan pembayaran.
             </p>
 
@@ -413,3 +516,4 @@ export default function PaymentVerification() {
     </div>
   );
 }
+

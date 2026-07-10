@@ -1,0 +1,4 @@
+block,unit_number,floor,size,occupancy_status,is_occupied,notes
+A,01,,72.00,owner_occupied,true,Example unit only
+A,02,,72.00,owner_vacant,false,Example unit only
+B,01,,90.00,owner_rented,true,Example unit only
