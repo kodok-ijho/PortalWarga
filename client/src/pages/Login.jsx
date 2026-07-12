@@ -275,12 +275,12 @@ export default function Login() {
               <div className="bg-forest-950/80 border border-forest-800 rounded-xl p-3.5 text-xs text-forest-300 space-y-2">
                 <div className="flex items-center gap-2 text-gold-400 font-semibold">
                   <AiOutlineSafetyCertificate className="text-base shrink-0" />
-                  <span>{IS_DEMO_MODE ? 'Mode Demo' : 'Google OAuth dan App JWT'}</span>
+                  <span>{IS_DEMO_MODE ? 'Mode Uji Coba' : 'Keamanan Akses Portal'}</span>
                 </div>
                 <p className="text-[11px] leading-relaxed text-forest-400">
                   {IS_DEMO_MODE
-                    ? 'Akun demo tidak memakai Google asli dan tidak menghubungi backend production.'
-                    : 'Setelah Google berhasil, portal memakai App JWT dari n8n untuk akses API warga.'}
+                    ? 'Ini adalah simulasi sistem portal warga. Data yang Anda masukkan bersifat sementara.'
+                    : 'Akses masuk diamankan menggunakan sistem autentikasi terverifikasi.'}
                 </p>
               </div>
             </div>
@@ -354,16 +354,16 @@ export default function Login() {
             <div className="mt-6 pt-5 border-t border-forest-800">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[11px] font-bold text-gold-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <AiOutlineCloudSync className="text-sm" /> Simulator JWT (Mode Demo)
+                  <AiOutlineCloudSync className="text-sm" /> Pilih Akun Cepat (Uji Coba)
                 </span>
                 <span className="text-[9px] bg-forest-800 text-forest-300 px-2 py-0.5 rounded-full border border-forest-700">
-                  Supabase + n8n Ready
+                  Demo Mandiri
                 </span>
               </div>
               <p className="text-[11px] text-forest-400 mb-3 leading-tight">
-                Klik peran di bawah untuk menyimulasikan penerimaan token JWT Google OAuth secara instan tanpa melewati popup login eksternal:
+                Klik nama warga atau peran di bawah ini untuk langsung masuk secara otomatis tanpa kata sandi:
               </p>
-              <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto pr-1">
                 {DEMO_ACCOUNT_LIST.map((acc) => (
                   <button
                     key={acc.id}
@@ -390,13 +390,10 @@ export default function Login() {
           )}
         </div>
 
-        {/* Footer info Arsitektur */}
+        {/* Footer info */}
         <div className="mt-6 text-center space-y-1">
           <p className="text-[11px] text-forest-400">
-            Protected by Google OAuth 2.0 and App JWT
-          </p>
-          <p className="text-[10px] text-forest-500">
-            Backend orchestrated via n8n workflows &bull; Database by Supabase PostgreSQL
+            Portal Warga Palm Village
           </p>
         </div>
       </div>

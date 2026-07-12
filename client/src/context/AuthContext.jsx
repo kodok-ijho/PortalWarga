@@ -68,6 +68,38 @@ const DEMO_ACCOUNTS = {
   },
 };
 
+// Generate 50 new accounts dynamically for demo
+const indonesianNames = [
+  "Ahmad Fauzi", "Budi Wijaya", "Cici Amalia", "Dedi Setiadi", "Endang Sri",
+  "Fahmi Idris", "Gita Gutawa", "Hendra Wijaya", "Indah Permata", "Joko Susilo",
+  "Kartika Sari", "Lukman Hakim", "Maria Ulfah", "Novianti", "Oki Setiana",
+  "Prabowo Subianto", "Qori Sandioriva", "Rian d'Masiv", "Siti Badriah", "Taufik Hidayat",
+  "Umar Shihab", "Vicky Shu", "Wulan Guritno", "Xena Aliyah", "Yuni Shara",
+  "Zaskia Adya", "Andi Pratama", "Dewi Sartika", "Eko Yuli", "Fitri Carlina",
+  "Guntur Saputra", "Harianto", "Irmawati", "Junaidi", "Kurniawan",
+  "Lestari", "Mulyadi", "Ningsih", "Oktavianus", "Putra",
+  "Qadir", "Rahmat", "Sari", "Tri", "Utami",
+  "Wahyudi", "Yuliana", "Zulkifli", "Agung", "Bambang"
+];
+
+for (let i = 1; i <= 50; i++) {
+  const id = 18 + i;
+  const email = `warga${i}@palmvillage.id`;
+  DEMO_ACCOUNTS[email] = {
+    password: 'demo123',
+    profile: {
+      id: `p-${id}`,
+      full_name: indonesianNames[i - 1],
+      phone: `0812-${String(1000 + i).padStart(4, '0')}-00${id}`,
+      role: 'warga',
+      unit_id: id,
+      occupancy_status: 'owner_occupied',
+      is_active: true,
+      email,
+    }
+  };
+}
+
 const DEMO_USERS = Object.values(DEMO_ACCOUNTS).map((a) => a.profile);
 
 // ====== Demo auth (mock, tanpa Supabase) ======

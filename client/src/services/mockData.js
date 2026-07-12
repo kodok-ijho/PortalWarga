@@ -288,6 +288,52 @@ export const mockProfiles = [
   },
 ];
 
+// Generate 50 new units and profiles for the demo meeting
+const indonesianNames = [
+  "Ahmad Fauzi", "Budi Wijaya", "Cici Amalia", "Dedi Setiadi", "Endang Sri",
+  "Fahmi Idris", "Gita Gutawa", "Hendra Wijaya", "Indah Permata", "Joko Susilo",
+  "Kartika Sari", "Lukman Hakim", "Maria Ulfah", "Novianti", "Oki Setiana",
+  "Prabowo Subianto", "Qori Sandioriva", "Rian d'Masiv", "Siti Badriah", "Taufik Hidayat",
+  "Umar Shihab", "Vicky Shu", "Wulan Guritno", "Xena Aliyah", "Yuni Shara",
+  "Zaskia Adya", "Andi Pratama", "Dewi Sartika", "Eko Yuli", "Fitri Carlina",
+  "Guntur Saputra", "Harianto", "Irmawati", "Junaidi", "Kurniawan",
+  "Lestari", "Mulyadi", "Ningsih", "Oktavianus", "Putra",
+  "Qadir", "Rahmat", "Sari", "Tri", "Utami",
+  "Wahyudi", "Yuliana", "Zulkifli", "Agung", "Bambang"
+];
+
+for (let i = 1; i <= 50; i++) {
+  const id = 18 + i;
+  const block = String.fromCharCode(68 + Math.floor((i - 1) / 10)); // Block D, E, F, G, H
+  const unitNum = String((i - 1) % 10 + 1).padStart(2, '0');
+  const email = `warga${i}@palmvillage.id`;
+  
+  mockUnits.push({
+    id,
+    block,
+    unit_number: unitNum,
+    floor: ((i - 1) % 3) + 1,
+    size: 72,
+    is_occupied: true,
+    owner_id: `p-${id}`,
+    ipl_schema_id: 'schema-komplit'
+  });
+
+  mockProfiles.push({
+    id: `p-${id}`,
+    full_name: indonesianNames[i - 1],
+    phone: `0812-${String(1000 + i).padStart(4, '0')}-00${id}`,
+    role: 'warga',
+    unit_id: id,
+    occupancy_status: 'owner_occupied',
+    is_active: true,
+    email,
+    approval_status: 'approved',
+    registered_at: `2025-01-${String(10 + i).padStart(2, '0')}T00:00:00Z`
+  });
+}
+
+
 
 // ── IPL SETTINGS ─────────────────────────────────────────────────
 // Konfigurasi IPL yang bisa diubah admin di halaman Settings.
@@ -395,8 +441,13 @@ const residentsWithUnit = mockProfiles.filter((p) => p.unit_id && p.is_active);
 const unitCutoffs = {}; // { unitId: cutoffMonth }
 for (const unit of occupiedUnits) {
   const seed = unit.id * 7 + 3; // deterministik per unit
-  // Range 10-17: sebagian lunas 2025 penuh + sebagian 2026, ada yang menunggak di 2025
-  unitCutoffs[unit.id] = 10 + (seed % 8);
+  if (unit.id > 18) {
+    // 30 unit baru: Pastikan lunas 2025 (>=12) dan acak di 2026 (12 s.d 18)
+    unitCutoffs[unit.id] = 12 + (seed % 7); // Range 12-18
+  } else {
+    // Range 10-17: sebagian lunas 2025 penuh + sebagian 2026, ada yang menunggak di 2025
+    unitCutoffs[unit.id] = 10 + (seed % 8);
+  }
 }
 
 function periodToIndex(period) {
