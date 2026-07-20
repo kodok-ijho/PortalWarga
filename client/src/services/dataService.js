@@ -64,6 +64,7 @@ export async function approveUser(token, payload) {
       profile_id: payload.profile_id,
       role: payload.role,
       unit_id: payload.unit_id,
+      occupancy_status: payload.occupancy_status,
       approval_note: payload.approval_note || '',
     },
   });

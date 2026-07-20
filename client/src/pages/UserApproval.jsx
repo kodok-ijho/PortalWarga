@@ -70,7 +70,7 @@ export default function UserApproval() {
 
   // Role assignment options tergantung role approver
   const allowedRoles = (() => {
-    if (role === 'admin') return ['warga', 'pengurus', 'bendahara'];
+    if (role === 'admin') return ['warga', 'pengurus', 'bendahara', 'admin'];
     if (role === 'bendahara') return ['warga', 'pengurus'];
     return ['warga']; // pengurus hanya bisa assign warga
   })();
