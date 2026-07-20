@@ -373,6 +373,7 @@ export default function PaymentMatrix() {
   const confirmManual = async ({ method, paidAt, note, receiptFile }) => {
     const methodLabel =
       method === 'cash' ? 'tunai' : method === 'bank_transfer' ? 'transfer' : 'QRIS';
+    const noteWithDate = [note?.trim(), `Tanggal diterima: ${paidAt}`].filter(Boolean).join(' | ');
     try {
       if (IS_DEMO) {
         let count = 0;
@@ -381,7 +382,7 @@ export default function PaymentMatrix() {
             method,
             paidAt,
             recordedBy: profile?.full_name || 'staff',
-            note,
+            note: noteWithDate,
             receiptFile,
           });
           count++;
@@ -397,7 +398,7 @@ export default function PaymentMatrix() {
                 bill_id: bill.id,
                 amount: bill.amount,
                 file: receiptFile,
-                note,
+                note: noteWithDate,
                 paid_at: paidAt,
               });
             } else {
@@ -405,14 +406,25 @@ export default function PaymentMatrix() {
                 bill_id: bill.id,
                 amount: bill.amount,
                 file: null,
-                note: note + (firstPayment?.file_url ? ` (Lampiran: ${firstPayment.file_url})` : ''),
+                note: noteWithDate + (firstPayment?.file_url ? ` (Lampiran: ${firstPayment.file_url})` : ''),
                 paid_at: paidAt,
               });
             }
           }
           toast.success(`Pembayaran tunai untuk ${manualModal.bills.length} tagihan berhasil dicatat.`);
+        } else if (method === 'bank_transfer') {
+          for (const bill of manualModal.bills) {
+            await submitManualPayment(session?.access_token, {
+              bill_id: bill.id,
+              method: 'bank_transfer',
+              amount: bill.amount,
+              file: receiptFile,
+              note: noteWithDate,
+            });
+          }
+          toast.success(`Bukti transfer untuk ${manualModal.bills.length} tagihan berhasil dicatat dan menunggu verifikasi bendahara.`);
         } else {
-          toast.error('Metode pembayaran non-tunai melalui panel staff belum didukung. Harap minta warga membayar langsung atau gunakan opsi Tunai.');
+          toast.error('QRIS melalui panel staff belum didukung. Gunakan Transfer atau Tunai.');
           return;
         }
       }
@@ -835,7 +847,7 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
     }
     try {
       const compressed = await compressImage(file);
-      setReceiptFile(compressed);
+      setReceiptFile(compressed.file || file);
     } catch (err) {
       setReceiptFile(file);
     }
@@ -981,7 +993,8 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
 }
 
 // ── Modal input manual (bendahara, multi-bulan lintas tahun) ───────
-// Mendukung 3 metode: Tunai, Transfer Bank (wajib bukti), QRIS.
+// Staff can record transfer proof for residents who cannot use the app yet.
+// Cash remains limited to bendahara/admin.
 function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
   const canRecordCash = isBendaharaOrAbove(role);
   const [method, setMethod] = useState(canRecordCash ? 'cash' : 'bank_transfer');
@@ -990,16 +1003,15 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
   const [receiptFile, setReceiptFile] = useState(null);
   const [uploadError, setUploadError] = useState('');
 
-  const MAX_SIZE = 3 * 1024 * 1024; // 3 MB
-  const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  const MAX_SIZE = 2 * 1024 * 1024; // n8n manual payment endpoint limit
+  const ACCEPTED = ['image/jpeg', 'image/jpg', 'image/png'];
 
   // bills diasumsikan satu unit, sudah runut & terurut (divalidasi sebelum modal).
   const total = bills.reduce((s, b) => s + b.amount, 0);
   const unit = getUnitById(bills[0].unit_id);
   const unitLabel = unit ? `Blok ${unit.block}/${unit.unit_number}` : '';
   const isMulti = bills.length > 1;
-  // QRIS tidak butuh bukti upload (otomatis terverifikasi). Tunai & Transfer wajib.
-  const needsReceipt = method !== 'qris';
+  const needsReceipt = true;
 
   const handleFile = async (e) => {
     setUploadError('');
@@ -1009,20 +1021,20 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
       return;
     }
     if (!ACCEPTED.includes(file.type)) {
-      setUploadError('Format tidak didukung. Gunakan JPG, PNG, WEBP, atau PDF.');
+      setUploadError('Format tidak didukung. Gunakan JPG atau PNG.');
       setReceiptFile(null);
       e.target.value = '';
       return;
     }
     if (file.size > MAX_SIZE) {
-      setUploadError('Ukuran file melebihi 3 MB.');
+      setUploadError('Ukuran file melebihi 2 MB.');
       setReceiptFile(null);
       e.target.value = '';
       return;
     }
     try {
       const compressed = await compressImage(file);
-      setReceiptFile(compressed);
+      setReceiptFile(compressed.file || file);
     } catch (err) {
       setReceiptFile(file);
     }
@@ -1043,9 +1055,7 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
       method,
       paidAt,
       note,
-      // Demo mode: simpan nama file saja. Saat Supabase terhubung,
-      // file asli disimpan di Supabase Storage dan field ini berisi path/URL.
-      receiptFile: receiptFile ? receiptFile.name : null,
+      receiptFile,
     });
   };
 
@@ -1056,19 +1066,22 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
       : 'Unggah foto tanda terima pembayaran tunai yang ditandatangani bendahara.';
 
   // Tombol pilihan metode (dipakai berulang)
-  const methodBtn = (value, label) => (
-    <button
-      type="button"
-      onClick={() => { setMethod(value); setUploadError(''); }}
-      className={`py-2.5 rounded-lg text-sm font-medium border transition-colors ${
-        method === value
-          ? 'bg-forest-800 text-gold-400 border-forest-800'
-          : 'bg-white text-forest-600 border-forest-200 hover:bg-forest-50'
-      }`}
-    >
-      {label}
-    </button>
-  );
+  const methodBtn = (value, label) => {
+    if (value === 'qris') return null;
+    return (
+      <button
+        type="button"
+        onClick={() => { setMethod(value); setUploadError(''); }}
+        className={`py-2.5 rounded-lg text-sm font-medium border transition-colors ${
+          method === value
+            ? 'bg-forest-800 text-gold-400 border-forest-800'
+            : 'bg-white text-forest-600 border-forest-200 hover:bg-forest-50'
+        }`}
+      >
+        {label}
+      </button>
+    );
+  };
 
   return (
     <Modal open onClose={onClose} title="Catat Pembayaran Bendahara" size="md">
@@ -1097,10 +1110,10 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
           </div>
         </div>
 
-        {/* Metode: Tunai / Transfer / QRIS */}
+        {/* Metode: Tunai / Transfer */}
         <div>
           <label className="block text-sm font-medium text-forest-700 mb-1">Metode Pembayaran</label>
-          <div className={`grid ${canRecordCash ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
+          <div className={`grid ${canRecordCash ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
             {canRecordCash && methodBtn('cash', '💵 Tunai')}
             {methodBtn('bank_transfer', '🏦 Transfer')}
             {methodBtn('qris', '📱 QRIS')}
@@ -1118,7 +1131,7 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
           />
         </div>
 
-        {/* Upload bukti hanya untuk Tunai & Transfer (QRIS tidak perlu) */}
+        {/* Upload bukti wajib untuk Tunai & Transfer */}
         {needsReceipt && (
           <div>
             <label className="block text-sm font-medium text-forest-700 mb-1">
@@ -1128,7 +1141,7 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
             <div className="rounded-lg border-2 border-dashed border-forest-200 bg-forest-50/50 p-4">
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp,application/pdf"
+                accept="image/jpeg,image/png"
                 onChange={handleFile}
                 className="block w-full text-xs text-forest-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-forest-800 file:text-gold-400 hover:file:bg-forest-700"
               />
@@ -1138,7 +1151,7 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
                 </p>
               )}
               <p className="mt-1.5 text-[10px] text-forest-400">
-                Format: JPG, PNG, WEBP, atau PDF. Maks 3 MB.
+                Format: JPG atau PNG. Maks 2 MB.
               </p>
             </div>
             {uploadError && (
