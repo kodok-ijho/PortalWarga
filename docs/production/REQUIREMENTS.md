@@ -509,7 +509,7 @@ sequenceDiagram
     N8N->>DB: Create pending_approval profile
     N8N-->>FE: 200 { status: "pending_approval" }
   else Rejected/suspended
-    N8N-->>FE: 403 { code: "ACCOUNT_NOT_ACTIVE" }
+    N8N-->>FE: 403 { code: "SUSPENDED_USER" / "ACCOUNT_REJECTED" }
   else Approved
     N8N->>DB: Update last_login_at
     N8N-->>FE: 200 { token, user }
@@ -571,10 +571,10 @@ Role helper:
 
 ```javascript
 const ROLE_LEVEL = {
-  warga: 1,
-  pengurus: 2,
-  bendahara: 3,
-  admin: 4,
+  warga: 10,
+  pengurus: 20,
+  bendahara: 30,
+  admin: 40,
 };
 
 function hasMinRole(userRole, minRole) {
@@ -620,7 +620,7 @@ Error:
 | `UNAUTHORIZED` | 401 | Missing/invalid/expired token |
 | `PENDING_APPROVAL` | 403 | User exists but not approved |
 | `ACCOUNT_REJECTED` | 403 | User rejected |
-| `ACCOUNT_SUSPENDED` | 403 | User inactive/suspended |
+| `SUSPENDED_USER` | 403 | User inactive/suspended |
 | `FORBIDDEN` | 403 | Role insufficient |
 | `NOT_FOUND` | 404 | Entity not found |
 | `CONFLICT` | 409 | Duplicate or invalid state transition |
@@ -1167,15 +1167,37 @@ Reports:
 ```text
 PV API - Auth Google
 PV API - Auth Me
+PV API - Profile Update
 PV API - Users Pending
 PV API - Users Approve
+PV API - Users Reject
+PV API - Units List
+PV API - Units Upsert
+PV API - Residents List
+PV API - Residents Create
+PV API - Residents Update
+PV API - Residents Delete
+PV API - Residents Import CSV
 PV API - Bills List
 PV API - Bills Generate
+PV API - Payments List
 PV API - Payments QRIS Create
 PV API - Payments Midtrans Webhook
 PV API - Payments Manual Submit
 PV API - Payments Manual Approve
+PV API - Payments Manual Reject
+PV API - Payments Cash Create
+PV API - Files Payment Proof Upload
+PV API - Files Expense Receipt Upload
+PV API - Expenses List
+PV API - Expenses Create
+PV API - Expenses Update
+PV API - Expenses Delete
+PV API - Logs List
 PV API - Reports Running Balance
+PV API - Reports Monthly Finance
+PV API - Settings Update
+PV API - Health Check
 PV JOB - Monthly Billing
 PV JOB - Payment Reminder
 PV JOB - Overdue Reminder

@@ -4,7 +4,7 @@
 >
 > Task: `TASKLIST.md` Phase 2 Task 2.4.
 >
-> Status: implemented and validated with `PV API - Role Check Test` as of 2026-07-09.
+> Status: implemented and validated with `PV API - Role Check Test` on 2026-07-09. The validation-only workflow was archived on 2026-07-11 after the evidence below was recorded.
 
 ---
 
@@ -126,7 +126,7 @@ n8n workflow id:
 gXFYbb1et7uZg3gb
 ```
 
-Production endpoint:
+Former production validation endpoint (archived; no longer active):
 
 ```text
 POST https://n8n-icyxwmjq.runner.web.id/webhook/portal-v1/auth/role-check-test
@@ -142,6 +142,11 @@ Request body used for validation:
 ```
 
 The validation endpoint accepts `minimum_role` only so the role matrix can be tested through one workflow. Real business endpoints must set the required role internally.
+
+Cleanup record:
+
+- Workflow `gXFYbb1et7uZg3gb` was archived on 2026-07-11 during UAT Fixing Phase F3.
+- Keep this section as implementation evidence; do not call the archived endpoint from frontend or production integrations.
 
 ---
 
@@ -177,4 +182,3 @@ Use this pattern in Phase 3 and later:
 - `/bills/generate`: minimum role `bendahara`.
 - `/payments/cash/create`: minimum role `bendahara`.
 - `/settings/update`: minimum role `admin`.
-

@@ -1,4 +1,5 @@
 const API_BASE_URL = (import.meta.env.VITE_N8N_API_BASE_URL || '').replace(/\/+$/, '');
+const API_TIMEOUT_MS = 45000;
 
 export class PortalApiError extends Error {
   constructor(message, options = {}) {
@@ -27,6 +28,27 @@ function normalizePath(path) {
   return path.startsWith('/') ? path : `/${path}`;
 }
 
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new PortalApiError('Koneksi ke API terlalu lama. Silakan coba lagi.', {
+        code: 'API_TIMEOUT',
+      });
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 export async function portalApiPost(path, { token, body } = {}) {
   if (!API_BASE_URL) {
     throw new PortalApiError('Konfigurasi API n8n belum tersedia.', {
@@ -34,7 +56,7 @@ export async function portalApiPost(path, { token, body } = {}) {
     });
   }
 
-  const response = await fetch(`${API_BASE_URL}${normalizePath(path)}`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}${normalizePath(path)}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -84,7 +106,7 @@ export async function portalApiUpload(path, { token, file, fields } = {}) {
     });
   }
 
-  const response = await fetch(`${API_BASE_URL}${normalizePath(path)}`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}${normalizePath(path)}`, {
     method: 'POST',
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -116,44 +138,3 @@ export async function portalApiUpload(path, { token, file, fields } = {}) {
   return payload.data;
 }
 
-function requireToken(token) {
-  if (!token) {
-    throw new PortalApiError('Sesi tidak ditemukan. Silakan login ulang.', {
-      code: 'MISSING_APP_TOKEN',
-      status: 401,
-    });
-  }
-}
-
-export async function fetchPendingUsers(token) {
-  requireToken(token);
-  const data = await portalApiPost('/users/pending', { token });
-  return {
-    users: Array.isArray(data?.users) ? data.users : [],
-    count: Number(data?.count || 0),
-  };
-}
-
-export async function approveUser(token, payload) {
-  requireToken(token);
-  return portalApiPost('/users/approve', {
-    token,
-    body: {
-      profile_id: payload.profile_id,
-      role: payload.role,
-      unit_id: payload.unit_id,
-      approval_note: payload.approval_note || '',
-    },
-  });
-}
-
-export async function rejectUser(token, payload) {
-  requireToken(token);
-  return portalApiPost('/users/reject', {
-    token,
-    body: {
-      profile_id: payload.profile_id,
-      approval_note: payload.approval_note,
-    },
-  });
-}

@@ -48,6 +48,16 @@ export function formatDate(dateStr) {
   return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+export function formatDateTime(dateStr) {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  const datePart = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  const timePart = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  return `${datePart} ${timePart}`;
+}
+
+
 // ── BILL STATUS ──────────────────────────────────────────────────
 export function billStatusLabel(status) {
   const map = { pending: 'Belum Bayar', paid: 'Lunas', overdue: 'Terlambat', partial: 'Sebagian', waiting_verification: 'Menunggu Verifikasi' };
@@ -112,6 +122,17 @@ export function occupancyStatusColor(status) {
     tenant: 'bg-indigo-100 text-indigo-700',
   };
   return map[status] || 'bg-gray-100 text-gray-500';
+}
+
+// ── IPL SCHEMA HELPERS ───────────────────────────────────────────
+export function computeSchemaAmount(schema) {
+  if (!schema || !schema.components) return 0;
+  return schema.components.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+}
+
+export function getSchemaById(schemas, schemaId) {
+  if (!schemas || !schemas.length) return null;
+  return schemas.find((s) => s.id === schemaId) || schemas[0];
 }
 
 // ── MONTH CONSTANTS ──────────────────────────────────────────────

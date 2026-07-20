@@ -1,25 +1,32 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import Modal from '../components/Modal';
 import {
-  getUserList,
-  addMockUser,
-  updateMockUser,
-  deactivateMockUser,
-  mockUnits,
+  fetchUsers,
+  createUser,
+  updateUser,
+  deactivateUser,
+  fetchUnits,
+} from '../services/dataService';
+import {
   roleLabel,
   roleColor,
   isStaffRole,
-} from '../services/mockData';
+} from '../services/dataHelpers';
 import { AiOutlinePlus, AiOutlineEdit, AiOutlineUserDelete } from 'react-icons/ai';
 
 export default function Users() {
-  const { role } = useAuth();
+  const { role, session } = useAuth();
+  const token = session?.access_token;
   const toast = useToast();
 
-  const [users, setUsers] = useState(() => getUserList());
+  const [users, setUsers] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [modalOpen, setModalOpen] = useState(null); // null | 'add' | 'edit'
   const [selectedUser, setSelectedUser] = useState(null); // profile obj to edit
 
@@ -35,6 +42,27 @@ export default function Users() {
   // Search/Filter states
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('');
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [resUsers, resUnits] = await Promise.all([
+        fetchUsers(token),
+        fetchUnits(token),
+      ]);
+      setUsers(resUsers);
+      setUnits(resUnits);
+    } catch (err) {
+      toast.error('Gagal memuat data pengguna/unit.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token, toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Filtered users
   const filteredUsers = useMemo(() => {
@@ -78,7 +106,7 @@ export default function Users() {
   };
 
   // Submit Add User
-  const handleAddSubmit = (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
     if (!fullName || !email) {
       toast.error('Nama dan Email wajib diisi.');
@@ -94,48 +122,71 @@ export default function Users() {
       return;
     }
 
-    const newUser = addMockUser({
-      full_name: fullName,
-      email,
-      phone,
-      role: userRole,
-      unit_id: unitId ? Number(unitId) : null,
-      occupancy_status: unitId ? occupancyStatus : null,
-    });
-
-    setUsers(getUserList());
-    setModalOpen(null);
-    toast.success(`User ${fullName} berhasil ditambahkan!`);
+    setIsSaving(true);
+    try {
+      await createUser(token, {
+        full_name: fullName,
+        email,
+        phone,
+        role: userRole,
+        unit_id: unitId ? Number(unitId) : null,
+        occupancy_status: unitId ? occupancyStatus : null,
+        is_active: true
+      });
+      toast.success(`User ${fullName} berhasil ditambahkan!`);
+      await loadData();
+      setModalOpen(null);
+    } catch (err) {
+      toast.error('Gagal menambahkan user.');
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Submit Edit User
-  const handleEditSubmit = (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!fullName) {
       toast.error('Nama wajib diisi.');
       return;
     }
 
-    updateMockUser(selectedUser.id, {
-      full_name: fullName,
-      phone,
-      role: userRole,
-      unit_id: unitId ? Number(unitId) : null,
-      occupancy_status: unitId ? occupancyStatus : null,
-      is_active: isActive,
-    });
-
-    setUsers(getUserList());
-    setModalOpen(null);
-    toast.success(`User ${fullName} berhasil diperbarui!`);
+    setIsSaving(true);
+    try {
+      await updateUser(token, selectedUser.id, {
+        full_name: fullName,
+        phone,
+        role: userRole,
+        unit_id: unitId ? Number(unitId) : null,
+        occupancy_status: unitId ? occupancyStatus : null,
+        is_active: isActive,
+      });
+      toast.success(`User ${fullName} berhasil diperbarui!`);
+      await loadData();
+      setModalOpen(null);
+    } catch (err) {
+      toast.error('Gagal memperbarui user.');
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Deactivate User
-  const handleDeactivate = (user) => {
+  const handleDeactivate = async (user) => {
     if (window.confirm(`Apakah Anda yakin ingin menonaktifkan akun ${user.full_name}?`)) {
-      deactivateMockUser(user.id);
-      setUsers(getUserList());
-      toast.success(`Akun ${user.full_name} berhasil dinonaktifkan.`);
+      setIsSaving(true);
+      try {
+        await deactivateUser(token, user.id);
+        toast.success(`Akun ${user.full_name} berhasil dinonaktifkan.`);
+        await loadData();
+      } catch (err) {
+        toast.error('Gagal menonaktifkan akun.');
+        console.error(err);
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -193,7 +244,19 @@ export default function Users() {
               </tr>
             </thead>
             <tbody className="divide-y divide-forest-100">
-              {filteredUsers.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center">
+                    <div className="flex justify-center items-center gap-2 text-forest-500 text-sm">
+                      <svg className="animate-spin h-5 w-5 text-gold-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Memuat data pengguna...
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-forest-400">
                     Tidak ditemukan pengguna yang cocok dengan kriteria.
@@ -214,7 +277,7 @@ export default function Users() {
                     </td>
                     <td className="px-4 py-3 text-forest-800 font-medium whitespace-nowrap">
                       {(() => {
-                        const unit = mockUnits.find((un) => un.id === u.unit_id);
+                        const unit = units.find((un) => un.id === u.unit_id);
                         return unit ? `Blok ${unit.block}/${unit.unit_number}` : '—';
                       })()}
                     </td>
@@ -231,7 +294,8 @@ export default function Users() {
                       <div className="flex justify-center items-center gap-1.5">
                         <button
                           onClick={() => openEditModal(u)}
-                          className="p-1.5 text-forest-500 hover:text-forest-800 hover:bg-forest-50 rounded-lg transition-colors"
+                          disabled={isSaving}
+                          className="p-1.5 text-forest-500 hover:text-forest-800 hover:bg-forest-50 rounded-lg transition-colors disabled:opacity-50"
                           title="Edit User"
                         >
                           <AiOutlineEdit className="text-base" />
@@ -239,7 +303,8 @@ export default function Users() {
                         {u.is_active !== false && u.role !== 'admin' && (
                           <button
                             onClick={() => handleDeactivate(u)}
-                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            disabled={isSaving}
+                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                             title="Nonaktifkan User"
                           >
                             <AiOutlineUserDelete className="text-base" />
@@ -259,74 +324,84 @@ export default function Users() {
       {modalOpen === 'add' && (
         <Modal open onClose={() => setModalOpen(null)} title="Tambah Pengguna Baru" size="md">
           <form onSubmit={handleAddSubmit} className="space-y-4 text-sm">
-            <div>
-              <label className="block text-sm font-medium text-forest-700 mb-1">Nama Lengkap</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-                className="pv-input"
-                placeholder="Mis. Fajar Setiawan"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-forest-700 mb-1">Email (Gmail)</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="pv-input"
-                placeholder="warga@gmail.com"
-              />
-              <p className="text-[10px] text-forest-400 mt-0.5">Wajib menggunakan email @gmail.com</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-forest-700 mb-1">No. Telp (WhatsApp)</label>
-              <input
-                type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="pv-input"
-                placeholder="0812-xxxx-xxxx"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-forest-700 mb-1">Role Akses</label>
-              <select value={userRole} onChange={(e) => setUserRole(e.target.value)} className="pv-input">
-                <option value="warga">Warga</option>
-                {(role === 'bendahara' || role === 'admin') && <option value="pengurus">Pengurus</option>}
-                {role === 'admin' && <option value="bendahara">Bendahara</option>}
-                {role === 'admin' && <option value="admin">Admin</option>}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-forest-700 mb-1">Penugasan Unit (Opsional)</label>
-              <select value={unitId} onChange={(e) => setUnitId(e.target.value)} className="pv-input">
-                <option value="">— Tidak ada unit —</option>
-                {mockUnits.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    Blok {unit.block}/{unit.unit_number} ({unit.is_occupied ? 'Berpenghuni' : 'Kosong'})
-                  </option>
-                ))}
-              </select>
-            </div>
-            {unitId && (
+            <fieldset disabled={isSaving} className="space-y-4 border-none p-0 m-0">
               <div>
-                <label className="block text-sm font-medium text-forest-700 mb-1">Status Kepemilikan Unit</label>
-                <select value={occupancyStatus} onChange={(e) => setOccupancyStatus(e.target.value)} className="pv-input">
-                  <option value="owner_occupied">Milik Sendiri (Ditempati)</option>
-                  <option value="owner_vacant">Milik Sendiri (Kosong)</option>
-                  <option value="owner_rented">Milik Sendiri (Dikontrakkan)</option>
-                  <option value="tenant">Penyewa / Kontrak</option>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Nama Lengkap</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  className="pv-input"
+                  placeholder="Mis. Fajar Setiawan"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Email (Gmail)</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="pv-input"
+                  placeholder="warga@gmail.com"
+                />
+                <p className="text-[10px] text-forest-400 mt-0.5">Wajib menggunakan email @gmail.com</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">No. Telp (WhatsApp)</label>
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="pv-input"
+                  placeholder="0812-xxxx-xxxx"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Role Akses</label>
+                <select value={userRole} onChange={(e) => setUserRole(e.target.value)} className="pv-input">
+                  <option value="warga">Warga</option>
+                  {(role === 'bendahara' || role === 'admin') && <option value="pengurus">Pengurus</option>}
+                  {role === 'admin' && <option value="bendahara">Bendahara</option>}
+                  {role === 'admin' && <option value="admin">Admin</option>}
                 </select>
               </div>
-            )}
-            <div className="flex gap-2 pt-2">
-              <button type="button" onClick={() => setModalOpen(null)} className="pv-btn-ghost flex-1">Batal</button>
-              <button type="submit" className="pv-btn-primary flex-1">Tambah User</button>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Penugasan Unit (Opsional)</label>
+                <select value={unitId} onChange={(e) => setUnitId(e.target.value)} className="pv-input">
+                  <option value="">— Tidak ada unit —</option>
+                  {units.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      Blok {unit.block}/{unit.unit_number} ({unit.is_occupied ? 'Berpenghuni' : 'Kosong'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {unitId && (
+                <div>
+                  <label className="block text-sm font-medium text-forest-700 mb-1">Status Kepemilikan Unit</label>
+                  <select value={occupancyStatus} onChange={(e) => setOccupancyStatus(e.target.value)} className="pv-input">
+                    <option value="owner_occupied">Milik Sendiri (Ditempati)</option>
+                    <option value="owner_vacant">Milik Sendiri (Kosong)</option>
+                    <option value="owner_rented">Milik Sendiri (Dikontrakkan)</option>
+                    <option value="tenant">Penyewa / Kontrak</option>
+                  </select>
+                </div>
+              )}
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setModalOpen(null)} disabled={isSaving} className="pv-btn-ghost flex-1">Batal</button>
+                <button type="submit" disabled={isSaving} className="pv-btn-primary flex-1 flex items-center justify-center gap-2">
+                  {isSaving && (
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  )}
+                  {isSaving ? 'Menambahkan...' : 'Tambah User'}
+                </button>
+              </div>
+            </fieldset>
           </form>
         </Modal>
       )}
@@ -335,85 +410,95 @@ export default function Users() {
       {modalOpen === 'edit' && (
         <Modal open onClose={() => setModalOpen(null)} title="Ubah Detail Pengguna" size="md">
           <form onSubmit={handleEditSubmit} className="space-y-4 text-sm">
-            <div>
-              <label className="block text-sm font-medium text-forest-700 mb-1">Nama Lengkap</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-                className="pv-input"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-forest-700 mb-1">Email (Gmail)</label>
-              <input
-                type="email"
-                value={email}
-                disabled
-                className="pv-input bg-forest-50/60 cursor-not-allowed"
-              />
-              <p className="text-[10px] text-forest-400 mt-0.5">Email tidak dapat diubah setelah pendaftaran.</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-forest-700 mb-1">No. Telp (WhatsApp)</label>
-              <input
-                type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="pv-input"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-forest-700 mb-1">Role Akses</label>
-              <select value={userRole} onChange={(e) => setUserRole(e.target.value)} className="pv-input">
-                <option value="warga">Warga</option>
-                {(role === 'bendahara' || role === 'admin') && <option value="pengurus">Pengurus</option>}
-                {role === 'admin' && <option value="bendahara">Bendahara</option>}
-                {role === 'admin' && <option value="admin">Admin</option>}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-forest-700 mb-1">Penugasan Unit</label>
-              <select value={unitId} onChange={(e) => setUnitId(e.target.value)} className="pv-input">
-                <option value="">— Tidak ada unit —</option>
-                {mockUnits.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    Blok {unit.block}/{unit.unit_number}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {unitId && (
+            <fieldset disabled={isSaving} className="space-y-4 border-none p-0 m-0">
               <div>
-                <label className="block text-sm font-medium text-forest-700 mb-1">Status Kepemilikan Unit</label>
-                <select value={occupancyStatus} onChange={(e) => setOccupancyStatus(e.target.value)} className="pv-input">
-                  <option value="owner_occupied">Milik Sendiri (Ditempati)</option>
-                  <option value="owner_vacant">Milik Sendiri (Kosong)</option>
-                  <option value="owner_rented">Milik Sendiri (Dikontrakkan)</option>
-                  <option value="tenant">Penyewa / Kontrak</option>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Nama Lengkap</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  className="pv-input"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Email (Gmail)</label>
+                <input
+                  type="email"
+                  value={email}
+                  disabled
+                  className="pv-input bg-forest-50/60 cursor-not-allowed"
+                />
+                <p className="text-[10px] text-forest-400 mt-0.5">Email tidak dapat diubah setelah pendaftaran.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">No. Telp (WhatsApp)</label>
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="pv-input"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Role Akses</label>
+                <select value={userRole} onChange={(e) => setUserRole(e.target.value)} className="pv-input">
+                  <option value="warga">Warga</option>
+                  {(role === 'bendahara' || role === 'admin') && <option value="pengurus">Pengurus</option>}
+                  {role === 'admin' && <option value="bendahara">Bendahara</option>}
+                  {role === 'admin' && <option value="admin">Admin</option>}
                 </select>
               </div>
-            )}
-            <div className="flex items-center justify-between p-3 rounded-lg border border-forest-100 bg-forest-50/20">
               <div>
-                <p className="text-sm font-semibold text-forest-800">Status Akun</p>
-                <p className="text-[10px] text-forest-500">Aktifkan atau nonaktifkan akses masuk warga</p>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Penugasan Unit</label>
+                <select value={unitId} onChange={(e) => setUnitId(e.target.value)} className="pv-input">
+                  <option value="">— Tidak ada unit —</option>
+                  {units.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      Blok {unit.block}/{unit.unit_number}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-forest-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold-500"></div>
-              </label>
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button type="button" onClick={() => setModalOpen(null)} className="pv-btn-ghost flex-1">Batal</button>
-              <button type="submit" className="pv-btn-primary flex-1">Simpan Perubahan</button>
-            </div>
+              {unitId && (
+                <div>
+                  <label className="block text-sm font-medium text-forest-700 mb-1">Status Kepemilikan Unit</label>
+                  <select value={occupancyStatus} onChange={(e) => setOccupancyStatus(e.target.value)} className="pv-input">
+                    <option value="owner_occupied">Milik Sendiri (Ditempati)</option>
+                    <option value="owner_vacant">Milik Sendiri (Kosong)</option>
+                    <option value="owner_rented">Milik Sendiri (Dikontrakkan)</option>
+                    <option value="tenant">Penyewa / Kontrak</option>
+                  </select>
+                </div>
+              )}
+              <div className="flex items-center justify-between p-3 rounded-lg border border-forest-100 bg-forest-50/20">
+                <div>
+                  <p className="text-sm font-semibold text-forest-800">Status Akun</p>
+                  <p className="text-[10px] text-forest-500">Aktifkan atau nonaktifkan akses masuk warga</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-forest-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold-500"></div>
+                </label>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setModalOpen(null)} disabled={isSaving} className="pv-btn-ghost flex-1">Batal</button>
+                <button type="submit" disabled={isSaving} className="pv-btn-primary flex-1 flex items-center justify-center gap-2">
+                  {isSaving && (
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  )}
+                  {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </fieldset>
           </form>
         </Modal>
       )}

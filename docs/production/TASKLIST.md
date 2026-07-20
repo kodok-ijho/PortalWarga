@@ -79,7 +79,7 @@ Current production-upgrade state:
   - [x] Phase 6 - Master Data and Billing.
   - [x] Phase 7 - Manual Payment.
 - Recommended next task:
-  - [ ] Phase 8 - Expenses and House Records.
+  - [x] Phase 8 - Expenses (fully migrated to production).
 
 Latest Phase 1/2 revalidation on 2026-07-09:
 
@@ -557,8 +557,8 @@ Notes:
   - `admin = 40`
 - n8n validation workflow created: `PV API - Role Check Test`.
 - n8n workflow id: `gXFYbb1et7uZg3gb`.
-- Workflow is published/active.
-- Production endpoint: `POST https://n8n-icyxwmjq.runner.web.id/webhook/portal-v1/auth/role-check-test`.
+- Workflow was published/active for validation, then archived on 2026-07-11 during UAT Fixing Phase F3.
+- Former production endpoint: `POST https://n8n-icyxwmjq.runner.web.id/webhook/portal-v1/auth/role-check-test` (inactive after archive).
 - Manual validation:
   - Execution `237378`: `warga` rejected from `admin` minimum role with `statusCode = 403`, `error.code = FORBIDDEN_ROLE`.
   - Execution `237379`: `pengurus` accepted for `pengurus` minimum role with `statusCode = 200`, `ok = true`.
@@ -1357,6 +1357,12 @@ Deliverables:
 Validation:
 
 - [x] Dry run writes no bills (verified via active n8n conditional execution path).
+- [x] UAT Fixing F4 execution `239452` returned exact coverage for 53 units (`0 preview + 53 skipped`) in about 1.26 seconds.
+
+Reliability update (2026-07-11):
+
+- Supabase lookup nodes `Fetch All Units`, `Fetch All Active Warga`, and `Fetch Existing Bills` use `executeOnce=true` to prevent item fan-out.
+- Corrected active workflow version: `317e7e49-db79-4863-af35-2365dbb5c2f5`.
 
 ### Task 6.5 - Implement Bill Generate Commit
 
@@ -1380,6 +1386,8 @@ Validation:
 
 Notes:
 - Both dry-run and commit flow are unified inside a single active n8n workflow.
+- A fully populated period now returns a successful no-change response (`generated_count=0`, `skipped_count=53`) instead of ending with no webhook response.
+- Idempotency execution `239453` did not execute `Insert Bills` or `Insert Audit Log`; bill and audit counts remained unchanged.
 - UI generator added at the bottom of the `Settings.jsx` page (visible only to Bendahara and Admin).
 - Supports real-time preview showing: period, count ready to create, skipped count, total nominal sum, list of previewed units with resident names.
 - Triggers are fully wired to `dataService.generateBills()`.

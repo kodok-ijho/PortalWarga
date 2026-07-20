@@ -27,9 +27,10 @@ export default function Reports() {
   const { role, session } = useAuth();
   const toast = useToast();
 
-  const years = [2025, 2026];
+  const years = [2026, 2027, 2028];
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const [reportType, setReportType] = useState('monthly'); // 'monthly' | 'yearly'
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
@@ -45,24 +46,154 @@ export default function Reports() {
     setIsLoading(true);
     setLoadError('');
     try {
-      // 1. Fetch monthly finance report
-      const finRes = await fetchMonthlyFinance(session?.access_token, { year, month });
-      const finData = finRes.data || finRes;
-      setReport(finData.report);
-      setExpenses(finData.expenses || []);
-      setCashPayments(finData.cashPayments || []);
+      if (reportType === 'monthly') {
+        // 1. Fetch monthly finance report
+        const finRes = await fetchMonthlyFinance(session?.access_token, { year, month });
+        const finData = finRes.data || finRes;
+        setReport(finData.report);
+        setExpenses(finData.expenses || []);
+        setCashPayments(finData.cashPayments || []);
 
-      // 2. Fetch running balance chain
-      const balRes = await fetchRunningBalance(session?.access_token, { year, month });
-      const balData = balRes.data || balRes;
-      setRunningChain(balData.chain || []);
+        // 2. Fetch running balance chain
+        const balRes = await fetchRunningBalance(session?.access_token, { year, month });
+        const balData = balRes.data || balRes;
+        setRunningChain(balData.chain || []);
+      } else {
+        // Yearly mode: July Y to June Y+1
+        const monthsOfFiscalYear = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+        const promises = monthsOfFiscalYear.map((m) => {
+          const y = m >= 7 ? year : year + 1;
+          return fetchMonthlyFinance(session?.access_token, { year: y, month: m });
+        });
+        
+        const results = await Promise.all(promises);
+        
+        // Fetch running balance up to the end of the fiscal year (June Y+1) to get the correct balance chain
+        const balRes = await fetchRunningBalance(session?.access_token, { year: year + 1, month: 6 });
+        const balData = balRes.data || balRes;
+        const allChain = balData.chain || [];
+        setRunningChain(allChain);
+
+        // Aggregate 12 months data
+        let totalBilled = 0;
+        let totalCollected = 0;
+        let paidCount = 0;
+        let billCount = 0;
+        const byBlockMap = {};
+        const aggregatedDetails = [];
+        const aggregatedExpenses = [];
+        const aggregatedPayments = [];
+
+        results.forEach((res) => {
+          const data = res.data || res;
+          const rep = data.report || {};
+          
+          totalBilled += Number(rep.totalBilled || 0);
+          totalCollected += Number(rep.totalCollected || 0);
+          paidCount += Number(rep.paidCount || 0);
+          billCount += Number(rep.billCount || 0);
+
+          if (rep.byBlock) {
+            rep.byBlock.forEach((b) => {
+              if (!byBlockMap[b.block]) {
+                byBlockMap[b.block] = { block: b.block, collected: 0, billed: 0 };
+              }
+              byBlockMap[b.block].collected += Number(b.collected || 0);
+              byBlockMap[b.block].billed += Number(b.billed || 0);
+            });
+          }
+
+          if (rep.details) {
+            aggregatedDetails.push(...rep.details);
+          }
+          if (data.expenses) {
+            aggregatedExpenses.push(...data.expenses);
+          }
+          if (data.cashPayments) {
+            aggregatedPayments.push(...data.cashPayments);
+          }
+        });
+
+        // Group details by unit so that the unit list has unique rows showing yearly summary
+        const groupedDetailsMap = {};
+        aggregatedDetails.forEach((d) => {
+          const key = `${d.block}-${d.unitNumber}`;
+          if (!groupedDetailsMap[key]) {
+            groupedDetailsMap[key] = {
+              unitId: d.unit_id,
+              unitNumber: d.unitNumber,
+              block: d.block,
+              residentName: d.residentName,
+              amount: 0,
+              paidCount: 0,
+              billedCount: 0,
+            };
+          }
+          groupedDetailsMap[key].amount += d.amount;
+          groupedDetailsMap[key].billedCount += 1;
+          if (d.status === 'paid') {
+            groupedDetailsMap[key].paidCount += 1;
+          }
+        });
+
+        const groupedDetails = Object.values(groupedDetailsMap).map((d) => {
+          let statusLabel = 'Belum Bayar';
+          if (d.paidCount === d.billedCount) {
+            statusLabel = 'paid'; // Lunas
+          } else if (d.paidCount > 0) {
+            statusLabel = 'partially_paid'; // Bayar Sebagian (Custom status for yearly)
+          } else {
+            statusLabel = 'pending'; // Belum Bayar
+          }
+          return {
+            unit_id: d.unitId,
+            unitNumber: d.unitNumber,
+            block: d.block,
+            residentName: d.residentName,
+            amount: d.amount,
+            status: statusLabel,
+            paidAt: null, // Multiple payments, so null
+            paidCount: d.paidCount,
+            billedCount: d.billedCount
+          };
+        });
+
+        // Sort details by block/unit
+        groupedDetails.sort((a, b) => {
+          const blockCompare = String(a.block || '').localeCompare(String(b.block || ''), 'id-ID', { numeric: true, sensitivity: 'base' });
+          if (blockCompare !== 0) return blockCompare;
+          return String(a.unitNumber || '').localeCompare(String(b.unitNumber || ''), 'id-ID', { numeric: true, sensitivity: 'base' });
+        });
+
+        const totalOutstanding = totalBilled - totalCollected;
+        const collectionRate = totalBilled > 0 ? (totalCollected / totalBilled) * 100 : 0;
+        const byBlock = Object.values(byBlockMap).sort((a, b) => a.block.localeCompare(b.block));
+
+        setReport({
+          billCount,
+          paidCount,
+          totalBilled,
+          totalCollected,
+          totalOutstanding,
+          collectionRate,
+          byBlock,
+          details: groupedDetails
+        });
+
+        // Sort expenses and payments by date
+        aggregatedExpenses.sort((a, b) => new Date(a.expense_date).getTime() - new Date(b.expense_date).getTime());
+        aggregatedPayments.sort((a, b) => new Date(a.paid_at).getTime() - new Date(b.paid_at).getTime());
+
+        setExpenses(aggregatedExpenses);
+        setCashPayments(aggregatedPayments);
+      }
     } catch (err) {
       setLoadError(err.message || 'Gagal memuat data laporan keuangan.');
       toast.error(err.message || 'Gagal memuat data laporan keuangan.');
     } finally {
       setIsLoading(false);
     }
-  }, [session?.access_token, year, month, toast]);
+  }, [session?.access_token, year, month, reportType, toast]);
 
   useEffect(() => {
     if (hasMinRole(role, 'pengurus')) {
@@ -70,42 +201,99 @@ export default function Reports() {
     }
   }, [loadData, role]);
 
-  // Running Balance dan Rincian untuk bulan terpilih
-  const monthlyBalance = useMemo(() => {
-    const periodStr = `${year}-${String(month).padStart(2, '0')}`;
-    const matched = runningChain.find(item => item.period === periodStr);
-    return matched || {
-      period: periodStr,
-      year,
-      month,
-      openingBalance: 15000000,
-      totalIncome: 0,
-      totalExpense: 0,
-      closingBalance: 15000000,
-      incomeCount: 0,
-      expenseCount: 0,
-    };
-  }, [runningChain, year, month]);
+  const periodLabel = useMemo(() => {
+    if (reportType === 'monthly') {
+      return `${MONTHS_LONG[month - 1]} ${year}`;
+    }
+    return `Juli ${year} - Juni ${year + 1}`;
+  }, [reportType, year, month]);
 
-  const totalCashIn = monthlyBalance.totalIncome;
-  const totalExpenses = monthlyBalance.totalExpense;
+  // Running Balance dan Rincian untuk periode terpilih
+  const activeBalance = useMemo(() => {
+    if (reportType === 'monthly') {
+      const periodStr = `${year}-${String(month).padStart(2, '0')}`;
+      const matched = runningChain.find(item => item.period === periodStr);
+      return matched || {
+        period: periodStr,
+        year,
+        month,
+        openingBalance: 15000000,
+        totalIncome: 0,
+        totalExpense: 0,
+        closingBalance: 15000000,
+        incomeCount: 0,
+        expenseCount: 0,
+      };
+    } else {
+      // Yearly: July Y to June Y+1
+      const startPeriod = `${year}-07`;
+      const endPeriod = `${year + 1}-06`;
+      
+      const startMonthData = runningChain.find(item => item.period === startPeriod);
+      const endMonthData = runningChain.find(item => item.period === endPeriod);
+      
+      // Sum incomes and expenses within range
+      let totalIncome = 0;
+      let totalExpense = 0;
+      runningChain.forEach(item => {
+        if (item.period >= startPeriod && item.period <= endPeriod) {
+          totalIncome += Number(item.totalIncome || 0);
+          totalExpense += Number(item.totalExpense || 0);
+        }
+      });
+      
+      const opening = startMonthData ? startMonthData.openingBalance : 15000000;
+      const closing = endMonthData ? endMonthData.closingBalance : (opening + totalIncome - totalExpense);
+
+      return {
+        period: `${year}/${year+1}`,
+        year,
+        month: 0,
+        openingBalance: opening,
+        totalIncome,
+        totalExpense,
+        closingBalance: closing,
+        incomeCount: 0,
+        expenseCount: 0,
+      };
+    }
+  }, [runningChain, year, month, reportType]);
+
+  const totalCashIn = activeBalance.totalIncome;
+  const totalExpenses = activeBalance.totalExpense;
   const netBalance = totalCashIn - totalExpenses;
-  const openingBalance = monthlyBalance.openingBalance;
-  const closingBalance = monthlyBalance.closingBalance;
+  const openingBalance = activeBalance.openingBalance;
+  const closingBalance = activeBalance.closingBalance;
 
   // Data tren untuk AreaChart
   const trenData = useMemo(() => {
-    return runningChain.map((item) => {
-      const [y, m] = item.period.split('-');
-      const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-      return {
-        name: `${monthsShort[parseInt(m) - 1]} ${y.substring(2)}`,
-        Pemasukan: item.totalIncome,
-        Pengeluaran: item.totalExpense,
-        Saldo: item.closingBalance,
-      };
-    });
-  }, [runningChain]);
+    if (reportType === 'monthly') {
+      return runningChain.map((item) => {
+        const [y, m] = item.period.split('-');
+        const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        return {
+          name: `${monthsShort[parseInt(m) - 1]} ${y.substring(2)}`,
+          Pemasukan: item.totalIncome,
+          Pengeluaran: item.totalExpense,
+          Saldo: item.closingBalance,
+        };
+      });
+    } else {
+      const startPeriod = `${year}-07`;
+      const endPeriod = `${year + 1}-06`;
+      const filtered = runningChain.filter(item => item.period >= startPeriod && item.period <= endPeriod);
+      return filtered.map((item) => {
+        const [y, m] = item.period.split('-');
+        const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        return {
+          name: `${monthsShort[parseInt(m) - 1]} ${y.substring(2)}`,
+          Pemasukan: item.totalIncome,
+          Pengeluaran: item.totalExpense,
+          Saldo: item.closingBalance,
+        };
+      });
+    }
+  }, [runningChain, year, reportType]);
 
   // Data untuk bar chart per blok
   const blockData = useMemo(() => {
@@ -136,10 +324,32 @@ export default function Reports() {
 
   const handleExportCSV = () => {
     if (!report) return;
-    const header = ['Unit', 'Blok', 'Penghuni', 'Jumlah', 'Status', 'Tanggal Bayar'];
-    const rows = report.details.map((d) => [
-      d.unitNumber, d.block, d.residentName, d.amount, billStatusLabel(d.status), d.paidAt ? formatDate(d.paidAt) : '-',
-    ]);
+    const isYearly = reportType === 'yearly';
+    const header = isYearly 
+      ? ['Unit', 'Blok', 'Penghuni', 'Total Billed', 'Bulan Lunas', 'Status']
+      : ['Unit', 'Blok', 'Penghuni', 'Jumlah', 'Status', 'Tanggal Bayar'];
+      
+    const rows = report.details.map((d) => {
+      if (isYearly) {
+        return [
+          d.unitNumber, 
+          d.block, 
+          d.residentName, 
+          d.amount, 
+          `${d.paidCount}/${d.billedCount}`, 
+          d.status === 'paid' ? 'Lunas' : d.status === 'partially_paid' ? 'Bayar Sebagian' : 'Belum Bayar'
+        ];
+      } else {
+        return [
+          d.unitNumber, 
+          d.block, 
+          d.residentName, 
+          d.amount, 
+          billStatusLabel(d.status), 
+          d.paidAt ? formatDate(d.paidAt) : '-'
+        ];
+      }
+    });
     const csv = Papa.unparse({
       fields: header,
       data: [
@@ -197,31 +407,59 @@ export default function Reports() {
 
   return (
     <div className="space-y-5">
+      {/* Tab Selector */}
+      <div className="no-print flex border-b border-forest-100 mb-4">
+        <button
+          onClick={() => setReportType('monthly')}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
+            reportType === 'monthly'
+              ? 'border-forest-800 text-forest-800'
+              : 'border-transparent text-forest-400 hover:text-forest-600'
+          }`}
+        >
+          📅 Laporan Bulanan
+        </button>
+        <button
+          onClick={() => setReportType('yearly')}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
+            reportType === 'yearly'
+              ? 'border-forest-800 text-forest-800'
+              : 'border-transparent text-forest-400 hover:text-forest-600'
+          }`}
+        >
+          📆 Laporan Tahunan (Juli - Juni)
+        </button>
+      </div>
+
       {/* Header & filter */}
       <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-forest-900">Laporan Keuangan IPL</h2>
           <p className="text-sm text-forest-500">
-            Periode: {MONTHS_LONG[month - 1]} {year}
+            Periode: {periodLabel}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-            className="pv-input w-auto text-sm"
-          >
-            {availableMonths.map((m) => (
-              <option key={m} value={m}>{MONTHS_LONG[m - 1]}</option>
-            ))}
-          </select>
+          {reportType === 'monthly' && (
+            <select
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              className="pv-input w-auto text-sm"
+            >
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>{MONTHS_LONG[m - 1]}</option>
+              ))}
+            </select>
+          )}
           <select
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
             className="pv-input w-auto text-sm"
           >
             {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
+              <option key={y} value={y}>
+                {reportType === 'yearly' ? `Tahun Buku ${y}/${y + 1}` : y}
+              </option>
             ))}
           </select>
           <button onClick={handlePrint} className="pv-btn-ghost text-xs">
@@ -235,7 +473,7 @@ export default function Reports() {
 
       {report.billCount === 0 ? (
         <div className="pv-card p-10 text-center text-forest-400 text-sm">
-          Tidak ada data tagihan untuk periode {MONTHS_LONG[month - 1]} {year}.
+          Tidak ada data tagihan untuk periode {periodLabel}.
         </div>
       ) : (
         <>
@@ -264,7 +502,7 @@ export default function Reports() {
           {/* Grafik Tren Running Balance */}
           <div className="pv-card p-5">
             <h3 className="text-sm font-semibold text-forest-800 mb-4">
-              Tren Arus Kas & Saldo Kumulatif (Sejak Jan 2025)
+              Tren Arus Kas & Saldo Kumulatif (Sejak Jul 2026)
             </h3>
             <ResponsiveContainer width="100%" height={320}>
               <AreaChart data={trenData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
@@ -361,7 +599,7 @@ export default function Reports() {
           <div className="pv-card overflow-hidden">
             <div className="px-5 py-3 border-b border-forest-100 bg-forest-50">
               <h3 className="text-sm font-semibold text-forest-800">
-                Histori Running Balance (Sejak Januari 2025)
+                Histori Running Balance (Sejak Juli 2026)
               </h3>
               <p className="text-[11px] text-forest-500 mt-0.5">
                 Perkembangan saldo kas dari bulan ke bulan secara runut. Saldo Akhir otomatis bergulir menjadi Saldo Awal bulan berikutnya.
@@ -416,7 +654,7 @@ export default function Reports() {
           <div className="pv-card overflow-hidden">
             <div className="px-5 py-3 border-b border-forest-100 bg-forest-50">
               <h3 className="text-sm font-semibold text-forest-800">
-                Rincian Kas Masuk IPL — {MONTHS_LONG[month - 1]} {year}
+                Rincian Kas Masuk IPL — {periodLabel}
               </h3>
               <p className="text-[11px] text-forest-500 mt-0.5">
                 Berdasarkan tanggal pembayaran, tanpa memandang periode tagihan IPL yang dilunasi.
@@ -424,7 +662,7 @@ export default function Reports() {
             </div>
             {cashPayments.length === 0 ? (
               <div className="p-10 text-center text-forest-400 text-sm">
-                Belum ada pembayaran yang tercatat pada {MONTHS_LONG[month - 1]} {year}.
+                Belum ada pembayaran yang tercatat pada {periodLabel}.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -478,7 +716,7 @@ export default function Reports() {
           {/* ── Section Pengeluaran ── */}
           <div className="pv-card p-5">
             <h3 className="text-sm font-semibold text-forest-800 mb-4">
-              Rincian Pengeluaran Kas — {MONTHS_LONG[month - 1]} {year}
+              Rincian Pengeluaran Kas — {periodLabel}
             </h3>
             {expenses.length === 0 ? (
               <p className="text-sm text-forest-400 text-center py-6">
@@ -511,39 +749,39 @@ export default function Reports() {
           <div className="pv-card overflow-hidden">
             <div className="px-5 py-3 border-b border-forest-100 bg-forest-800">
               <h3 className="text-sm font-semibold text-gold-400">
-                Neraca Arus Kas — {MONTHS_LONG[month - 1]} {year}
+                Neraca Arus Kas — {periodLabel}
               </h3>
             </div>
             <div className="p-5 space-y-3 text-sm">
               <div className="flex justify-between items-center py-2 border-b border-forest-50">
                 <span className="text-forest-600 flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-amber-400"></span>
-                  Saldo Awal Bulan (Carry-forward)
+                  Saldo Awal Periode (Carry-forward)
                 </span>
                 <span className="font-semibold text-forest-800">{formatRupiah(openingBalance)}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-forest-50">
                 <span className="text-forest-600 flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                  Pemasukan IPL Bulan Ini
+                  Pemasukan IPL Periode Ini
                 </span>
                 <span className="font-semibold text-emerald-600">+ {formatRupiah(totalCashIn)}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-forest-50">
                 <span className="text-forest-600 flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-red-500"></span>
-                  Pengeluaran Kas Bulan Ini
+                  Pengeluaran Kas Periode Ini
                 </span>
                 <span className="font-semibold text-red-600">− {formatRupiah(totalExpenses)}</span>
               </div>
               <div className="flex justify-between items-center py-3 mt-2 bg-forest-50 rounded-lg px-3">
-                <span className="font-semibold text-forest-800">Saldo Akhir Bulan</span>
+                <span className="font-semibold text-forest-800">Saldo Akhir Periode</span>
                 <span className={`font-bold text-base ${closingBalance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                   {formatRupiah(closingBalance)}
                 </span>
               </div>
               <p className="text-[11px] text-forest-400 pt-1">
-                Laporan ini dihitung menggunakan basis kas masuk running balance (kumulatif), dimulai dari Januari 2025 (Saldo Awal Kas = Rp 15.000.000 dari peralihan pengurus sebelumnya).
+                Laporan ini dihitung menggunakan basis kas masuk running balance (kumulatif), dimulai dari Juli 2026.
               </p>
             </div>
           </div>

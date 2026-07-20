@@ -273,7 +273,7 @@ export default function UserApproval() {
                   type="text"
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  disabled={!IS_DEMO}
+                  disabled={!!actionKey}
                   className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none disabled:bg-forest-50 disabled:text-forest-500"
                 />
               </div>
@@ -285,7 +285,7 @@ export default function UserApproval() {
                   type="text"
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
-                  disabled={!IS_DEMO}
+                  disabled={!!actionKey}
                   className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none disabled:bg-forest-50 disabled:text-forest-500"
                 />
               </div>

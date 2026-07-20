@@ -95,6 +95,7 @@ Naming rules:
 | Workflow | Method | Route | Minimum Role | Purpose |
 | --- | --- | --- | --- | --- |
 | `PV API - Auth Me` | `POST` | `/portal-v1/auth/me` | `warga` | Return current approved profile |
+| `PV API - Profile Update` | `POST` | `/portal-v1/profile/update` | `warga` | Update own profile (full_name, phone, avatar_url) |
 
 ### 4.3 User Approval and Management
 
@@ -123,6 +124,7 @@ Naming rules:
 
 | Workflow | Method | Route | Minimum Role | Purpose |
 | --- | --- | --- | --- | --- |
+| `PV API - Payments List` | `POST` | `/portal-v1/payments/list` | `bendahara` | List all payments with joined bill/unit data |
 | `PV API - Payments Manual Submit` | `POST` | `/portal-v1/payments/manual/submit` | `warga` | Submit transfer proof and create pending verification payment |
 | `PV API - Payments Cash Create` | `POST` | `/portal-v1/payments/cash/create` | `bendahara` | Record cash payment |
 | `PV API - Payments Manual Approve` | `POST` | `/portal-v1/payments/manual/approve` | `bendahara` | Approve pending manual payment |
@@ -142,7 +144,11 @@ QRIS is optional if the project keeps a strict zero-monthly-cost / low-cost manu
 
 | Workflow | Method | Route | Minimum Role | Purpose |
 | --- | --- | --- | --- | --- |
-| `PV API - Expenses Create` | `POST` | `/portal-v1/expenses/create` | `bendahara` | Create expense record |
+| `PV API - Expenses List` | `POST` | `/portal-v1/expenses/list` | `bendahara` | List all expense records |
+| `PV API - Expenses Create` | `POST` | `/portal-v1/expenses/create` | `bendahara` | Create expense record with optional receipt upload |
+| `PV API - Expenses Update` | `POST` | `/portal-v1/expenses/update` | `bendahara` | Update existing expense record |
+| `PV API - Expenses Delete` | `POST` | `/portal-v1/expenses/delete` | `bendahara` | Delete expense record |
+| `PV API - Logs List` | `POST` | `/portal-v1/logs/list` | `admin` | List security and access audit logs |
 | `PV API - Reports Running Balance` | `POST` | `/portal-v1/reports/running-balance` | `pengurus` | Monthly running balance |
 | `PV API - Reports Monthly Finance` | `POST` | `/portal-v1/reports/monthly-finance` | `pengurus` | Monthly finance report details |
 | `PV API - Settings Update` | `POST` | `/portal-v1/settings/update` | `admin` | Update app/IPL settings |
@@ -152,7 +158,7 @@ QRIS is optional if the project keeps a strict zero-monthly-cost / low-cost manu
 | Workflow | Method | Route | Minimum Role | Purpose |
 | --- | --- | --- | --- | --- |
 | `PV API - Health Check` | `POST` | `/portal-v1/health/check` | Public | Verify standard response shape and runtime connectivity |
-| `PV API - Role Check Test` | `POST` | `/portal-v1/auth/role-check-test` | Dynamic test input | Validate App JWT plus minimum-role matrix |
+| `PV API - Role Check Test` (archived) | `POST` | `/portal-v1/auth/role-check-test` | Dynamic test input | Historical role-matrix validation evidence only |
 | `PV API - Audit Log Test` | `POST` | `/portal-v1/audit/log-test` | `pengurus` by default | Validate audit insert pattern |
 
 Use public health only if it returns no secrets and no DB-private details. Otherwise require admin JWT.
@@ -177,14 +183,13 @@ Current implementation decision:
 - Production path: `/webhook/portal-v1/health/check`.
 - Full current endpoint: `https://n8n-icyxwmjq.runner.web.id/webhook/portal-v1/health/check`.
 
-Current role-check validation decision:
+Role-check validation cleanup decision:
 
-- `PV API - Role Check Test` is protected by App JWT.
-- It exists to validate role hierarchy before real business endpoints are built.
+- `PV API - Role Check Test` was protected by App JWT and used to validate role hierarchy before real business endpoints were built.
 - It accepts `minimum_role` only for controlled validation; real endpoints must hardcode their minimum role.
 - Workflow id: `gXFYbb1et7uZg3gb`.
-- Production path: `/webhook/portal-v1/auth/role-check-test`.
-- Full current endpoint: `https://n8n-icyxwmjq.runner.web.id/webhook/portal-v1/auth/role-check-test`.
+- Former production path: `/webhook/portal-v1/auth/role-check-test`.
+- The workflow was archived on 2026-07-11; the path is no longer an active production endpoint.
 
 Current audit-log validation decision:
 
@@ -277,6 +282,7 @@ Manual payment and Google Drive upload workflows should start after the auth/rol
 - Auth Me validation covered missing token, invalid token, approved user, and pending user in manual and production execution modes.
 - `PV API - Role Check Test` was created, validated, and published on 2026-07-09.
 - `PV API - Role Check Test` workflow id: `gXFYbb1et7uZg3gb`.
+- `PV API - Role Check Test` was archived on 2026-07-11 after validation evidence was retained.
 - Role validation covered `warga` rejected from `admin`, `pengurus` accepted for `pengurus`, `bendahara` accepted for `bendahara`, and `admin` accepted for `admin`.
 - Role production validation executions:
   - `237382`: `warga` rejected from `admin` with `403 FORBIDDEN_ROLE`.

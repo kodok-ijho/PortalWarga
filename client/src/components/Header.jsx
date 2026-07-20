@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -23,13 +23,12 @@ import { useToast } from '../hooks/useToast';
 import {
   isStaffRole,
   isBendaharaOrAbove,
-  getPendingRegistrations,
-  getPendingPayments,
   roleLabel,
-} from '../services/mockData';
+} from '../services/dataHelpers';
+import { fetchDashboardData } from '../services/dataService';
 
 export default function Header() {
-  const { isAuthenticated, profile, role, signOut, updateProfile } = useAuth();
+  const { isAuthenticated, profile, role, signOut, updateProfile, session } = useAuth();
   const location = useLocation();
   const toast = useToast();
   const [openDropdown, setOpenDropdown] = useState(null); // null | 'keuangan' | 'warga' | 'sistem'
@@ -63,8 +62,25 @@ export default function Header() {
     }
   };
 
-  const pendingRegCount = getPendingRegistrations().length;
-  const pendingPayCount = getPendingPayments().length;
+  const [pendingRegCount, setPendingRegCount] = useState(0);
+  const [pendingPayCount, setPendingPayCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated || !session?.access_token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchDashboardData(session?.access_token, { role });
+        if (!cancelled) {
+          setPendingRegCount(data?.pendingRegistrationCount || 0);
+          setPendingPayCount(data?.pendingPaymentCount || 0);
+        }
+      } catch {
+        // Non-critical — don't break header
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, session?.access_token, role]);
 
   // Tutup dropdown saat pindah halaman
   useEffect(() => {

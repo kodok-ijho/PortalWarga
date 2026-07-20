@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   AiOutlineDelete,
@@ -8,23 +8,23 @@ import {
   AiOutlinePlus,
   AiOutlineSearch,
 } from 'react-icons/ai';
-import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import Modal from '../components/Modal';
-import Placeholder from '../components/Placeholder';
 import {
-  mockIPLBills,
-  mockProfiles,
-  mockUnits,
-  getUnitOccupant,
-  getUnitOwner,
+  fetchUnits,
+  upsertUnit,
+  fetchResidents,
+  fetchPayments,
+  fetchIPLSchemas,
+} from '../services/dataService';
+import {
   isStaffRole,
   isBendaharaOrAbove,
-  getIPLSchemas,
-  getIPLSchemaById,
   formatRupiah,
   computeSchemaAmount,
-} from '../services/mockData';
+  getSchemaById,
+} from '../services/dataHelpers';
 
 const EMPTY_FORM = {
   block: 'CB1',
@@ -38,16 +38,69 @@ const EMPTY_FORM = {
 };
 
 export default function Houses() {
-  const { role } = useAuth();
+  const { role, session } = useAuth();
+  const token = session?.access_token;
   const toast = useToast();
   const isStaff = isStaffRole(role);
 
-  const [units, setUnits] = useState([...mockUnits]);
+  // Data states
+  const [units, setUnits] = useState([]);
+  const [profiles, setProfiles] = useState([]);
+  const [iplSchemas, setIplSchemas] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [search, setSearch] = useState('');
   const [filterBlock, setFilterBlock] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [formUnit, setFormUnit] = useState(null);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [resUnits, resProfiles, resSchemas] = await Promise.all([
+        fetchUnits(token),
+        fetchResidents(token),
+        fetchIPLSchemas(token),
+      ]);
+      setUnits(resUnits);
+      setProfiles(resProfiles);
+      setIplSchemas(resSchemas);
+    } catch (err) {
+      toast.error('Gagal memuat data master rumah/unit.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token, toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const getUnitOwner = useCallback((unitId) => {
+    if (!unitId) return null;
+    const unit = units.find((u) => u.id === Number(unitId));
+    if (!unit) return null;
+    if (unit.owner_id) {
+      const p = profiles.find((p) => p.id === unit.owner_id);
+      if (p) return p;
+    }
+    return profiles.find(
+      (p) => p.unit_id === Number(unitId) && p.occupancy_status && p.occupancy_status.startsWith('owner_')
+    ) || null;
+  }, [units, profiles]);
+
+  const getUnitOccupant = useCallback((unitId) => {
+    if (!unitId) return null;
+    return profiles.find(
+      (p) =>
+        p.unit_id === Number(unitId) &&
+        p.is_active &&
+        (p.occupancy_status === 'tenant' || p.occupancy_status === 'owner_occupied')
+    ) || null;
+  }, [profiles]);
 
   const blocks = useMemo(
     () => [...new Set(units.map((unit) => unit.block))].sort(),
@@ -82,27 +135,11 @@ export default function Houses() {
       if (filterStatus === 'vacant' && unit.is_occupied) return false;
       return true;
     });
-  }, [filterBlock, filterStatus, search, units]);
+  }, [filterBlock, filterStatus, search, units, getUnitOwner, getUnitOccupant]);
 
   if (!isStaff) {
     return <Navigate to="/" replace />;
   }
-
-  if (!IS_DEMO_MODE) {
-    return (
-      <Placeholder
-        title="Manajemen Rumah"
-        description="Hubungkan ke Supabase untuk mengelola master data rumah/unit real."
-        phase="Phase 1 - Supabase integration"
-      />
-    );
-  }
-
-  const syncUnits = (nextUnits) => {
-    mockUnits.length = 0;
-    mockUnits.push(...nextUnits);
-    setUnits([...nextUnits]);
-  };
 
   const openAdd = () => {
     setFormUnit({ ...EMPTY_FORM });
@@ -117,7 +154,7 @@ export default function Houses() {
     });
   };
 
-  const handleSave = (data) => {
+  const handleSave = async (data) => {
     const normalized = {
       ...data,
       block: data.block.trim().toUpperCase(),
@@ -146,24 +183,26 @@ export default function Houses() {
       return;
     }
 
-    if (normalized.id) {
-      const nextUnits = units.map((unit) =>
-        unit.id === normalized.id ? { ...unit, ...normalized } : unit
-      );
-      syncUnits(nextUnits);
-      toast.success(`Rumah ${normalized.block}/${normalized.unit_number} dan skema IPL diperbarui.`);
-    } else {
-      const nextId = Math.max(0, ...units.map((unit) => Number(unit.id) || 0)) + 1;
-      syncUnits([...units, { ...normalized, id: nextId }]);
-      toast.success(`Rumah ${normalized.block}/${normalized.unit_number} ditambahkan.`);
+    setIsSaving(true);
+    try {
+      await upsertUnit(token, normalized);
+      toast.success(normalized.id ? `Rumah ${normalized.block}/${normalized.unit_number} dan skema IPL diperbarui.` : `Rumah ${normalized.block}/${normalized.unit_number} ditambahkan.`);
+      await loadData();
+      setFormUnit(null);
+    } catch (err) {
+      toast.error('Gagal menyimpan data rumah/unit.');
+      console.error(err);
+    } finally {
+      setIsSaving(false);
     }
-
-    setFormUnit(null);
   };
 
-  const handleDelete = (unit) => {
-    const relatedProfiles = mockProfiles.filter((profile) => profile.unit_id === unit.id);
-    const relatedBills = mockIPLBills.filter((bill) => bill.unit_id === unit.id);
+  const handleDelete = async (unit) => {
+    // Delete in supabase: we can just update unit status or show warning.
+    // In our backend, there is only a units upsert workflow.
+    // If unit needs to be deleted/marked as inactive, we call upsertUnit setting occupancy_status = 'owner_vacant' and is_occupied = false.
+    const relatedProfiles = profiles.filter((profile) => profile.unit_id === unit.id);
+    const relatedBills = payments.filter((bill) => bill.unit_id === unit.id);
 
     if (relatedProfiles.length || relatedBills.length) {
       if (
@@ -173,19 +212,39 @@ export default function Houses() {
       ) {
         return;
       }
-      const nextUnits = units.map((item) =>
-        item.id === unit.id ? { ...item, is_occupied: false } : item
-      );
-      syncUnits(nextUnits);
-      toast.success(`Rumah ${unit.block}/${unit.unit_number} dinonaktifkan.`);
-      setSelectedUnit(null);
+      setIsSaving(true);
+      try {
+        await upsertUnit(token, { ...unit, is_occupied: false });
+        toast.success(`Rumah ${unit.block}/${unit.unit_number} dinonaktifkan.`);
+        await loadData();
+        setSelectedUnit(null);
+      } catch (err) {
+        toast.error('Gagal menonaktifkan rumah.');
+        console.error(err);
+      } finally {
+        setIsSaving(false);
+      }
       return;
     }
 
     if (!confirm(`Hapus rumah ${unit.block}/${unit.unit_number}?`)) return;
-    syncUnits(units.filter((item) => item.id !== unit.id));
-    toast.success(`Rumah ${unit.block}/${unit.unit_number} dihapus.`);
-    setSelectedUnit(null);
+    setIsSaving(true);
+    try {
+      // In the database schema, we don't have delete webhook for units, but we can set size = -1 or delete it if we had a webhook.
+      // Wait, let's look at the requirements: we don't delete units row from DB usually, we just de-occupy it or deactivate it.
+      // If we want to hard delete it, wait, does the upsert units webhook allow it? No, but we can de-occupy it.
+      // Wait, is there a delete webhook for units? No. So we will update units to set is_occupied = false or do a prompt.
+      // Wait, if the user really wants to delete it, we can just do a mock success or call upsert with is_occupied = false. Let's do upsert with is_occupied = false.
+      await upsertUnit(token, { ...unit, is_occupied: false });
+      toast.success(`Rumah ${unit.block}/${unit.unit_number} ditandai tidak dihuni.`);
+      await loadData();
+      setSelectedUnit(null);
+    } catch (err) {
+      toast.error('Gagal menghapus rumah.');
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -290,7 +349,19 @@ export default function Houses() {
               </tr>
             </thead>
             <tbody className="divide-y divide-forest-100">
-              {filteredUnits.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center">
+                    <div className="flex justify-center items-center gap-2 text-forest-500 text-sm">
+                      <svg className="animate-spin h-5 w-5 text-gold-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Memuat data rumah...
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredUnits.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-10 text-center text-forest-400">
                     Tidak ada rumah yang cocok.
@@ -300,7 +371,7 @@ export default function Houses() {
                 filteredUnits.map((unit) => {
                   const owner = getUnitOwner(unit.id);
                   const occupant = getUnitOccupant(unit.id);
-                  const schema = getIPLSchemaById(unit.ipl_schema_id);
+                  const schema = getSchemaById(iplSchemas, unit.ipl_schema_id);
                   return (
                     <tr key={unit.id} className="hover:bg-forest-50/80">
                       <td className="px-4 py-3">
@@ -381,6 +452,12 @@ export default function Houses() {
       {selectedUnit && (
         <UnitDetailModal
           unit={selectedUnit}
+          getUnitOwner={getUnitOwner}
+          getUnitOccupant={getUnitOccupant}
+          profiles={profiles}
+          iplSchemas={iplSchemas}
+          token={token}
+          role={role}
           onClose={() => setSelectedUnit(null)}
           onEdit={() => {
             openEdit(selectedUnit);
@@ -393,10 +470,12 @@ export default function Houses() {
       {formUnit && (
         <UnitFormModal
           unit={formUnit}
-          owners={mockProfiles.filter((profile) => profile.role !== 'admin')}
+          owners={profiles.filter((profile) => profile.role !== 'admin')}
           canEditSchema={isBendaharaOrAbove(role)}
+          iplSchemas={iplSchemas}
           onClose={() => setFormUnit(null)}
           onSave={handleSave}
+          isSaving={isSaving}
         />
       )}
     </div>
@@ -422,13 +501,44 @@ function StatCard({ label, value, tone }) {
   );
 }
 
-function UnitDetailModal({ unit, onClose, onEdit, onDelete }) {
+function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSchemas, token, role, onClose, onEdit, onDelete }) {
   const owner = getUnitOwner(unit.id);
   const occupant = getUnitOccupant(unit.id);
-  const profiles = mockProfiles.filter((profile) => profile.unit_id === unit.id);
-  const bills = mockIPLBills.filter((bill) => bill.unit_id === unit.id);
-  const schema = getIPLSchemaById(unit.ipl_schema_id);
+  const relatedProfiles = profiles.filter((profile) => profile.unit_id === unit.id);
+  const schema = getSchemaById(iplSchemas, unit.ipl_schema_id);
   const schemaAmount = computeSchemaAmount(schema);
+
+  const [billsCount, setBillsCount] = useState(0);
+  const [loadingBills, setLoadingBills] = useState(true);
+
+  const hasAccess = isBendaharaOrAbove(role);
+
+  useEffect(() => {
+    if (!token || !hasAccess) {
+      setLoadingBills(false);
+      return;
+    }
+
+    let active = true;
+    async function loadBills() {
+      setLoadingBills(true);
+      try {
+        const res = await fetchPayments(token);
+        if (!active) return;
+        const filtered = res.filter((b) => b.unit_id === unit.id);
+        setBillsCount(filtered.length);
+      } catch (err) {
+        console.warn('Failed to load payments in detail modal:', err);
+        if (active) setBillsCount(0);
+      } finally {
+        if (active) setLoadingBills(false);
+      }
+    }
+    loadBills();
+    return () => {
+      active = false;
+    };
+  }, [unit.id, token, role, hasAccess]);
 
   return (
     <Modal open onClose={onClose} title={`Rumah ${unit.block}/${unit.unit_number}`}>
@@ -442,8 +552,17 @@ function UnitDetailModal({ unit, onClose, onEdit, onDelete }) {
         />
         <InfoRow label="Lantai" value={unit.floor || '-'} />
         <InfoRow label="Luas" value={`${unit.size || 0}m2`} />
-        <InfoRow label="Relasi Warga" value={`${profiles.length} profil`} />
-        <InfoRow label="Relasi Tagihan" value={`${bills.length} tagihan`} />
+        <InfoRow label="Relasi Warga" value={`${relatedProfiles.length} profil`} />
+        <InfoRow
+          label="Relasi Tagihan"
+          value={
+            !hasAccess
+              ? 'Terbatas (Akses Bendahara)'
+              : loadingBills
+              ? 'Memuat...'
+              : `${billsCount} tagihan`
+          }
+        />
         {unit.notes && <InfoRow label="Catatan" value={unit.notes} />}
       </div>
       <div className="mt-6 flex gap-2 border-t border-forest-100 pt-4">
@@ -458,7 +577,7 @@ function UnitDetailModal({ unit, onClose, onEdit, onDelete }) {
   );
 }
 
-function UnitFormModal({ unit, owners, canEditSchema, onClose, onSave }) {
+function UnitFormModal({ unit, owners, canEditSchema, iplSchemas, onClose, onSave, isSaving }) {
   const isEdit = Boolean(unit.id);
   const [form, setForm] = useState(unit);
 
@@ -474,131 +593,139 @@ function UnitFormModal({ unit, owners, canEditSchema, onClose, onSave }) {
   return (
     <Modal open onClose={onClose} title={isEdit ? 'Edit Rumah & Skema IPL' : 'Tambah Rumah Baru'}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Blok" required>
-            <input
-              type="text"
-              value={form.block}
-              onChange={(event) => updateField('block', event.target.value)}
-              className="pv-input uppercase"
-              placeholder="CB1"
-              required
-            />
-          </Field>
-          <Field label="Nomor Rumah" required>
-            <input
-              type="text"
-              value={form.unit_number}
-              onChange={(event) => updateField('unit_number', event.target.value)}
-              className="pv-input uppercase"
-              placeholder="01 / 3A / 12A"
-              required
-            />
-          </Field>
-        </div>
+        <fieldset disabled={isSaving} className="space-y-4 border-none p-0 m-0">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Blok" required>
+              <input
+                type="text"
+                value={form.block}
+                onChange={(event) => updateField('block', event.target.value)}
+                className="pv-input uppercase"
+                placeholder="CB1"
+                required
+              />
+            </Field>
+            <Field label="Nomor Rumah" required>
+              <input
+                type="text"
+                value={form.unit_number}
+                onChange={(event) => updateField('unit_number', event.target.value)}
+                className="pv-input uppercase"
+                placeholder="01 / 3A / 12A"
+                required
+              />
+            </Field>
+          </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Lantai">
-            <input
-              type="number"
-              min="1"
-              value={form.floor}
-              onChange={(event) => updateField('floor', event.target.value)}
-              className="pv-input"
-            />
-          </Field>
-          <Field label="Luas (m2)">
-            <input
-              type="number"
-              min="0"
-              value={form.size}
-              onChange={(event) => updateField('size', event.target.value)}
-              className="pv-input"
-            />
-          </Field>
-        </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Lantai">
+              <input
+                type="number"
+                min="1"
+                value={form.floor}
+                onChange={(event) => updateField('floor', event.target.value)}
+                className="pv-input"
+              />
+            </Field>
+            <Field label="Luas (m2)">
+              <input
+                type="number"
+                min="0"
+                value={form.size}
+                onChange={(event) => updateField('size', event.target.value)}
+                className="pv-input"
+              />
+            </Field>
+          </div>
 
-        <Field label="Owner">
-          <select
-            value={form.owner_id || ''}
-            onChange={(event) => updateField('owner_id', event.target.value)}
-            className="pv-input"
-          >
-            <option value="">Belum ada owner</option>
-            {owners.map((owner) => (
-              <option key={owner.id} value={owner.id}>
-                {owner.full_name}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        {/* Pilihan Profil Skema Biaya IPL */}
-        <div className="p-3 bg-forest-50/70 border border-forest-200 rounded-lg space-y-2">
-          <Field label="Profil Skema Biaya IPL">
+          <Field label="Owner">
             <select
-              value={form.ipl_schema_id || 'schema-basic'}
-              onChange={(event) => updateField('ipl_schema_id', event.target.value)}
-              disabled={!canEditSchema}
-              className="pv-input disabled:bg-forest-100/60 disabled:text-forest-600 disabled:cursor-not-allowed font-semibold"
+              value={form.owner_id || ''}
+              onChange={(event) => updateField('owner_id', event.target.value)}
+              className="pv-input"
             >
-              {getIPLSchemas().map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} — ({formatRupiah(computeSchemaAmount(s))} / bln)
+              <option value="">Belum ada owner</option>
+              {owners.map((owner) => (
+                <option key={owner.id} value={owner.id}>
+                  {owner.full_name}
                 </option>
               ))}
             </select>
           </Field>
-          {!canEditSchema ? (
-            <p className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 flex items-center gap-1.5">
-              <span>🔒</span>
-              <span>Hak akses ubah skema IPL dibatasi khusus untuk <b>Bendahara & Admin</b>.</span>
-            </p>
-          ) : (
-            <p className="text-[11px] text-forest-500">
-              Menentukan besaran tarif bulanan yang dibebankan kepada unit ini.
-            </p>
-          )}
-        </div>
 
-        <label className="flex items-start gap-3 rounded-lg border border-forest-200 p-3 text-sm hover:bg-forest-50 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={Boolean(form.is_occupied)}
-            onChange={(event) => {
-              const checked = event.target.checked;
-              updateField('is_occupied', checked);
-              if (canEditSchema) {
-                updateField('ipl_schema_id', checked ? 'schema-komplit' : 'schema-basic');
-              }
-            }}
-            className="mt-1 accent-gold-500"
-          />
-          <span>
-            <span className="font-medium text-forest-800">Rumah sedang terhuni</span>
-            <span className="block text-xs text-forest-500">
-              Matikan jika rumah kosong atau tidak dihuni. {canEditSchema ? 'Otomatis mengubah skema IPL di atas.' : ''}
+          {/* Pilihan Profil Skema Biaya IPL */}
+          <div className="p-3 bg-forest-50/70 border border-forest-200 rounded-lg space-y-2">
+            <Field label="Profil Skema Biaya IPL">
+              <select
+                value={form.ipl_schema_id || 'schema-basic'}
+                onChange={(event) => updateField('ipl_schema_id', event.target.value)}
+                disabled={!canEditSchema}
+                className="pv-input disabled:bg-forest-100/60 disabled:text-forest-600 disabled:cursor-not-allowed font-semibold"
+              >
+                {iplSchemas.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} — ({formatRupiah(computeSchemaAmount(s))} / bln)
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {!canEditSchema ? (
+              <p className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 flex items-center gap-1.5">
+                <span>🔒</span>
+                <span>Hak akses ubah skema IPL dibatasi khusus untuk <b>Bendahara & Admin</b>.</span>
+              </p>
+            ) : (
+              <p className="text-[11px] text-forest-500">
+                Menentukan besaran tarif bulanan yang dibebankan kepada unit ini.
+              </p>
+            )}
+          </div>
+
+          <label className="flex items-start gap-3 rounded-lg border border-forest-200 p-3 text-sm hover:bg-forest-50 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(form.is_occupied)}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                updateField('is_occupied', checked);
+                if (canEditSchema) {
+                  updateField('ipl_schema_id', checked ? 'schema-komplit' : 'schema-basic');
+                }
+              }}
+              className="mt-1 accent-gold-500"
+            />
+            <span>
+              <span className="font-medium text-forest-800">Rumah sedang terhuni</span>
+              <span className="block text-xs text-forest-500">
+                Matikan jika rumah kosong atau tidak dihuni. {canEditSchema ? 'Otomatis mengubah skema IPL di atas.' : ''}
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
 
-        <Field label="Catatan">
-          <textarea
-            value={form.notes || ''}
-            onChange={(event) => updateField('notes', event.target.value)}
-            className="pv-input min-h-24 resize-y"
-            placeholder="Contoh: posisi hook mapsite, status renovasi, atau catatan pengurus."
-          />
-        </Field>
+          <Field label="Catatan">
+            <textarea
+              value={form.notes || ''}
+              onChange={(event) => updateField('notes', event.target.value)}
+              className="pv-input min-h-24 resize-y"
+              placeholder="Contoh: posisi hook mapsite, status renovasi, atau catatan pengurus."
+            />
+          </Field>
 
-        <div className="flex gap-2 pt-2">
-          <button type="button" onClick={onClose} className="pv-btn-ghost flex-1 text-sm">
-            Batal
-          </button>
-          <button type="submit" className="pv-btn-primary flex-1 text-sm">
-            {isEdit ? 'Simpan Perubahan' : 'Tambah Rumah'}
-          </button>
-        </div>
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={onClose} disabled={isSaving} className="pv-btn-ghost flex-1 text-sm">
+              Batal
+            </button>
+            <button type="submit" disabled={isSaving} className="pv-btn-primary flex-1 text-sm flex items-center justify-center gap-2">
+              {isSaving && (
+                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              )}
+              {isSaving ? 'Menyimpan...' : isEdit ? 'Simpan Perubahan' : 'Tambah Rumah'}
+            </button>
+          </div>
+        </fieldset>
       </form>
     </Modal>
   );

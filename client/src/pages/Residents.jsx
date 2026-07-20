@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   AiOutlinePlus,
   AiOutlineEdit,
@@ -8,27 +8,37 @@ import {
   AiOutlineUserAdd,
 } from 'react-icons/ai';
 import Papa from 'papaparse';
-import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import Modal from '../components/Modal';
-import Placeholder from '../components/Placeholder';
 import {
-  mockProfiles,
-  mockUnits,
-  getUnitById,
-  getUnitOwner,
+  fetchResidents,
+  createResident,
+  updateResident,
+  deleteResident,
+  importResidentsCSV,
+  fetchUnits,
+} from '../services/dataService';
+import {
   roleLabel,
   roleColor,
   occupancyStatusLabel,
   occupancyStatusColor,
   OCCUPANCY_STATUS,
   isStaffRole,
-} from '../services/mockData';
+} from '../services/dataHelpers';
 
 export default function Residents() {
-  const { role } = useAuth();
+  const { role, session } = useAuth();
+  const token = session?.access_token;
   const toast = useToast();
   const isStaff = isStaffRole(role);
+
+  // Data states
+  const [profiles, setProfiles] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // State filter & search
   const [search, setSearch] = useState('');
@@ -38,11 +48,55 @@ export default function Residents() {
   const [selectedId, setSelectedId] = useState(null);
 
   // State untuk CRUD & upload
-  const [profiles, setProfiles] = useState(mockProfiles);
   const [modalAddEdit, setModalAddEdit] = useState(null); // null | 'add' | profile obj
   const [modalUpload, setModalUpload] = useState(false);
 
-  const blocks = useMemo(() => [...new Set(mockUnits.map((u) => u.block))].sort(), []);
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    
+    const fetchResPromise = fetchResidents(token)
+      .then((res) => {
+        setProfiles(res);
+        setIsLoading(false);
+      });
+      
+    const fetchUnitsPromise = fetchUnits(token)
+      .then((res) => {
+        setUnits(res);
+      });
+
+    try {
+      await Promise.all([fetchResPromise, fetchUnitsPromise]);
+    } catch (err) {
+      toast.error('Gagal memuat data warga/unit.');
+      console.error(err);
+      setIsLoading(false);
+    }
+  }, [token, toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const getUnitById = useCallback((id) => {
+    if (!id) return null;
+    return units.find((u) => u.id === Number(id));
+  }, [units]);
+
+  const getUnitOwner = useCallback((unitId) => {
+    if (!unitId) return null;
+    const unit = units.find((u) => u.id === Number(unitId));
+    if (!unit) return null;
+    if (unit.owner_id) {
+      const p = profiles.find((p) => p.id === unit.owner_id);
+      if (p) return p;
+    }
+    return profiles.find(
+      (p) => p.unit_id === Number(unitId) && p.occupancy_status && p.occupancy_status.startsWith('owner_')
+    ) || null;
+  }, [units, profiles]);
+
+  const blocks = useMemo(() => [...new Set(units.map((u) => u.block))].sort(), [units]);
 
   const filtered = useMemo(() => {
     return profiles.filter((p) => {
@@ -54,7 +108,7 @@ export default function Residents() {
           !p.full_name.toLowerCase().includes(q) &&
           !(p.email || '').toLowerCase().includes(q) &&
           !(p.phone || '').includes(q) &&
-          !unitLabel.includes(q)
+          !unitLabel.toLowerCase().includes(q)
         )
           return false;
       }
@@ -67,47 +121,61 @@ export default function Residents() {
       if (filterOccupancy && p.occupancy_status !== filterOccupancy) return false;
       return true;
     });
-  }, [profiles, search, filterBlock, filterStatus, filterOccupancy]);
+  }, [profiles, search, filterBlock, filterStatus, filterOccupancy, getUnitById]);
 
   const selected = selectedId ? profiles.find((p) => p.id === selectedId) : null;
 
   // ── Handlers ──────────────────────────────────────────
-  const handleSaveProfile = (data) => {
-    if (modalAddEdit === 'add') {
-      const newProfile = {
-        ...data,
-        id: 'p-' + Date.now(),
-        is_active: data.is_active ?? true,
-      };
-      setProfiles((prev) => [...prev, newProfile]);
-      // sync ke mockProfiles (supaya halaman lain dapat update)
-      mockProfiles.push(newProfile);
-      toast.success(`Warga "${data.full_name}" berhasil ditambahkan.`);
-    } else {
-      // edit
-      setProfiles((prev) =>
-        prev.map((p) => (p.id === data.id ? { ...p, ...data } : p))
-      );
-      const idx = mockProfiles.findIndex((p) => p.id === data.id);
-      if (idx >= 0) Object.assign(mockProfiles[idx], data);
-      toast.success(`Data warga "${data.full_name}" berhasil diperbarui.`);
+  const handleSaveProfile = async (data) => {
+    setIsSaving(true);
+    try {
+      if (modalAddEdit === 'add') {
+        const payload = {
+          ...data,
+          unit_id: data.unit_id ? Number(data.unit_id) : null,
+          is_active: data.is_active ?? true,
+        };
+        await createResident(token, payload);
+        toast.success(`Warga "${data.full_name}" berhasil ditambahkan.`);
+      } else {
+        // edit
+        const payload = {
+          ...data,
+          unit_id: data.unit_id ? Number(data.unit_id) : null,
+        };
+        await updateResident(token, data.id, payload);
+        toast.success(`Data warga "${data.full_name}" berhasil diperbarui.`);
+      }
+      await loadData();
+      setModalAddEdit(null);
+    } catch (err) {
+      toast.error('Gagal menyimpan data warga.');
+      console.error(err);
+    } finally {
+      setIsSaving(false);
     }
-    setModalAddEdit(null);
   };
 
   // Helper: cari unit berdasarkan blok+nomor (dipakai export/import CSV)
   const findUnit = (block, unitNumber) =>
-    mockUnits.find(
+    units.find(
       (u) => u.block === String(block).toUpperCase() && u.unit_number === String(unitNumber)
     );
 
-  const handleDelete = (profile) => {
+  const handleDelete = async (profile) => {
     if (!confirm(`Hapus warga "${profile.full_name}"? Tindakan ini tidak dapat dibatalkan.`)) return;
-    setProfiles((prev) => prev.filter((p) => p.id !== profile.id));
-    const idx = mockProfiles.findIndex((p) => p.id === profile.id);
-    if (idx >= 0) mockProfiles.splice(idx, 1);
-    toast.success(`Warga "${profile.full_name}" berhasil dihapus.`);
-    setSelectedId(null);
+    setIsSaving(true);
+    try {
+      await deleteResident(token, profile.id);
+      toast.success(`Warga "${profile.full_name}" berhasil dihapus.`);
+      setSelectedId(null);
+      await loadData();
+    } catch (err) {
+      toast.error('Gagal menghapus data warga.');
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleExportCSV = () => {
@@ -140,7 +208,7 @@ export default function Residents() {
     toast.success('CSV berhasil di-export.');
   };
 
-  const handleImportCSV = (parsedRows, mode) => {
+  const handleImportCSV = async (parsedRows, mode) => {
     // Reverse map label → key untuk occupancy_status
     const labelToStatusKey = Object.fromEntries(
       Object.entries(OCCUPANCY_STATUS).map(([k, v]) => [v.toLowerCase(), k])
@@ -160,7 +228,7 @@ export default function Residents() {
     // Validasi & mapping
     const mapped = parsedRows
       .filter((r) => r.Nama || r.full_name || r[0])
-      .map((r, i) => {
+      .map((r) => {
         // Support header dalam berbagai format
         const name = r.Nama || r.full_name || r.nama || Object.values(r)[0];
         const email = r.Email || r.email || '';
@@ -176,7 +244,6 @@ export default function Residents() {
         const unit_id = unit?.id || null;
 
         return {
-          id: 'imp-' + Date.now() + '-' + i,
           full_name: name,
           email: email,
           phone: phone,
@@ -193,49 +260,21 @@ export default function Residents() {
       return;
     }
 
-    if (mode === 'delete-insert') {
-      // Hapus semua warga, replace dengan import (pertahankan staff/admin)
-      const keepStaff = mockProfiles.filter((p) => p.role !== 'warga');
-      const newProfiles = [...keepStaff, ...mapped];
-      mockProfiles.length = 0;
-      mockProfiles.push(...newProfiles);
-      setProfiles([...mockProfiles]);
-      toast.success(`${mapped.length} warga diimport (mode: Delete & Insert).`);
-    } else {
-      // Upsert: match berdasarkan email atau nama+unit
-      let added = 0, updated = 0;
-      for (const m of mapped) {
-        const idx = mockProfiles.findIndex(
-          (p) =>
-            (p.email && m.email && p.email.toLowerCase() === m.email.toLowerCase()) ||
-            (p.full_name.toLowerCase() === m.full_name.toLowerCase() &&
-              p.unit_id === m.unit_id)
-        );
-        if (idx >= 0) {
-          Object.assign(mockProfiles[idx], m, { id: mockProfiles[idx].id });
-          updated++;
-        } else {
-          mockProfiles.push(m);
-          added++;
-        }
-      }
-      setProfiles([...mockProfiles]);
-      toast.success(`Import selesai: ${added} baru, ${updated} diperbarui (Upsert).`);
+    setIsSaving(true);
+    try {
+      await importResidentsCSV(token, mapped, mode);
+      toast.success(`${mapped.length} warga berhasil di-import (mode: ${mode === 'delete-insert' ? 'Delete & Insert' : 'Upsert'}).`);
+      await loadData();
+    } catch (err) {
+      toast.error('Gagal mengimpor data warga.');
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+      setModalUpload(false);
     }
-    setModalUpload(false);
   };
 
   // ── Render ────────────────────────────────────────────
-  if (!IS_DEMO_MODE) {
-    return (
-      <Placeholder
-        title="Daftar Penghuni"
-        description="Hubungkan ke Supabase untuk mengelola data penghuni real."
-        phase="Phase 1 — MVP"
-      />
-    );
-  }
-
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -322,7 +361,19 @@ export default function Residents() {
               </tr>
             </thead>
             <tbody className="divide-y divide-forest-100">
-              {filtered.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center">
+                    <div className="flex justify-center items-center gap-2 text-forest-500 text-sm">
+                      <svg className="animate-spin h-5 w-5 text-gold-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Memuat data penghuni...
+                    </div>
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-10 text-center text-forest-400">
                     Tidak ada penghuni yang cocok.
@@ -333,99 +384,107 @@ export default function Residents() {
                   const unit = getUnitById(p.unit_id);
                   return (
                     <tr
-                      key={p.id}
-                      onClick={() => setSelectedId(p.id)}
-                      className="hover:bg-forest-50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-forest-100 text-forest-700 font-semibold text-xs">
-                            {p.full_name.charAt(0)}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="font-medium text-forest-900 truncate">{p.full_name}</p>
-                            <p className="text-[11px] text-forest-400 truncate">{p.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-forest-700">
-                        {unit ? `${unit.block}/${unit.unit_number}` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-forest-500 hidden sm:table-cell">{p.phone || '—'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`pv-badge ${p.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
-                          {p.is_active ? 'Aktif' : 'Non-aktif'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        {p.occupancy_status ? (
-                          <span className={`pv-badge ${occupancyStatusColor(p.occupancy_status)}`}>
-                            {occupancyStatusLabel(p.occupancy_status)}
-                          </span>
-                        ) : (
-                          <span className="text-forest-400 text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-forest-700 text-xs">
-                        {(() => {
-                          if (!unit) return '—';
-                          if (p.occupancy_status === 'tenant') {
-                            const owner = getUnitOwner(p.unit_id);
-                            return owner ? owner.full_name : '—';
-                          }
-                          if (p.occupancy_status && p.occupancy_status.startsWith('owner_')) {
-                            return <span className="text-emerald-600 font-medium">Diri sendiri</span>;
-                          }
-                          return '—';
-                        })()}
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <span className={`pv-badge ${roleColor(p.role)}`}>{roleLabel(p.role)}</span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Modal detail */}
-      {selected && (
-        <DetailModal
-          profile={selected}
-          isStaff={isStaff}
-          onClose={() => setSelectedId(null)}
-          onEdit={() => {
-            setModalAddEdit(selected);
-            setSelectedId(null);
-          }}
-          onDelete={() => handleDelete(selected)}
-        />
-      )}
-
-      {/* Modal add/edit */}
-      {modalAddEdit && (
-        <ProfileFormModal
-          profile={modalAddEdit === 'add' ? null : modalAddEdit}
-          onSave={handleSaveProfile}
-          onClose={() => setModalAddEdit(null)}
-        />
-      )}
-
-      {/* Modal upload CSV */}
-      {modalUpload && (
-        <UploadCSVModal onImport={handleImportCSV} onClose={() => setModalUpload(false)} />
-      )}
-    </div>
-  );
-}
-
-// ── Sub-komponen ──────────────────────────────────────────────────
-
-function DetailModal({ profile, isStaff, onClose, onEdit, onDelete }) {
-  const unit = getUnitById(profile.unit_id);
+                       key={p.id}
+                       onClick={() => setSelectedId(p.id)}
+                       className="hover:bg-forest-50 cursor-pointer transition-colors"
+                     >
+                       <td className="px-4 py-3">
+                         <div className="flex items-center gap-2.5">
+                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-forest-100 text-forest-700 font-semibold text-xs">
+                             {p.full_name.charAt(0)}
+                           </span>
+                           <div className="min-w-0">
+                             <p className="font-medium text-forest-900 truncate">{p.full_name}</p>
+                             <p className="text-[11px] text-forest-400 truncate">{p.email}</p>
+                           </div>
+                         </div>
+                       </td>
+                       <td className="px-4 py-3 text-forest-700">
+                         {unit ? `${unit.block}/${unit.unit_number}` : '—'}
+                       </td>
+                       <td className="px-4 py-3 text-forest-500 hidden sm:table-cell">{p.phone || '—'}</td>
+                       <td className="px-4 py-3">
+                         <span className={`pv-badge ${p.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
+                           {p.is_active ? 'Aktif' : 'Non-aktif'}
+                         </span>
+                       </td>
+                       <td className="px-4 py-3 hidden lg:table-cell">
+                         {p.occupancy_status ? (
+                           <span className={`pv-badge ${occupancyStatusColor(p.occupancy_status)}`}>
+                             {occupancyStatusLabel(p.occupancy_status)}
+                           </span>
+                         ) : (
+                           <span className="text-forest-400 text-xs">—</span>
+                         )}
+                       </td>
+                       <td className="px-4 py-3 hidden lg:table-cell text-forest-700 text-xs">
+                         {(() => {
+                           if (!unit) return '—';
+                           if (p.occupancy_status === 'tenant') {
+                             const owner = getUnitOwner(p.unit_id);
+                             return owner ? owner.full_name : '—';
+                           }
+                           if (p.occupancy_status && p.occupancy_status.startsWith('owner_')) {
+                             return <span className="text-emerald-600 font-medium">Diri sendiri</span>;
+                           }
+                           return '—';
+                           })()}
+                       </td>
+                       <td className="px-4 py-3 hidden md:table-cell">
+                         <span className={`pv-badge ${roleColor(p.role)}`}>{roleLabel(p.role)}</span>
+                       </td>
+                     </tr>
+                   );
+                 })
+               )}
+             </tbody>
+           </table>
+         </div>
+       </div>
+ 
+       {/* Modal detail */}
+       {selected && (
+         <DetailModal
+           profile={selected}
+           isStaff={isStaff}
+           getUnitById={getUnitById}
+           getUnitOwner={getUnitOwner}
+           onClose={() => setSelectedId(null)}
+           onEdit={() => {
+             setModalAddEdit(selected);
+             setSelectedId(null);
+           }}
+           onDelete={() => handleDelete(selected)}
+         />
+       )}
+ 
+       {/* Modal add/edit */}
+       {modalAddEdit && (
+         <ProfileFormModal
+           profile={modalAddEdit === 'add' ? null : modalAddEdit}
+           onSave={handleSaveProfile}
+           onClose={() => setModalAddEdit(null)}
+           isSaving={isSaving}
+           units={units}
+         />
+       )}
+ 
+       {/* Modal upload CSV */}
+       {modalUpload && (
+         <UploadCSVModal
+           onImport={handleImportCSV}
+           onClose={() => setModalUpload(false)}
+           isSaving={isSaving}
+         />
+       )}
+     </div>
+   );
+ }
+ 
+ // ── Sub-komponen ──────────────────────────────────────────────────
+ 
+ function DetailModal({ profile, isStaff, getUnitById, getUnitOwner, onClose, onEdit, onDelete }) {
+   const unit = getUnitById(profile.unit_id);
   const owner = profile.occupancy_status === 'tenant' ? getUnitOwner(profile.unit_id) : null;
   return (
     <Modal open onClose={onClose} title="Detail Penghuni">
@@ -472,7 +531,7 @@ function DetailModal({ profile, isStaff, onClose, onEdit, onDelete }) {
   );
 }
 
-function ProfileFormModal({ profile, onSave, onClose }) {
+function ProfileFormModal({ profile, onSave, onClose, isSaving, units }) {
   const isEdit = !!profile;
   const [form, setForm] = useState({
     full_name: profile?.full_name || '',
@@ -502,96 +561,104 @@ function ProfileFormModal({ profile, onSave, onClose }) {
   return (
     <Modal open onClose={onClose} title={isEdit ? 'Edit Warga' : 'Tambah Warga'}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Field label="Nama Lengkap" required>
-          <input
-            type="text"
-            value={form.full_name}
-            onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-            required
-            className="pv-input"
-            placeholder="Nama lengkap"
-          />
-        </Field>
-        <Field label="Email">
-          <input
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="pv-input"
-            placeholder="email@contoh.com"
-          />
-        </Field>
-        <Field label="Telepon">
-          <input
-            type="text"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            className="pv-input"
-            placeholder="08xx-xxxx-xxxx"
-          />
-        </Field>
-        <Field label="Unit">
-          <select
-            value={form.unit_id}
-            onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
-            className="pv-input"
-          >
-            <option value="">— Tidak ada unit —</option>
-            {mockUnits.map((u) => (
-              <option key={u.id} value={u.id}>
-                Blok {u.block} / {u.unit_number}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Status Tinggal">
-          <select
-            value={form.occupancy_status}
-            onChange={(e) => setForm({ ...form, occupancy_status: e.target.value })}
-            className="pv-input"
-          >
-            <option value="">— Tidak ada —</option>
-            {Object.entries(OCCUPANCY_STATUS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Role">
+        <fieldset disabled={isSaving} className="space-y-4 border-none p-0 m-0">
+          <Field label="Nama Lengkap" required>
+            <input
+              type="text"
+              value={form.full_name}
+              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+              required
+              className="pv-input"
+              placeholder="Nama lengkap"
+            />
+          </Field>
+          <Field label="Email">
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="pv-input"
+              placeholder="email@contoh.com"
+            />
+          </Field>
+          <Field label="Telepon">
+            <input
+              type="text"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              className="pv-input"
+              placeholder="08xx-xxxx-xxxx"
+            />
+          </Field>
+          <Field label="Unit">
             <select
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value })}
+              value={form.unit_id}
+              onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
               className="pv-input"
             >
-              <option value="warga">Warga</option>
-              <option value="pengurus">Pengurus</option>
-              <option value="bendahara">Bendahara</option>
-              <option value="admin">Admin</option>
+              <option value="">— Tidak ada unit —</option>
+              {units.map((u) => (
+                <option key={u.id} value={u.id}>
+                  Blok {u.block} / {u.unit_number}
+                </option>
+              ))}
             </select>
           </Field>
-          <Field label="Status">
+          <Field label="Status Tinggal">
             <select
-              value={form.is_active ? 'active' : 'inactive'}
-              onChange={(e) => setForm({ ...form, is_active: e.target.value === 'active' })}
+              value={form.occupancy_status}
+              onChange={(e) => setForm({ ...form, occupancy_status: e.target.value })}
               className="pv-input"
             >
-              <option value="active">Aktif</option>
-              <option value="inactive">Non-aktif</option>
+              <option value="">— Tidak ada —</option>
+              {Object.entries(OCCUPANCY_STATUS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
             </select>
           </Field>
-        </div>
-        <div className="flex gap-2 pt-2">
-          <button type="button" onClick={onClose} className="pv-btn-ghost flex-1 text-sm">Batal</button>
-          <button type="submit" className="pv-btn-primary flex-1 text-sm">
-            {isEdit ? 'Simpan Perubahan' : 'Tambah'}
-          </button>
-        </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Role">
+              <select
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                className="pv-input"
+              >
+                <option value="warga">Warga</option>
+                <option value="pengurus">Pengurus</option>
+                <option value="bendahara">Bendahara</option>
+                <option value="admin">Admin</option>
+              </select>
+            </Field>
+            <Field label="Status">
+              <select
+                value={form.is_active ? 'active' : 'inactive'}
+                onChange={(e) => setForm({ ...form, is_active: e.target.value === 'active' })}
+                className="pv-input"
+              >
+                <option value="active">Aktif</option>
+                <option value="inactive">Non-aktif</option>
+              </select>
+            </Field>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={onClose} disabled={isSaving} className="pv-btn-ghost flex-1 text-sm">Batal</button>
+            <button type="submit" disabled={isSaving} className="pv-btn-primary flex-1 text-sm flex items-center justify-center gap-2">
+              {isSaving && (
+                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              )}
+              {isSaving ? 'Menyimpan...' : isEdit ? 'Simpan Perubahan' : 'Tambah'}
+            </button>
+          </div>
+        </fieldset>
       </form>
     </Modal>
   );
 }
 
-function UploadCSVModal({ onImport, onClose }) {
+function UploadCSVModal({ onImport, onClose, isSaving }) {
   const [step, setStep] = useState(1); // 1=upload, 2=preview
   const [parsedRows, setParsedRows] = useState([]);
   const [mode, setMode] = useState('upsert');
@@ -633,7 +700,7 @@ function UploadCSVModal({ onImport, onClose }) {
             Upload file CSV berisi data warga. Format kolom: <strong>Nama, Email, Telepon, Blok, Unit, Status, Role</strong>.
           </p>
 
-          <button onClick={downloadTemplate} className="pv-btn-ghost text-xs">
+          <button onClick={downloadTemplate} disabled={isSaving} className="pv-btn-ghost text-xs">
             <AiOutlineDownload /> Download Template CSV
           </button>
 
@@ -647,6 +714,7 @@ function UploadCSVModal({ onImport, onClose }) {
               type="file"
               accept=".csv"
               className="hidden"
+              disabled={isSaving}
               onChange={(e) => handleFile(e.target.files[0])}
             />
           </label>
@@ -658,6 +726,7 @@ function UploadCSVModal({ onImport, onClose }) {
               <input
                 type="radio"
                 checked={mode === 'upsert'}
+                disabled={isSaving}
                 onChange={() => setMode('upsert')}
                 className="mt-1 accent-gold-500"
               />
@@ -670,6 +739,7 @@ function UploadCSVModal({ onImport, onClose }) {
               <input
                 type="radio"
                 checked={mode === 'delete-insert'}
+                disabled={isSaving}
                 onChange={() => setMode('delete-insert')}
                 className="mt-1 accent-gold-500"
               />
@@ -721,12 +791,19 @@ function UploadCSVModal({ onImport, onClose }) {
           </div>
 
           <div className="flex gap-2">
-            <button onClick={() => setStep(1)} className="pv-btn-ghost flex-1 text-sm">← Kembali</button>
+            <button onClick={() => setStep(1)} disabled={isSaving} className="pv-btn-ghost flex-1 text-sm">← Kembali</button>
             <button
               onClick={() => onImport(parsedRows, mode)}
-              className="pv-btn-primary flex-1 text-sm"
+              disabled={isSaving}
+              className="pv-btn-primary flex-1 text-sm flex items-center justify-center gap-2"
             >
-              Import {parsedRows.length} Warga
+              {isSaving && (
+                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              )}
+              {isSaving ? 'Mengimpor...' : `Import ${parsedRows.length} Warga`}
             </button>
           </div>
         </div>

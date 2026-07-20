@@ -67,8 +67,10 @@ Dokumen ini adalah panduan langkah demi langkah untuk menguji seluruh fitur sist
     1.  Masuk ke halaman **Settings** -> bagian **Billing Generation**.
     2.  Pilih periode tagihan (contoh: `2026-07`) dan klik **Generate**.
 *   **Hasil yang Diharapkan:**
-    *   [ ] Tagihan baru terbuat otomatis untuk seluruh 53 unit rumah.
-    *   [ ] Tarif dihitung rill berdasarkan komponen aktif (IPL + Keamanan).
+    *   [x] Tagihan tersedia otomatis untuk seluruh 53 unit rumah; duplicate generate aman dan tidak membuat baris baru.
+    *   [x] Tarif dihitung rill berdasarkan komponen aktif (IPL + Keamanan).
+
+*   **Evidence 2026-07-11:** PASS melalui execution `239452`, `239453`, dan matrix `239454`. Periode `2026-07` berisi 53 tagihan unik.
 
 ---
 
@@ -78,12 +80,14 @@ Dokumen ini adalah panduan langkah demi langkah untuk menguji seluruh fitur sist
 *   **Langkah-langkah:**
     1.  Buka dashboard Warga, pilih tagihan bulanan.
     2.  Klik tombol **Bayar Manual**.
-    3.  Pilih file bukti transfer (JPG/PNG/PDF) berukuran di bawah 2MB.
+    3.  Pilih file bukti transfer JPG/PNG berukuran maksimal 2 MB.
     4.  Klik **Submit**.
 *   **Hasil yang Diharapkan:**
     *   [ ] Status tagihan di matrix berubah menjadi **Menunggu Verifikasi**.
     *   [ ] Bukti transfer terunggah aman ke Google Drive.
     *   [ ] Bendahara menerima notifikasi pengajuan verifikasi baru.
+
+*   **Evidence 2026-07-14:** Credential organisasi `Palm Village Google Drive account`, yang diautentikasi sebagai `palmvillage.paguyuban@gmail.com`, sudah dipasang pada node upload/share. Folder tujuan final adalah `1nmpwQ-zN5AKDmyIOFI48FSXvji_aSKC4` dan workflow manual sudah dipublish sebagai versi `c136a28a-9c6c-4afa-9854-eb33851d1e0a`. Runtime valid-upload masih perlu diulang sebelum UAT ini berstatus PASS. Negative tests PASS: `239455` invalid MIME, `239456` >2 MB, `239457` tanpa file, `239458` tanpa JWT. Guard `239461` memastikan kegagalan Drive tidak menulis payment.
 
 ---
 

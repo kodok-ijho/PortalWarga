@@ -1,11 +1,10 @@
 -- =====================================================================
--- LEGACY/REFERENCE ONLY
+-- LEGACY/REFERENCE ONLY — DO NOT USE FOR PRODUCTION
 -- ---------------------------------------------------------------------
 -- Production schema source of truth is now:
 -- supabase/migrations/202607080001_initial_production_schema.sql
 --
--- This v1 file is kept as historical reference until the migration-based
--- schema is fully adopted by local Supabase CLI workflows.
+-- This v1 file is kept as historical reference only.
 -- =====================================================================
 
 -- =====================================================================

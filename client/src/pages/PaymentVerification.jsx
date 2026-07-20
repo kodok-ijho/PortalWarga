@@ -10,6 +10,12 @@ import {
   IS_DEMO,
 } from '../services/dataService';
 import {
+  formatRupiah,
+  formatDate,
+  formatPeriod,
+  isBendaharaOrAbove,
+} from '../services/dataHelpers';
+import {
   getUnitById,
   getProfileById,
   mockIPLBills,
@@ -17,11 +23,6 @@ import {
   verifyPayment,
   rejectPayment,
   mockPayments,
-  formatRupiah,
-  formatDate,
-  formatPeriod,
-  billStatusLabel,
-  billStatusColor,
   downloadDigitalReceipt,
   sendEmailReceipt,
 } from '../services/mockData';
@@ -173,8 +174,14 @@ export default function PaymentVerification() {
   };
 
   function getBillPeriod(payment) {
-    const bill = mockIPLBills.find((b) => b.id === payment.ipl_bill_id);
-    return bill?.period || '';
+    // Production: use joined _bill.period data from fetchPayments API response
+    if (payment._bill?.period) return payment._bill.period;
+    // Demo mode fallback: lookup from mockIPLBills
+    if (IS_DEMO) {
+      const bill = mockIPLBills.find((b) => b.id === payment.ipl_bill_id);
+      return bill?.period || '';
+    }
+    return '';
   }
 
   return (
@@ -423,7 +430,7 @@ export default function PaymentVerification() {
             </div>
 
             <div className="flex flex-col gap-2 mt-6">
-              {selectedPayment.status === 'verified' && (
+              {selectedPayment.status === 'verified' && IS_DEMO && (
                 <div className="grid grid-cols-2 gap-2 pb-2 border-b border-forest-100">
                   <button
                     onClick={() => {

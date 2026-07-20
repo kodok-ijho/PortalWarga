@@ -10,6 +10,7 @@ import NotFound from './pages/NotFound';
 
 // Lazy-load halaman berat untuk code-splitting (recharts, papaparse)
 import { lazy, Suspense } from 'react';
+import { useAuth } from './hooks/useAuth';
 const Residents = lazy(() => import('./pages/Residents'));
 const Houses = lazy(() => import('./pages/Houses'));
 const PaymentMatrix = lazy(() => import('./pages/PaymentMatrix'));
@@ -26,6 +27,18 @@ const PageLoader = () => (
     <div className="h-8 w-8 rounded-full border-2 border-forest-200 border-t-gold-500 animate-spin" />
   </div>
 );
+
+/**
+ * RoleGuard — renders children only if user has one of the allowed roles.
+ * Otherwise redirects to home page.
+ */
+function RoleGuard({ allowed, children }) {
+  const { role } = useAuth();
+  if (!role || !allowed.includes(role)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -62,7 +75,9 @@ export default function App() {
                   path="/houses"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <Houses />
+                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin']}>
+                        <Houses />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />
@@ -78,7 +93,9 @@ export default function App() {
                   path="/reports"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <Reports />
+                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin']}>
+                        <Reports />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />
@@ -86,7 +103,9 @@ export default function App() {
                   path="/settings"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <Settings />
+                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin']}>
+                        <Settings />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />
@@ -94,7 +113,9 @@ export default function App() {
                   path="/expenses"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <Expenses />
+                      <RoleGuard allowed={['bendahara', 'admin']}>
+                        <Expenses />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />
@@ -102,7 +123,9 @@ export default function App() {
                   path="/users"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <Users />
+                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin']}>
+                        <Users />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />
@@ -110,7 +133,9 @@ export default function App() {
                   path="/logs"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <Logs />
+                      <RoleGuard allowed={['admin']}>
+                        <Logs />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />
@@ -118,7 +143,9 @@ export default function App() {
                   path="/user-approval"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <UserApproval />
+                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin']}>
+                        <UserApproval />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />
@@ -126,7 +153,9 @@ export default function App() {
                   path="/payment-verification"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <PaymentVerification />
+                      <RoleGuard allowed={['bendahara', 'admin']}>
+                        <PaymentVerification />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />

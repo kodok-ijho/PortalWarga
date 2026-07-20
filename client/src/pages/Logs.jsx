@@ -1,70 +1,158 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { fetchAuditLogs, IS_DEMO } from '../services/dataService';
+import { formatDateTime, formatRupiah, isAdminRole } from '../services/dataHelpers';
 import {
-  mockLogSettings,
-  mockLoginLogs,
-  mockAccessLogs,
-  mockTransactionLogs,
-  formatDate,
-  formatRupiah,
-  isAdminRole,
-} from '../services/mockData';
+  AiOutlineSearch,
+  AiOutlineFilter,
+  AiOutlineClockCircle,
+  AiOutlineInfoCircle,
+} from 'react-icons/ai';
+
+const ACTION_OPTIONS = [
+  { value: '', label: 'Semua Aksi' },
+  { value: 'login.success', label: 'Login Berhasil' },
+  { value: 'login.failed', label: 'Login Gagal' },
+  { value: 'profile.update', label: 'Update Profil' },
+  { value: 'payment.submit', label: 'Kirim Bukti Bayar' },
+  { value: 'payment.approve', label: 'Verifikasi Pembayaran' },
+  { value: 'payment.reject', label: 'Tolak Pembayaran' },
+  { value: 'expense.create', label: 'Catat Pengeluaran' },
+  { value: 'expense.update', label: 'Update Pengeluaran' },
+  { value: 'expense.delete', label: 'Hapus Pengeluaran' },
+  { value: 'settings.update', label: 'Ubah Pengaturan' },
+  { value: 'page.view', label: 'Akses Halaman' },
+];
 
 export default function Logs() {
-  const { role } = useAuth();
+  const { role, session } = useAuth();
+  const token = session?.access_token;
   const toast = useToast();
 
-  const [activeTab, setActiveTab] = useState('login');
+  const [logs, setLogs] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isMoreLoading, setIsMoreLoading] = useState(false);
+
+  // Filters
   const [search, setSearch] = useState('');
-  
-  // Toggles state
-  const [loginEnabled, setLoginEnabled] = useState(mockLogSettings.loginLogEnabled);
-  const [accessEnabled, setAccessEnabled] = useState(mockLogSettings.accessLogEnabled);
-  const [transactionEnabled, setTransactionEnabled] = useState(mockLogSettings.transactionLogEnabled);
+  const [filterAction, setFilterAction] = useState('');
+  const [offset, setOffset] = useState(0);
+  const limit = 50;
 
   // Guard: Admin-only
   if (!isAdminRole(role)) {
     return <Navigate to="/" replace />;
   }
 
-  // Handle setting toggles
-  const handleToggle = (type) => {
-    if (type === 'login') {
-      mockLogSettings.loginLogEnabled = !loginEnabled;
-      setLoginEnabled(!loginEnabled);
-      toast.success(`Log Login berhasil ${!loginEnabled ? 'diaktifkan' : 'dinonaktifkan'}.`);
-    } else if (type === 'access') {
-      mockLogSettings.accessLogEnabled = !accessEnabled;
-      setAccessEnabled(!accessEnabled);
-      toast.success(`Log Akses berhasil ${!accessEnabled ? 'diaktifkan' : 'dinonaktifkan'}.`);
-    } else if (type === 'transaction') {
-      mockLogSettings.transactionLogEnabled = !transactionEnabled;
-      setTransactionEnabled(!transactionEnabled);
-      toast.success(`Log Transaksi berhasil ${!transactionEnabled ? 'diaktifkan' : 'dinonaktifkan'}.`);
-    }
+  const loadLogs = useCallback(
+    async (currentOffset, reset = false) => {
+      if (!token && !IS_DEMO) return;
+      try {
+        if (reset) {
+          setIsLoading(true);
+        } else {
+          setIsMoreLoading(true);
+        }
+
+        const filters = {
+          action: filterAction || undefined,
+          search: search.trim() || undefined,
+          limit,
+          offset: currentOffset,
+        };
+
+        const result = await fetchAuditLogs(token, filters);
+        const newLogs = result?.logs || [];
+        const count = result?.total_count || 0;
+
+        if (reset) {
+          setLogs(newLogs);
+        } else {
+          setLogs((prev) => [...prev, ...newLogs]);
+        }
+        setTotalCount(count);
+      } catch (err) {
+        toast.error('Gagal mengambil data sistem log.');
+      } finally {
+        setIsLoading(false);
+        setIsMoreLoading(false);
+      }
+    },
+    [token, filterAction, search, toast]
+  );
+
+  // Load logs on filter change
+  useEffect(() => {
+    setOffset(0);
+    loadLogs(0, true);
+  }, [filterAction, search, loadLogs]);
+
+  const handleLoadMore = () => {
+    const nextOffset = offset + limit;
+    setOffset(nextOffset);
+    loadLogs(nextOffset, false);
   };
 
-  // Filtered lists
-  const filteredLoginLogs = mockLoginLogs.filter((l) => {
-    if (!loginEnabled) return false;
-    return l.email?.toLowerCase().includes(search.toLowerCase()) || l.ip?.includes(search);
-  });
+  const getActionBadgeColor = (action) => {
+    if (action.startsWith('login.success')) {
+      return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+    }
+    if (action.startsWith('login.failed') || action.includes('delete') || action.includes('reject')) {
+      return 'bg-red-50 text-red-700 border border-red-200';
+    }
+    if (action.includes('payment') || action.includes('expense')) {
+      return 'bg-amber-50 text-amber-700 border border-amber-200';
+    }
+    if (action.includes('settings') || action.includes('update')) {
+      return 'bg-blue-50 text-blue-700 border border-blue-200';
+    }
+    return 'bg-forest-50 text-forest-700 border border-forest-200';
+  };
 
-  const filteredAccessLogs = mockAccessLogs.filter((a) => {
-    if (!accessEnabled) return false;
-    return a.userName?.toLowerCase().includes(search.toLowerCase()) || a.page?.toLowerCase().includes(search.toLowerCase());
-  });
+  const formatMetadataSummary = (log) => {
+    const meta = typeof log.metadata === 'string' ? JSON.parse(log.metadata) : (log.metadata || {});
+    
+    if (log.action === 'page.view') {
+      return `Membuka halaman "${meta.page || log.entity_id || ''}"`;
+    }
+    if (log.action.startsWith('login')) {
+      return `Login ${meta.status === 'success' ? 'Berhasil' : 'Gagal'} (IP: ${log.ip_address || meta.ip || '—'})`;
+    }
+    if (log.action.includes('expense')) {
+      const parts = [];
+      const prefix = log.action === 'expense.create' ? 'Catat Baru' : (log.action === 'expense.delete' ? 'Hapus' : 'Update');
+      parts.push(prefix);
+      if (meta.category) parts.push(`Kategori: ${meta.category}`);
+      if (meta.amount) parts.push(formatRupiah(meta.amount));
+      if (meta.details || meta.description) parts.push(meta.details || meta.description);
+      if (meta.has_file === true || meta.has_file === 'true' || meta.receipt_file_url) {
+        parts.push('📎 Bukti Kwitansi Baru');
+      }
+      return parts.join(' · ');
+    }
+    if (log.action.includes('payment')) {
+      const parts = [];
+      const prefix = log.action === 'payment.submit' ? 'Kirim Pembayaran' : (log.action === 'payment.approve' ? 'Verifikasi Lunas' : 'Tolak Bukti');
+      parts.push(prefix);
+      if (meta.amount) parts.push(formatRupiah(meta.amount));
+      if (meta.details || meta.description) parts.push(meta.details || meta.description);
+      if (meta.note) parts.push(`Catatan: "${meta.note}"`);
+      return parts.join(' · ');
+    }
+    if (log.action.includes('settings')) {
+      return `Ubah Pengaturan · ${meta.details || 'Parameter diperbarui'}`;
+    }
 
-  const filteredTransactionLogs = mockTransactionLogs.filter((t) => {
-    if (!transactionEnabled) return false;
-    return (
-      t.userName?.toLowerCase().includes(search.toLowerCase()) ||
-      t.action?.toLowerCase().includes(search.toLowerCase()) ||
-      t.details?.toLowerCase().includes(search.toLowerCase())
-    );
-  });
+    // Fallback
+    const keys = Object.keys(meta);
+    if (keys.length > 0) {
+      return keys.map(k => `${k}: ${typeof meta[k] === 'object' ? JSON.stringify(meta[k]) : meta[k]}`).join(', ');
+    }
+    return '—';
+  };
 
   return (
     <div className="space-y-5">
@@ -72,244 +160,160 @@ export default function Logs() {
       <div>
         <h2 className="text-lg font-bold text-forest-900">Sistem Log Keamanan &amp; Akses</h2>
         <p className="text-sm text-forest-500">
-          Pantau riwayat login, akses halaman, dan transaksi keuangan warga komplek.
+          Pantau seluruh aktivitas administratif, log keamanan login, dan audit transaksi komplek.
         </p>
       </div>
 
-      {/* Log Settings Card */}
-      <div className="pv-card p-4 bg-forest-50/30 border border-forest-100 space-y-3">
-        <h3 className="text-xs font-bold text-forest-800 uppercase tracking-wider">Konfigurasi Logging</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Toggle Login */}
-          <div className="flex items-center justify-between p-2.5 rounded-lg bg-white border border-forest-100 shadow-sm">
-            <div>
-              <p className="text-xs font-semibold text-forest-800">Log Aktivitas Login</p>
-              <p className="text-[10px] text-forest-500">Catat login berhasil/gagal</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={loginEnabled}
-                onChange={() => handleToggle('login')}
-                className="sr-only peer"
-              />
-              <div className="w-9 h-5 bg-forest-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gold-500"></div>
-            </label>
+      {/* Filter and Search Bar */}
+      <div className="pv-card p-4 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3 no-print">
+        <div className="flex flex-col sm:flex-row gap-3 flex-1">
+          {/* Search */}
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-forest-400">
+              <AiOutlineSearch size={18} />
+            </span>
+            <input
+              type="text"
+              placeholder="Cari email aktor atau aksi..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pv-input pl-9 text-sm w-full"
+            />
           </div>
 
-          {/* Toggle Access */}
-          <div className="flex items-center justify-between p-2.5 rounded-lg bg-white border border-forest-100 shadow-sm">
-            <div>
-              <p className="text-xs font-semibold text-forest-800">Log Akses Halaman</p>
-              <p className="text-[10px] text-forest-500">Catat navigasi menu admin/warga</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={accessEnabled}
-                onChange={() => handleToggle('access')}
-                className="sr-only peer"
-              />
-              <div className="w-9 h-5 bg-forest-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gold-500"></div>
-            </label>
+          {/* Action Filter */}
+          <div className="relative min-w-[200px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-forest-400">
+              <AiOutlineFilter size={18} />
+            </span>
+            <select
+              value={filterAction}
+              onChange={(e) => setFilterAction(e.target.value)}
+              className="pv-input pl-9 text-sm w-full"
+            >
+              {ACTION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
+        </div>
 
-          {/* Toggle Transaction */}
-          <div className="flex items-center justify-between p-2.5 rounded-lg bg-white border border-forest-100 shadow-sm">
-            <div>
-              <p className="text-xs font-semibold text-forest-800">Log Transaksi Keuangan</p>
-              <p className="text-[10px] text-forest-500">Catat pembayaran &amp; pengeluaran</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={transactionEnabled}
-                onChange={() => handleToggle('transaction')}
-                className="sr-only peer"
-              />
-              <div className="w-9 h-5 bg-forest-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gold-500"></div>
-            </label>
-          </div>
+        {/* Counter Badge */}
+        <div className="text-xs text-forest-500 font-medium text-right shrink-0">
+          Menampilkan <span className="font-semibold text-forest-800">{logs.length}</span> dari{' '}
+          <span className="font-semibold text-forest-800">{totalCount}</span> log
         </div>
       </div>
 
-      {/* Tabs & Search Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 no-print">
-        <div className="flex border-b border-forest-100 overflow-x-auto">
-          <button
-            onClick={() => { setActiveTab('login'); setSearch(''); }}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-              activeTab === 'login'
-                ? 'border-gold-500 text-gold-600 font-semibold'
-                : 'border-transparent text-forest-500 hover:text-forest-800'
-            }`}
-          >
-            🔒 Log Login
-          </button>
-          <button
-            onClick={() => { setActiveTab('access'); setSearch(''); }}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-              activeTab === 'access'
-                ? 'border-gold-500 text-gold-600 font-semibold'
-                : 'border-transparent text-forest-500 hover:text-forest-800'
-            }`}
-          >
-            🧭 Log Akses
-          </button>
-          <button
-            onClick={() => { setActiveTab('transaction'); setSearch(''); }}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-              activeTab === 'transaction'
-                ? 'border-gold-500 text-gold-600 font-semibold'
-                : 'border-transparent text-forest-500 hover:text-forest-800'
-            }`}
-          >
-            💸 Log Transaksi
-          </button>
-        </div>
-        <input
-          type="text"
-          placeholder="Cari kata kunci log..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pv-input text-sm md:w-64"
-        />
-      </div>
-
-      {/* Table Card */}
+      {/* Unified Table Card */}
       <div className="pv-card overflow-hidden">
-        {/* Tab 1: Log Login */}
-        {activeTab === 'login' && (
-          <div>
-            {!loginEnabled ? (
-              <p className="text-sm text-forest-400 text-center py-10">Log Aktivitas Login sedang dinonaktifkan.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-forest-100 bg-forest-50/50">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Waktu</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Email</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-forest-600 uppercase">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Alamat IP</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-forest-100">
-                    {filteredLoginLogs.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-forest-400">Tidak ada log login.</td>
-                      </tr>
-                    ) : (
-                      filteredLoginLogs.map((l) => (
-                        <tr key={l.id} className="hover:bg-forest-50/50">
-                          <td className="px-4 py-3 text-forest-500 text-xs whitespace-nowrap">{formatDate(l.timestamp)}</td>
-                          <td className="px-4 py-3 font-medium text-forest-900">{l.email}</td>
-                          <td className="px-4 py-3 text-center whitespace-nowrap">
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold ${
-                              l.status === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
-                            }`}>
-                              {l.status === 'success' ? 'Berhasil' : 'Gagal'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-forest-600 font-mono text-xs">{l.ip}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-12 space-y-3">
+            <svg className="animate-spin h-8 w-8 text-gold-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="text-sm text-forest-500 font-medium">Memuat data sistem log...</p>
           </div>
-        )}
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-forest-100 bg-forest-50/50">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase w-[160px]">Waktu</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase w-[220px]">Aktor</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase w-[150px]">Aksi</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase w-[120px]">Entitas</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Rincian</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase w-[120px]">Alamat IP</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-forest-100">
+                {logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-12 text-center text-forest-400">
+                      Tidak ada log aktivitas yang cocok dengan filter.
+                    </td>
+                  </tr>
+                ) : (
+                  logs.map((log) => (
+                    <tr key={log.id} className="hover:bg-forest-50/30 transition-colors">
+                      {/* Waktu */}
+                      <td className="px-4 py-3 text-forest-500 text-xs whitespace-nowrap">
+                        {formatDateTime(log.created_at || log.timestamp)}
+                      </td>
 
-        {/* Tab 2: Log Akses */}
-        {activeTab === 'access' && (
-          <div>
-            {!accessEnabled ? (
-              <p className="text-sm text-forest-400 text-center py-10">Log Akses Halaman sedang dinonaktifkan.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-forest-100 bg-forest-50/50">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Waktu</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Pengguna</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Halaman yang Diakses</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-forest-100">
-                    {filteredAccessLogs.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-forest-400">Tidak ada log akses halaman.</td>
-                      </tr>
-                    ) : (
-                      filteredAccessLogs.map((a) => (
-                        <tr key={a.id} className="hover:bg-forest-50/50">
-                          <td className="px-4 py-3 text-forest-500 text-xs whitespace-nowrap">{formatDate(a.timestamp)}</td>
-                          <td className="px-4 py-3 font-semibold text-forest-900">{a.userName}</td>
-                          <td className="px-4 py-3 text-forest-700 font-mono text-xs">{a.page}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+                      {/* Aktor */}
+                      <td className="px-4 py-3 min-w-[200px]">
+                        <div className="font-semibold text-forest-900 leading-tight">
+                          {log.actor_name || 'Sistem'}
+                        </div>
+                        {log.actor_email && (
+                          <div className="text-[11px] text-forest-400 font-mono mt-0.5 select-all">
+                            {log.actor_email}
+                          </div>
+                        )}
+                      </td>
 
-        {/* Tab 3: Log Transaksi */}
-        {activeTab === 'transaction' && (
-          <div>
-            {!transactionEnabled ? (
-              <p className="text-sm text-forest-400 text-center py-10">Log Transaksi Keuangan sedang dinonaktifkan.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-forest-100 bg-forest-50/50">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Waktu</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Pengguna</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Aksi</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Rincian</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Jumlah</th>
+                      {/* Aksi */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center rounded px-2 py-0.5 text-2xs font-semibold leading-none ${getActionBadgeColor(log.action)}`}>
+                          {log.action}
+                        </span>
+                      </td>
+
+                      {/* Entitas */}
+                      <td className="px-4 py-3 whitespace-nowrap text-xs">
+                        <span className="font-medium text-forest-700">{log.entity_type || '—'}</span>
+                        {log.entity_id && (
+                          <span className="text-forest-400 font-mono text-[10px] ml-1 select-all">
+                            ({String(log.entity_id).substring(0, 8)})
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Rincian */}
+                      <td className="px-4 py-3 text-xs text-forest-700 font-medium">
+                        {formatMetadataSummary(log)}
+                      </td>
+
+                      {/* IP Address */}
+                      <td className="px-4 py-3 text-forest-500 font-mono text-xs whitespace-nowrap">
+                        {log.ip_address || '—'}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-forest-100">
-                    {filteredTransactionLogs.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-forest-400">Tidak ada log transaksi.</td>
-                      </tr>
-                    ) : (
-                      filteredTransactionLogs.map((t) => (
-                        <tr key={t.id} className="hover:bg-forest-50/50">
-                          <td className="px-4 py-3 text-forest-500 text-xs whitespace-nowrap">{formatDate(t.timestamp)}</td>
-                          <td className="px-4 py-3 font-semibold text-forest-900 whitespace-nowrap">{t.userName}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold leading-none ${
-                              t.action.includes('Lunas') || t.action.includes('Bayar') || t.action.includes('Catat Pembayaran')
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : t.action.includes('Pengaturan')
-                                ? 'bg-blue-50 text-blue-700'
-                                : 'bg-red-50 text-red-700'
-                            }`}>
-                              {t.action}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-forest-700">{t.details}</td>
-                          <td className="px-4 py-3 text-right font-semibold text-forest-950 whitespace-nowrap">
-                            {t.amount ? formatRupiah(t.amount) : '—'}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
+
+      {/* Load More Button */}
+      {!isLoading && logs.length < totalCount && (
+        <div className="flex justify-center pt-2">
+          <button
+            onClick={handleLoadMore}
+            disabled={isMoreLoading}
+            className="pv-btn-ghost text-xs border-forest-200 hover:border-forest-300 text-forest-700 px-6 py-2.5 flex items-center gap-2"
+          >
+            {isMoreLoading ? (
+              <>
+                <svg className="animate-spin h-3.5 w-3.5 text-forest-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Memuat...
+              </>
+            ) : (
+              'Muat Lebih Banyak Log'
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

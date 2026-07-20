@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { registerUnauthorizedHandler, portalApiPost } from '../services/apiClient';
+import { updateProfileApi } from '../services/dataService';
 
 const AuthContext = createContext(null);
 
@@ -455,6 +456,14 @@ function useProductionAuth() {
       ...(Object.prototype.hasOwnProperty.call(newProps, 'phone') ? { phone: newProps.phone } : {}),
       ...(Object.prototype.hasOwnProperty.call(newProps, 'avatar_url') ? { avatar_url: newProps.avatar_url } : {}),
     };
+    // Call n8n API to persist changes to Supabase
+    try {
+      await updateProfileApi(session?.access_token, editableProps);
+    } catch (err) {
+      // Re-throw so callers can show error toast
+      throw err;
+    }
+    // Update local state + localStorage only after API success
     const updated = { ...profile, ...editableProps };
     persist(session?.access_token, updated, tokenExpiresAt);
     return updated;

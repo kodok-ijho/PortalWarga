@@ -42,8 +42,27 @@ import { compressImage } from '../utils/imageCompressor';
 export default function PaymentMatrix() {
   const { profile, role, session } = useAuth();
   const toast = useToast();
-  const years = [2025, 2026];
-  const [year, setYear] = useState(new Date().getFullYear());
+  const years = [2026, 2027, 2028];
+  const [year, setYear] = useState(2026); // Default to billing start year 2026
+
+  const matrixMonths = useMemo(() => {
+    const startYrStr = String(year).substring(2);
+    const endYrStr = String(year + 1).substring(2);
+    return [
+      { label: `Jul '${startYrStr}`, period: `${year}-07` },
+      { label: `Agt '${startYrStr}`, period: `${year}-08` },
+      { label: `Sep '${startYrStr}`, period: `${year}-09` },
+      { label: `Okt '${startYrStr}`, period: `${year}-10` },
+      { label: `Nov '${startYrStr}`, period: `${year}-11` },
+      { label: `Des '${startYrStr}`, period: `${year}-12` },
+      { label: `Jan '${endYrStr}`, period: `${year+1}-01` },
+      { label: `Feb '${endYrStr}`, period: `${year+1}-02` },
+      { label: `Mar '${endYrStr}`, period: `${year+1}-03` },
+      { label: `Apr '${endYrStr}`, period: `${year+1}-04` },
+      { label: `Mei '${endYrStr}`, period: `${year+1}-05` },
+      { label: `Jun '${endYrStr}`, period: `${year+1}-06` }
+    ];
+  }, [year]);
 
   // Seleksi sel (warga QRIS). Key pakai bill.id (unik lintas tahun).
   const [selected, setSelected] = useState({}); // { [billId]: true }
@@ -447,7 +466,7 @@ export default function PaymentMatrix() {
         >
           {years.map((y) => (
             <option key={y} value={y}>
-              Tahun {y}
+              Tahun Buku {y}/{y+1}
             </option>
           ))}
         </select>
@@ -481,12 +500,12 @@ export default function PaymentMatrix() {
                 <th className="sticky left-0 z-20 bg-forest-800 px-3 py-3 text-left text-[11px] font-semibold text-gold-400 uppercase tracking-wide w-[180px]">
                   Rumah / Warga
                 </th>
-                {MONTHS_SHORT.map((m) => (
+                {matrixMonths.map((m) => (
                   <th
-                    key={m}
+                    key={m.period}
                     className="px-1 py-3 text-center text-[11px] font-semibold text-gold-400 uppercase w-16"
                   >
-                    {m}
+                    {m.label}
                   </th>
                 ))}
               </tr>
