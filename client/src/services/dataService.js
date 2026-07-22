@@ -142,7 +142,7 @@ export async function fetchDashboardData(token, { role, period } = {}) {
     if (isBendaharaOrAbove(role)) {
       try {
         const payments = await fetchPayments(token);
-        pendingPaymentCount = payments.filter((p) => p.status === 'pending').length;
+        pendingPaymentCount = payments.filter((p) => p.status === 'pending_verification').length;
       } catch (err) {
         console.warn('Failed to load pending payments count for dashboard:', err);
       }
@@ -530,7 +530,7 @@ function normalizeBillMatrixRows(rows) {
 // PAYMENTS
 // =====================================================================
 
-export async function submitManualPayment(token, { bill_id, method, amount, file, proof_file, note }) {
+export async function submitManualPayment(token, { bill_id, method, amount, file, proof_file, note, paid_at }) {
   if (IS_DEMO) {
     const mock = await getMockData();
     return mock.recordResidentPayment([bill_id], { method, receiptFile: file || proof_file, note });
@@ -540,12 +540,12 @@ export async function submitManualPayment(token, { bill_id, method, amount, file
     return portalApiUpload('/payments/manual/submit', {
       token,
       file,
-      fields: { bill_id, method, amount, note }
+      fields: { bill_id, method, amount, note, paid_at }
     });
   } else {
     return portalApiPost('/payments/manual/submit', {
       token,
-      body: { bill_id, method, amount, proof_file, note }
+      body: { bill_id, method, amount, proof_file, note, paid_at }
     });
   }
 }

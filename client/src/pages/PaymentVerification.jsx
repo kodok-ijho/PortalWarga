@@ -43,6 +43,7 @@ export default function PaymentVerification() {
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [modalMode, setModalMode] = useState(null); // 'detail' | 'reject'
   const [rejectReason, setRejectReason] = useState('');
+  const [activeActionId, setActiveActionId] = useState(null);
 
   const [payments, setPayments] = useState([]);
   const [units, setUnits] = useState([]);
@@ -119,6 +120,8 @@ export default function PaymentVerification() {
       : rejectedPayments;
 
   const handleVerify = async (payment) => {
+    if (!payment || activeActionId) return;
+    setActiveActionId(payment.id);
     try {
       if (IS_DEMO) {
         verifyPayment(payment.id, { verifiedBy: profile.full_name });
@@ -131,6 +134,8 @@ export default function PaymentVerification() {
       setModalMode(null);
     } catch (err) {
       toast.error(err.message || 'Gagal memverifikasi pembayaran.');
+    } finally {
+      setActiveActionId(null);
     }
   };
 
@@ -141,10 +146,12 @@ export default function PaymentVerification() {
   };
 
   const handleReject = async () => {
+    if (!selectedPayment || activeActionId) return;
     if (!rejectReason.trim()) {
       toast.error('Silakan isi alasan penolakan.');
       return;
     }
+    setActiveActionId(selectedPayment.id);
     try {
       if (IS_DEMO) {
         rejectPayment(selectedPayment.id, {
@@ -160,6 +167,8 @@ export default function PaymentVerification() {
       setModalMode(null);
     } catch (err) {
       toast.error(err.message || 'Gagal menolak pembayaran.');
+    } finally {
+      setActiveActionId(null);
     }
   };
 
@@ -317,12 +326,14 @@ export default function PaymentVerification() {
                       <>
                         <button
                           onClick={() => handleVerify(payment)}
+                          disabled={Boolean(activeActionId)}
                           className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 text-white px-3 py-2 text-xs font-medium hover:bg-emerald-700 transition-colors"
                         >
                           <AiOutlineCheck /> Verifikasi
                         </button>
                         <button
                           onClick={() => openRejectModal(payment)}
+                          disabled={Boolean(activeActionId)}
                           className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 px-3 py-2 text-xs font-medium hover:bg-red-100 transition-colors"
                         >
                           <AiOutlineClose /> Tolak
@@ -330,6 +341,7 @@ export default function PaymentVerification() {
                       </>
                     )}
                     <button
+                      disabled={Boolean(activeActionId)}
                       onClick={() => openDetail(payment)}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-forest-50 text-forest-600 border border-forest-200 px-3 py-2 text-xs font-medium hover:bg-forest-100 transition-colors"
                     >
@@ -461,12 +473,14 @@ export default function PaymentVerification() {
                   <>
                     <button
                       onClick={() => handleVerify(selectedPayment)}
+                      disabled={Boolean(activeActionId)}
                       className="flex-1 pv-btn-primary py-2.5 rounded-lg text-sm"
                     >
                       ✅ Verifikasi
                     </button>
                     <button
                       onClick={() => { setModalMode('reject'); setRejectReason(''); }}
+                      disabled={Boolean(activeActionId)}
                       className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 py-2.5 text-sm font-medium hover:bg-red-100 transition-colors"
                     >
                       ❌ Tolak
@@ -506,6 +520,7 @@ export default function PaymentVerification() {
             <div className="flex gap-2 mt-6">
               <button
                 onClick={handleReject}
+                disabled={Boolean(activeActionId)}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 text-white py-2.5 text-sm font-medium hover:bg-red-700 transition-colors"
               >
                 ❌ Tolak Pembayaran

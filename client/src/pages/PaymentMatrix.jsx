@@ -23,6 +23,7 @@ import {
   createCashPayment,
   approveManualPayment,
   rejectManualPayment,
+  fetchPayments,
   createQrisPayment,
   IS_DEMO,
 } from '../services/dataService';
@@ -79,6 +80,7 @@ export default function PaymentMatrix() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [matrix, setMatrix] = useState([]);
+  const [productionPayments, setProductionPayments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
@@ -86,8 +88,14 @@ export default function PaymentMatrix() {
     setIsLoading(true);
     setLoadError('');
     try {
-      const data = await fetchBillMatrix(session?.access_token, year);
+      const [data, paymentData] = await Promise.all([
+        fetchBillMatrix(session?.access_token, year),
+        !IS_DEMO && isBendaharaOrAbove(role)
+          ? fetchPayments(session?.access_token)
+          : Promise.resolve([]),
+      ]);
       setMatrix(data);
+      setProductionPayments(paymentData);
     } catch (err) {
       const msg = err.message || 'Gagal memuat matriks pembayaran.';
       setLoadError(msg);
@@ -95,7 +103,12 @@ export default function PaymentMatrix() {
     } finally {
       setIsLoading(false);
     }
-  }, [session?.access_token, year, toast]);
+  }, [session?.access_token, year, role, toast]);
+
+  const getPaymentForBillView = useCallback((billId) => {
+    if (IS_DEMO) return getPaymentForBill(billId);
+    return productionPayments.find((payment) => payment.ipl_bill_id === billId) || null;
+  }, [productionPayments]);
 
   useEffect(() => {
     loadMatrix();
@@ -249,7 +262,10 @@ export default function PaymentMatrix() {
   );
 
   const totalToPay = useMemo(
-    () => selectedBills.reduce((s, bill) => s + bill.amount, 0),
+    () => selectedBills.reduce(
+      (sum, bill) => sum + Number(bill.amount || 0) + Number(bill.late_fee || 0),
+      0
+    ),
     [selectedBills]
   );
 
@@ -285,6 +301,7 @@ export default function PaymentMatrix() {
   };
 
   const confirmPay = async ({ method, receiptFile, note }) => {
+    let completedCount = 0;
     try {
       if (method === 'qris') {
         const billIds = payModal.map(b => b.id);
@@ -316,24 +333,14 @@ export default function PaymentMatrix() {
             toast.error('Metode pembayaran ini belum diimplementasikan di mode production.');
             return;
           }
-          let firstPayment = null;
-          for (let i = 0; i < payModal.length; i++) {
-            const bill = payModal[i];
-            if (i === 0) {
-              firstPayment = await submitManualPayment(session?.access_token, {
-                bill_id: bill.id,
-                method: 'bank_transfer',
-                file: receiptFile,
-                note,
-              });
-            } else {
-              await submitManualPayment(session?.access_token, {
-                bill_id: bill.id,
-                method: 'bank_transfer',
-                proof_file: firstPayment.file_url,
-                note,
-              });
-            }
+          for (const bill of payModal) {
+            await submitManualPayment(session?.access_token, {
+              bill_id: bill.id,
+              method: 'bank_transfer',
+              file: receiptFile,
+              note,
+            });
+            completedCount += 1;
           }
           toast.success('Bukti transfer berhasil dikirim. Menunggu verifikasi bendahara.');
         }
@@ -342,7 +349,14 @@ export default function PaymentMatrix() {
       setPayModal(null);
       setRefreshKey((k) => k + 1);
     } catch (err) {
-      toast.error(err.message || 'Gagal mengirim pembayaran.');
+      if (completedCount > 0) {
+        toast.error(`${completedCount} dari ${payModal.length} tagihan berhasil dikirim. Daftar tagihan dimuat ulang untuk mencegah duplikasi.`);
+        setSelected({});
+        setPayModal(null);
+        setRefreshKey((k) => k + 1);
+      } else {
+        toast.error(err.message || 'Gagal mengirim pembayaran.');
+      }
     }
   };
 
@@ -374,6 +388,7 @@ export default function PaymentMatrix() {
     const methodLabel =
       method === 'cash' ? 'tunai' : method === 'bank_transfer' ? 'transfer' : 'QRIS';
     const noteWithDate = [note?.trim(), `Tanggal diterima: ${paidAt}`].filter(Boolean).join(' | ');
+    let completedCount = 0;
     try {
       if (IS_DEMO) {
         let count = 0;
@@ -396,7 +411,7 @@ export default function PaymentMatrix() {
             if (i === 0) {
               firstPayment = await createCashPayment(session?.access_token, {
                 bill_id: bill.id,
-                amount: bill.amount,
+                amount: Number(bill.amount || 0) + Number(bill.late_fee || 0),
                 file: receiptFile,
                 note: noteWithDate,
                 paid_at: paidAt,
@@ -404,12 +419,13 @@ export default function PaymentMatrix() {
             } else {
               await createCashPayment(session?.access_token, {
                 bill_id: bill.id,
-                amount: bill.amount,
+                amount: Number(bill.amount || 0) + Number(bill.late_fee || 0),
                 file: null,
                 note: noteWithDate + (firstPayment?.file_url ? ` (Lampiran: ${firstPayment.file_url})` : ''),
                 paid_at: paidAt,
               });
             }
+            completedCount += 1;
           }
           toast.success(`Pembayaran tunai untuk ${manualModal.bills.length} tagihan berhasil dicatat.`);
         } else if (method === 'bank_transfer') {
@@ -417,10 +433,12 @@ export default function PaymentMatrix() {
             await submitManualPayment(session?.access_token, {
               bill_id: bill.id,
               method: 'bank_transfer',
-              amount: bill.amount,
+              amount: Number(bill.amount || 0) + Number(bill.late_fee || 0),
               file: receiptFile,
               note: noteWithDate,
+              paid_at: paidAt,
             });
+            completedCount += 1;
           }
           toast.success(`Bukti transfer untuk ${manualModal.bills.length} tagihan berhasil dicatat dan menunggu verifikasi bendahara.`);
         } else {
@@ -432,7 +450,14 @@ export default function PaymentMatrix() {
       setManualModal(null);
       setRefreshKey((k) => k + 1);
     } catch (err) {
-      toast.error(err.message || 'Gagal mencatat pembayaran.');
+      if (completedCount > 0) {
+        toast.error(`${completedCount} dari ${manualModal.bills.length} pembayaran berhasil dicatat. Matriks dimuat ulang untuk mencegah duplikasi.`);
+        setSelected({});
+        setManualModal(null);
+        setRefreshKey((k) => k + 1);
+      } else {
+        toast.error(err.message || 'Gagal mencatat pembayaran.');
+      }
     }
   };
 
@@ -596,7 +621,7 @@ export default function PaymentMatrix() {
                               isLockedOtherUnit={isLockedOtherUnit}
                               onClick={() => {
                                 if (cell?.status === 'paid' || cell?.status === 'pending_verification' || cell?.status === 'rejected') {
-                                  const payment = getPaymentForBill(cell.bill.id);
+                                  const payment = getPaymentForBillView(cell.bill.id);
                                   setDetailModal({ bill: cell.bill, payment });
                                   return;
                                 }
@@ -821,9 +846,10 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
   const [receiptFile, setReceiptFile] = useState(null);
   const [uploadError, setUploadError] = useState('');
   const [note, setNote] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const MAX_SIZE = 3 * 1024 * 1024; // 3 MB
-  const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  const MAX_SIZE = 2 * 1024 * 1024;
+  const ACCEPTED = ['image/jpeg', 'image/jpg', 'image/png'];
   const isMulti = bills.length > 1;
 
   const handleFile = async (e) => {
@@ -834,13 +860,13 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
       return;
     }
     if (!ACCEPTED.includes(file.type)) {
-      setUploadError('Format tidak didukung. Gunakan JPG, PNG, WEBP, atau PDF.');
+      setUploadError('Format tidak didukung. Gunakan JPG atau PNG.');
       setReceiptFile(null);
       e.target.value = '';
       return;
     }
     if (file.size > MAX_SIZE) {
-      setUploadError('Ukuran file melebihi 3 MB.');
+      setUploadError('Ukuran file melebihi 2 MB.');
       setReceiptFile(null);
       e.target.value = '';
       return;
@@ -853,19 +879,22 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (method === 'bank_transfer' && !receiptFile) {
       setUploadError('Bukti transfer wajib diunggah.');
       return;
     }
-    onConfirm({
-      method,
-      note,
-      // Demo mode: simpan nama file saja. Saat Supabase terhubung,
-      // file asli disimpan di Supabase Storage dan field ini berisi path/URL.
-      receiptFile: receiptFile ? receiptFile.name : null,
-    });
+    setIsSubmitting(true);
+    try {
+      await onConfirm({
+        method,
+        note,
+        receiptFile: IS_DEMO ? (receiptFile?.name || null) : receiptFile,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -947,7 +976,7 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
             <div className="rounded-lg border-2 border-dashed border-forest-200 bg-forest-50/50 p-4">
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp,application/pdf"
+                accept="image/jpeg,image/png"
                 onChange={handleFile}
                 className="block w-full text-xs text-forest-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-forest-800 file:text-gold-400 hover:file:bg-forest-700"
               />
@@ -957,7 +986,7 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
                 </p>
               )}
               <p className="mt-1.5 text-[10px] text-forest-400">
-                Format: JPG, PNG, WEBP, atau PDF. Maks 3 MB.
+                Format: JPG atau PNG. Maks 2 MB.
               </p>
             </div>
             {uploadError && (
@@ -980,11 +1009,11 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
         </div>
 
         <div className="flex gap-2 pt-2">
-          <button type="button" onClick={onClose} className="pv-btn-ghost flex-1 text-sm">
+          <button type="button" onClick={onClose} disabled={isSubmitting} className="pv-btn-ghost flex-1 text-sm disabled:opacity-50">
             Batal
           </button>
-          <button type="submit" className="pv-btn-primary flex-1 text-sm">
-            {method === 'qris' ? 'Lanjut ke Checkout Midtrans (Simulasi)' : 'Kirim Bukti Transfer'}
+          <button type="submit" disabled={isSubmitting} className="pv-btn-primary flex-1 text-sm disabled:opacity-50">
+            {isSubmitting ? 'Memproses...' : method === 'qris' ? 'Lanjut ke Checkout Midtrans (Simulasi)' : 'Kirim Bukti Transfer'}
           </button>
         </div>
       </form>
@@ -1002,12 +1031,16 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
   const [note, setNote] = useState('');
   const [receiptFile, setReceiptFile] = useState(null);
   const [uploadError, setUploadError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const MAX_SIZE = 2 * 1024 * 1024; // n8n manual payment endpoint limit
   const ACCEPTED = ['image/jpeg', 'image/jpg', 'image/png'];
 
   // bills diasumsikan satu unit, sudah runut & terurut (divalidasi sebelum modal).
-  const total = bills.reduce((s, b) => s + b.amount, 0);
+  const total = bills.reduce(
+    (sum, bill) => sum + Number(bill.amount || 0) + Number(bill.late_fee || 0),
+    0
+  );
   const unit = getUnitById(bills[0].unit_id);
   const unitLabel = unit ? `Blok ${unit.block}/${unit.unit_number}` : '';
   const isMulti = bills.length > 1;
@@ -1040,7 +1073,7 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!paidAt) return;
     if (needsReceipt && !receiptFile) {
@@ -1051,12 +1084,12 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
       );
       return;
     }
-    onConfirm({
-      method,
-      paidAt,
-      note,
-      receiptFile,
-    });
+    setIsSubmitting(true);
+    try {
+      await onConfirm({ method, paidAt, note, receiptFile });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const receiptLabel = method === 'bank_transfer' ? 'Bukti Transfer' : 'Bukti Penerimaan Tunai';
@@ -1174,11 +1207,11 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
         </div>
 
         <div className="flex gap-2 pt-2">
-          <button type="button" onClick={onClose} className="pv-btn-ghost flex-1 text-sm">
+          <button type="button" onClick={onClose} disabled={isSubmitting} className="pv-btn-ghost flex-1 text-sm disabled:opacity-50">
             Batal
           </button>
-          <button type="submit" className="pv-btn-primary flex-1 text-sm">
-            Catat Pembayaran
+          <button type="submit" disabled={isSubmitting} className="pv-btn-primary flex-1 text-sm disabled:opacity-50">
+            {isSubmitting ? 'Memproses...' : 'Catat Pembayaran'}
           </button>
         </div>
       </form>
@@ -1204,9 +1237,11 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
   const [newReceipt, setNewReceipt] = useState(null);
   const [reviseNote, setReviseNote] = useState(payment?.metadata?.note || '');
   const [uploadError, setUploadError] = useState('');
+  const [isActing, setIsActing] = useState(false);
 
   const handleVerify = async () => {
-    if (!payment) return;
+    if (!payment || isActing) return;
+    setIsActing(true);
     try {
       if (IS_DEMO) {
         verifyPayment(payment.id, { verifiedBy: roleLabel(role) });
@@ -1218,13 +1253,16 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
       onClose();
     } catch (err) {
       toast.error(err.message || 'Gagal memverifikasi pembayaran.');
+    } finally {
+      setIsActing(false);
     }
   };
 
   const handleReject = async () => {
-    if (!payment) return;
+    if (!payment || isActing) return;
     const reason = prompt('Masukkan alasan penolakan bukti pembayaran:');
     if (reason === null) return;
+    setIsActing(true);
     try {
       if (IS_DEMO) {
         rejectPayment(payment.id, { rejectedBy: roleLabel(role), reason: reason || 'Bukti transfer tidak valid/blur' });
@@ -1236,6 +1274,8 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
       onClose();
     } catch (err) {
       toast.error(err.message || 'Gagal menolak pembayaran.');
+    } finally {
+      setIsActing(false);
     }
   };
 
@@ -1456,10 +1496,10 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
 
           {payment?.status === 'pending_verification' && canVerify && (
             <div className="flex gap-2">
-              <button type="button" onClick={handleVerify} className="pv-btn-primary flex-1 bg-emerald-600 hover:bg-emerald-700">
+              <button type="button" onClick={handleVerify} disabled={isActing} className="pv-btn-primary flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
                 ✓ Verifikasi Lunas
               </button>
-              <button type="button" onClick={handleReject} className="pv-btn-ghost flex-1 border-red-300 text-red-600 hover:bg-red-50">
+              <button type="button" onClick={handleReject} disabled={isActing} className="pv-btn-ghost flex-1 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50">
                 ✕ Tolak Bukti
               </button>
             </div>
