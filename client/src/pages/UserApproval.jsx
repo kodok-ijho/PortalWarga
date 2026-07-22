@@ -160,20 +160,20 @@ export default function UserApproval() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-forest-900 flex items-center gap-2">
-            <AiOutlineUser className="text-gold-600" /> Approval User Baru
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-lg font-bold text-forest-900 sm:text-xl">
+            <AiOutlineUser className="shrink-0 text-gold-600" /> Verifikasi Warga Baru
           </h1>
-          <p className="text-sm text-forest-500 mt-1">
+          <p className="mt-1 text-sm leading-5 text-forest-500">
             Verifikasi dan setujui pendaftaran warga baru ke portal
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
           {pendingUsers.length > 0 && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800 sm:text-sm">
               <AiOutlineClockCircle />
               {pendingUsers.length} Menunggu
             </span>
@@ -191,13 +191,13 @@ export default function UserApproval() {
 
       {/* Pending Users List */}
       {isLoading ? (
-        <div className="pv-card p-12 text-center">
+        <div className="pv-card p-8 text-center sm:p-12">
           <div className="mx-auto mb-4 h-12 w-12 rounded-full border-4 border-forest-100 border-t-gold-500 animate-spin" />
           <h2 className="text-lg font-semibold text-forest-800">Memuat Pendaftaran</h2>
           <p className="text-sm text-forest-500 mt-2">Mengambil data pendaftaran terbaru.</p>
         </div>
       ) : loadError ? (
-        <div className="pv-card border-red-200 bg-red-50 p-8 text-center">
+        <div className="pv-card border-red-200 bg-red-50 p-6 text-center sm:p-8">
           <h2 className="text-lg font-semibold text-red-700">Gagal Memuat Data</h2>
           <p className="text-sm text-red-600 mt-2">{loadError}</p>
           <button
@@ -209,7 +209,7 @@ export default function UserApproval() {
           </button>
         </div>
       ) : pendingUsers.length === 0 ? (
-        <div className="pv-card p-12 text-center">
+        <div className="pv-card p-8 text-center sm:p-12">
           <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center">
             <AiOutlineCheck className="text-3xl text-emerald-600" />
           </div>
@@ -220,32 +220,32 @@ export default function UserApproval() {
         <div className="space-y-3">
           {pendingUsers.map((user) => (
             <div key={user.id} className="pv-card p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
                   <div className="h-10 w-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-base flex-shrink-0">
-                    {user.full_name.charAt(0)}
+                    {(user.full_name || user.email || '?').charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-forest-900">{user.full_name}</h3>
-                    <p className="text-xs text-forest-500 mt-0.5">{user.email}</p>
-                    <div className="flex items-center gap-3 mt-1.5 text-xs text-forest-400">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="break-words font-semibold text-forest-900">{user.full_name}</h3>
+                    <p className="mt-0.5 break-all text-xs leading-5 text-forest-500">{user.email}</p>
+                    <div className="mt-1.5 grid gap-0.5 text-xs leading-5 text-forest-400 sm:flex sm:flex-wrap sm:gap-x-3">
                       <span>HP: {user.phone || '-'}</span>
                       <span>Daftar: {formatDate(user.registered_at)}</span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-shrink-0">
                   <button
                     onClick={() => openApproveModal(user)}
                     disabled={!!actionKey}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 text-white px-3 py-2 text-xs font-medium hover:bg-emerald-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <AiOutlineCheck /> Setujui
                   </button>
                   <button
                     onClick={() => openRejectModal(user)}
                     disabled={!!actionKey}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 px-3 py-2 text-xs font-medium hover:bg-red-100 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <AiOutlineClose /> Tolak
                   </button>
@@ -258,8 +258,8 @@ export default function UserApproval() {
 
       {/* Approve Modal */}
       {modalMode === 'approve' && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+        <div className="pv-dialog-backdrop">
+          <div className="pv-dialog-panel">
             <h2 className="text-lg font-bold text-forest-900 mb-1">Setujui Pendaftaran</h2>
             <p className="text-sm text-forest-500 mb-4">
               Verifikasi data <strong>{selectedUser.full_name}</strong> dan tetapkan unit rumah.
@@ -296,7 +296,7 @@ export default function UserApproval() {
                 <select
                   value={unitId}
                   onChange={(e) => setUnitId(e.target.value)}
-                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none"
+                  className="w-full min-w-0 rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none"
                 >
                   <option value="">-- Pilih Unit --</option>
                   {availableUnits.map((u) => {
@@ -345,7 +345,7 @@ export default function UserApproval() {
               </div>
             </div>
 
-            <div className="flex gap-2 mt-6">
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row">
               <button
                 onClick={handleApprove}
                 disabled={actionKey === `approve:${selectedUser.id}`}
@@ -355,7 +355,7 @@ export default function UserApproval() {
               </button>
               <button
                 onClick={closeModal}
-                className="pv-btn-ghost py-2.5 px-4 rounded-lg text-sm"
+                className="pv-btn-ghost w-full rounded-lg px-4 py-2.5 text-sm sm:w-auto"
               >
                 Batal
               </button>
@@ -366,10 +366,10 @@ export default function UserApproval() {
 
       {/* Reject Modal */}
       {modalMode === 'reject' && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+        <div className="pv-dialog-backdrop">
+          <div className="pv-dialog-panel">
             <h2 className="text-lg font-bold text-red-700 mb-1">Tolak Pendaftaran</h2>
-            <p className="text-sm text-forest-500 mb-4">
+            <p className="mb-4 break-words text-sm leading-5 text-forest-500">
               Tolak pendaftaran <strong>{selectedUser.full_name}</strong> ({selectedUser.email}).
             </p>
 
@@ -384,7 +384,7 @@ export default function UserApproval() {
               />
             </div>
 
-            <div className="flex gap-2 mt-6">
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row">
               <button
                 onClick={handleReject}
                 disabled={actionKey === `reject:${selectedUser.id}`}
@@ -394,7 +394,7 @@ export default function UserApproval() {
               </button>
               <button
                 onClick={closeModal}
-                className="pv-btn-ghost py-2.5 px-4 rounded-lg text-sm"
+                className="pv-btn-ghost w-full rounded-lg px-4 py-2.5 text-sm sm:w-auto"
               >
                 Batal
               </button>

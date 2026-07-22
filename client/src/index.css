@@ -40,6 +40,23 @@
   .pv-input {
     @apply w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 placeholder:text-forest-400 focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 outline-none transition-all;
   }
+
+  .pv-dialog-backdrop {
+    @apply fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:px-4 sm:py-6;
+  }
+
+  .pv-dialog-panel {
+    @apply w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl sm:p-6;
+    max-height: calc(100dvh - 0.5rem);
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 640px) {
+  .pv-dialog-panel {
+    max-height: calc(100dvh - 3rem);
+    padding-bottom: 1.5rem;
+  }
 }
 
 /* Animasi toast */

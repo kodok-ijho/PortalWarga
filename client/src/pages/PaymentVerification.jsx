@@ -30,10 +30,28 @@ import { AiOutlineCheck, AiOutlineClose, AiOutlineEye, AiOutlineClockCircle } fr
 import { useToast } from '../hooks/useToast';
 
 const TABS = [
-  { key: 'pending', label: 'Menunggu', icon: '⏳' },
-  { key: 'verified', label: 'Terverifikasi', icon: '✅' },
-  { key: 'rejected', label: 'Ditolak', icon: '❌' },
+  { key: 'pending', label: 'Menunggu' },
+  { key: 'verified', label: 'Terverifikasi' },
+  { key: 'rejected', label: 'Ditolak' },
 ];
+
+function isImageReceipt(payment) {
+  const mimeType = String(payment?.proof_file_mime_type || '').toLowerCase();
+  const fileName = String(payment?.proof_file_name || payment?.receipt_file || '').toLowerCase();
+  return mimeType.startsWith('image/') || /\.(png|jpe?g|webp|gif)(\?.*)?$/.test(fileName);
+}
+
+function getReceiptPreviewUrl(payment) {
+  const sourceUrl = payment?.proof_file_url;
+  if (!sourceUrl) return null;
+
+  const driveMatch = String(sourceUrl).match(/drive\.google\.com\/file\/d\/([^/]+)/i);
+  if (driveMatch?.[1] && driveMatch[1] !== 'undefined') {
+    return `https://drive.google.com/thumbnail?id=${encodeURIComponent(driveMatch[1])}&sz=w1200`;
+  }
+
+  return sourceUrl;
+}
 
 export default function PaymentVerification() {
   const { role, profile, session } = useAuth();
@@ -44,6 +62,7 @@ export default function PaymentVerification() {
   const [modalMode, setModalMode] = useState(null); // 'detail' | 'reject'
   const [rejectReason, setRejectReason] = useState('');
   const [activeActionId, setActiveActionId] = useState(null);
+  const [receiptPreviewError, setReceiptPreviewError] = useState(false);
 
   const [payments, setPayments] = useState([]);
   const [units, setUnits] = useState([]);
@@ -83,6 +102,10 @@ export default function PaymentVerification() {
     loadData();
     return () => { active = false; };
   }, [refreshKey, session?.access_token]);
+
+  useEffect(() => {
+    setReceiptPreviewError(false);
+  }, [selectedPayment?.id]);
 
   const getUnit = (unitId) => {
     return units.find(u => u.id === unitId) || getUnitById(unitId);
@@ -193,20 +216,22 @@ export default function PaymentVerification() {
     return '';
   }
 
+  const selectedReceiptPreviewUrl = getReceiptPreviewUrl(selectedPayment);
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-forest-900 flex items-center gap-2">
-            <AiOutlineCheck className="text-gold-600" /> Verifikasi Pembayaran
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-lg font-bold text-forest-900 sm:text-xl">
+            <AiOutlineCheck className="shrink-0 text-gold-600" /> Verifikasi Pembayaran
           </h1>
-          <p className="text-sm text-forest-500 mt-1">
+          <p className="mt-1 text-sm leading-5 text-forest-500">
             Verifikasi bukti transfer pembayaran IPL dari warga
           </p>
         </div>
         {pendingPayments.length > 0 && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1.5 text-sm font-semibold text-orange-800">
+          <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1.5 text-xs font-semibold text-orange-800 sm:text-sm">
             <AiOutlineClockCircle />
             {pendingPayments.length} Menunggu
           </span>
@@ -214,8 +239,13 @@ export default function PaymentVerification() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-forest-100 rounded-lg">
+      <div className="grid grid-cols-3 gap-1 rounded-lg bg-forest-100 p-1">
         {TABS.map((tab) => {
+          const TabIcon = tab.key === 'pending'
+            ? AiOutlineClockCircle
+            : tab.key === 'verified'
+              ? AiOutlineCheck
+              : AiOutlineClose;
           const count =
             tab.key === 'pending'
               ? pendingPayments.length
@@ -226,16 +256,17 @@ export default function PaymentVerification() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 py-2.5 text-sm rounded-md transition-all flex items-center justify-center gap-1.5 ${
+              className={`relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-2 text-[11px] transition-all sm:flex-row sm:gap-1.5 sm:py-2.5 sm:text-sm ${
                 activeTab === tab.key
                   ? 'bg-forest-800 text-gold-400 font-semibold shadow-sm'
                   : 'text-forest-600 hover:text-forest-800'
               }`}
             >
-              <span>{tab.icon}</span>
-              {tab.label}
+              <TabIcon className="text-base sm:text-sm" aria-hidden="true" />
+              <span className="truncate sm:hidden">{tab.key === 'verified' ? 'Selesai' : tab.label}</span>
+              <span className="hidden truncate sm:inline">{tab.label}</span>
               {count > 0 && (
-                <span className={`ml-1 text-[10px] rounded-full px-1.5 py-0.5 font-bold ${
+                <span className={`absolute right-1 top-1 min-w-4 rounded-full px-1 py-0.5 text-center text-[9px] font-bold sm:static sm:ml-1 sm:px-1.5 sm:text-[10px] ${
                   activeTab === tab.key ? 'bg-gold-500 text-forest-900' : 'bg-forest-200 text-forest-600'
                 }`}>
                   {count}
@@ -248,12 +279,12 @@ export default function PaymentVerification() {
 
       {/* Payment List */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-20 space-y-4">
+        <div className="flex flex-col items-center justify-center space-y-4 p-12 sm:p-20">
           <div className="h-10 w-10 border-4 border-forest-200 border-t-gold-500 rounded-full animate-spin" />
           <p className="text-sm text-forest-500">Memuat data verifikasi pembayaran...</p>
         </div>
       ) : currentList.length === 0 ? (
-        <div className="pv-card p-12 text-center">
+        <div className="pv-card p-8 text-center sm:p-12">
           <p className="text-sm text-forest-500">
             {activeTab === 'pending'
               ? 'Tidak ada pembayaran yang menunggu verifikasi.'
@@ -268,11 +299,16 @@ export default function PaymentVerification() {
             const unit = getUnit(payment.unit_id || payment._bill?.unit_id);
             const resident = payment._profile || getResident(payment.resident_id);
             const period = payment.period || payment._bill?.period || getBillPeriod(payment);
+            const StatusIcon = payment.status === 'pending_verification'
+              ? AiOutlineClockCircle
+              : payment.status === 'verified'
+                ? AiOutlineCheck
+                : AiOutlineClose;
 
             return (
               <div key={payment.id} className="pv-card p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
                     <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-base flex-shrink-0 ${
                       payment.status === 'pending_verification'
                         ? 'bg-orange-100 text-orange-700'
@@ -280,16 +316,17 @@ export default function PaymentVerification() {
                         ? 'bg-emerald-100 text-emerald-700'
                         : 'bg-red-100 text-red-700'
                     }`}>
-                      {payment.status === 'pending_verification' ? '⏳' : payment.status === 'verified' ? '✅' : '❌'}
+                      <StatusIcon aria-hidden="true" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-forest-900">
-                        {resident?.full_name || 'Unknown'} — {unit ? `Blok ${unit.block}/${unit.unit_number}` : '-'}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="break-words font-semibold text-forest-900">
+                        {resident?.full_name || 'Tidak diketahui'}
                       </h3>
-                      <p className="text-xs text-forest-500 mt-0.5">
-                        Periode: <strong>{formatPeriod(period)}</strong> • {formatRupiah(payment.amount)}
+                      <p className="mt-0.5 text-xs leading-5 text-forest-500">
+                        {unit ? `Blok ${unit.block}/${unit.unit_number}` : '-'} · <strong>{formatPeriod(period)}</strong>
                       </p>
-                      <div className="flex items-center gap-3 mt-1.5 text-xs text-forest-400">
+                      <p className="text-sm font-semibold text-forest-800">{formatRupiah(payment.amount)}</p>
+                      <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-xs leading-5 text-forest-400 sm:flex sm:flex-wrap">
                         <span>{payment.method === 'cash' ? '💵 Tunai' : '🏦 Transfer Bank'}</span>
                         <span>📅 {formatDate(payment.paid_at)}</span>
                         {(payment.proof_file_url || payment.receipt_file) && (
@@ -303,14 +340,14 @@ export default function PaymentVerification() {
                                 alert(`Mengunduh file: ${payment.receipt_file}`);
                               }
                             }}
-                            className="text-gold-600 hover:underline flex items-center gap-1"
+                            className="col-span-2 flex min-w-0 items-center gap-1 text-gold-600 hover:underline"
                           >
-                            📎 {payment.proof_file_name || payment.receipt_file || 'Bukti'} 🔗
+                            <span className="truncate">📎 {payment.proof_file_name || payment.receipt_file || 'Bukti pembayaran'}</span>
                           </a>
                         )}
                       </div>
                       {payment.metadata?.note && (
-                        <p className="text-xs text-forest-400 mt-1 italic">"{payment.metadata.note}"</p>
+                        <p className="mt-1 break-words text-xs leading-5 text-forest-400 italic">"{payment.metadata.note}"</p>
                       )}
                       {payment.rejection_reason && (
                         <p className="text-xs text-red-500 mt-1">Alasan: {payment.rejection_reason}</p>
@@ -321,20 +358,20 @@ export default function PaymentVerification() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-shrink-0">
                     {payment.status === 'pending_verification' && (
                       <>
                         <button
                           onClick={() => handleVerify(payment)}
                           disabled={Boolean(activeActionId)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 text-white px-3 py-2 text-xs font-medium hover:bg-emerald-700 transition-colors"
+                          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
                         >
                           <AiOutlineCheck /> Verifikasi
                         </button>
                         <button
                           onClick={() => openRejectModal(payment)}
                           disabled={Boolean(activeActionId)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 px-3 py-2 text-xs font-medium hover:bg-red-100 transition-colors"
+                          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60"
                         >
                           <AiOutlineClose /> Tolak
                         </button>
@@ -343,7 +380,7 @@ export default function PaymentVerification() {
                     <button
                       disabled={Boolean(activeActionId)}
                       onClick={() => openDetail(payment)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-forest-50 text-forest-600 border border-forest-200 px-3 py-2 text-xs font-medium hover:bg-forest-100 transition-colors"
+                      className="col-span-2 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-forest-200 bg-forest-50 px-3 py-2 text-xs font-medium text-forest-600 transition-colors hover:bg-forest-100 disabled:opacity-60 sm:col-span-1"
                     >
                       <AiOutlineEye /> Detail
                     </button>
@@ -357,40 +394,40 @@ export default function PaymentVerification() {
 
       {/* Detail Modal */}
       {modalMode === 'detail' && selectedPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+        <div className="pv-dialog-backdrop">
+          <div className="pv-dialog-panel">
             <h2 className="text-lg font-bold text-forest-900 mb-4">Detail Pembayaran</h2>
 
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
+              <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start gap-3">
                 <span className="text-forest-500">Warga</span>
-                <span className="font-medium text-forest-900">
+                <span className="min-w-0 break-words text-right font-medium text-forest-900">
                   {(selectedPayment._profile || getResident(selectedPayment.resident_id))?.full_name || '-'}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start gap-3">
                 <span className="text-forest-500">Periode</span>
-                <span className="font-medium text-forest-900">
+                <span className="min-w-0 break-words text-right font-medium text-forest-900">
                   {formatPeriod(selectedPayment.period || selectedPayment._bill?.period || getBillPeriod(selectedPayment))}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start gap-3">
                 <span className="text-forest-500">Jumlah</span>
-                <span className="font-bold text-forest-900">{formatRupiah(selectedPayment.amount)}</span>
+                <span className="min-w-0 break-words text-right font-bold text-forest-900">{formatRupiah(selectedPayment.amount)}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start gap-3">
                 <span className="text-forest-500">Metode</span>
-                <span className="font-medium">
+                <span className="min-w-0 break-words text-right font-medium">
                   {selectedPayment.method === 'cash' ? '💵 Tunai' : selectedPayment.method === 'qris' ? '📱 QRIS' : '🏦 Transfer Bank'}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start gap-3">
                 <span className="text-forest-500">Tanggal Bayar</span>
-                <span className="font-medium">{formatDate(selectedPayment.paid_at)}</span>
+                <span className="min-w-0 break-words text-right font-medium">{formatDate(selectedPayment.paid_at)}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start gap-3">
                 <span className="text-forest-500">Status</span>
-                <span className={`pv-badge ${
+                <span className={`pv-badge min-w-0 justify-self-end text-right ${
                   selectedPayment.status === 'pending_verification'
                     ? 'bg-orange-50 text-orange-700 border-orange-200'
                     : selectedPayment.status === 'verified'
@@ -406,6 +443,21 @@ export default function PaymentVerification() {
               </div>
 
               {/* Receipt preview link */}
+              {selectedReceiptPreviewUrl && isImageReceipt(selectedPayment) && !receiptPreviewError && (
+                <div className="mt-4 overflow-hidden rounded-lg border border-forest-200 bg-forest-50">
+                  <p className="border-b border-forest-200 px-3 py-2 text-xs font-semibold text-forest-700">
+                    Preview Bukti Transfer
+                  </p>
+                  <div className="flex min-h-40 items-center justify-center bg-forest-100 p-2 sm:min-h-52">
+                    <img
+                      src={selectedReceiptPreviewUrl}
+                      alt={`Preview ${selectedPayment.proof_file_name || 'bukti transfer'}`}
+                      className="max-h-64 w-full rounded-md object-contain sm:max-h-80"
+                      onError={() => setReceiptPreviewError(true)}
+                    />
+                  </div>
+                </div>
+              )}
               {(selectedPayment.proof_file_url || selectedPayment.receipt_file) && (
                 <div className="mt-4 p-3 rounded-lg bg-forest-50 border border-forest-200">
                   <p className="text-xs font-medium text-forest-700 mb-2">📎 Bukti Transfer</p>
@@ -421,14 +473,14 @@ export default function PaymentVerification() {
                     }}
                     className="block p-3 rounded-lg border border-forest-200 bg-white hover:bg-forest-50 transition-colors"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-lg">🖼️</span>
                         <span className="truncate text-xs font-medium text-forest-700">
                           {selectedPayment.proof_file_name || selectedPayment.receipt_file || 'Lihat Bukti Lampiran'}
                         </span>
                       </div>
-                      <span className="text-xs text-gold-600 font-semibold flex-shrink-0">Buka Lampiran 🔗</span>
+                      <span className="text-xs font-semibold text-gold-600 sm:flex-shrink-0">Buka Lampiran</span>
                     </div>
                   </a>
                 </div>
@@ -443,7 +495,7 @@ export default function PaymentVerification() {
 
             <div className="flex flex-col gap-2 mt-6">
               {selectedPayment.status === 'verified' && IS_DEMO && (
-                <div className="grid grid-cols-2 gap-2 pb-2 border-b border-forest-100">
+                <div className="grid grid-cols-1 gap-2 border-b border-forest-100 pb-2 sm:grid-cols-2">
                   <button
                     onClick={() => {
                       const bill = mockIPLBills.find((b) => b.id === selectedPayment.bill_id) || { id: selectedPayment.bill_id, period: selectedPayment.period || '2026-01', amount: selectedPayment.amount };
@@ -468,7 +520,7 @@ export default function PaymentVerification() {
                   </button>
                 </div>
               )}
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 {selectedPayment.status === 'pending_verification' && (
                   <>
                     <button
@@ -487,7 +539,7 @@ export default function PaymentVerification() {
                     </button>
                   </>
                 )}
-                <button onClick={closeModal} className="pv-btn-ghost py-2.5 px-4 rounded-lg text-sm flex-1">
+                <button onClick={closeModal} className="pv-btn-ghost min-h-11 flex-1 rounded-lg px-4 py-2.5 text-sm">
                   Tutup
                 </button>
               </div>
@@ -498,10 +550,10 @@ export default function PaymentVerification() {
 
       {/* Reject Modal */}
       {modalMode === 'reject' && selectedPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+        <div className="pv-dialog-backdrop">
+          <div className="pv-dialog-panel">
             <h2 className="text-lg font-bold text-red-700 mb-1">Tolak Pembayaran</h2>
-            <p className="text-sm text-forest-500 mb-4">
+            <p className="mb-4 break-words text-sm leading-5 text-forest-500">
               Tolak bukti transfer dari <strong>{(selectedPayment._profile || getResident(selectedPayment.resident_id))?.full_name}</strong>.
               Warga akan dapat mengirim ulang bukti baru atau membatalkan pembayaran.
             </p>
@@ -517,7 +569,7 @@ export default function PaymentVerification() {
               />
             </div>
 
-            <div className="flex gap-2 mt-6">
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row">
               <button
                 onClick={handleReject}
                 disabled={Boolean(activeActionId)}
@@ -527,7 +579,7 @@ export default function PaymentVerification() {
               </button>
               <button
                 onClick={() => setModalMode('detail')}
-                className="pv-btn-ghost py-2.5 px-4 rounded-lg text-sm"
+                className="pv-btn-ghost w-full rounded-lg px-4 py-2.5 text-sm sm:w-auto"
               >
                 Kembali
               </button>
