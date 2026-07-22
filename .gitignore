@@ -80,6 +80,13 @@ Thumbs.db
 *.swo
 *~
 
+# Local tooling and debug artifacts
+.agents/
+client/.tmp/
+client/debug-login.js
+client/error-debug.png
+client/login-page-debug.*
+
 # Screenshot utility (dev only)
 capture-screenshots.js
 docs/screenshots/capture.js
