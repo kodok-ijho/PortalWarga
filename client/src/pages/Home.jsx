@@ -58,7 +58,7 @@ export default function Home() {
   const getFeatures = () => {
     const base = [
       { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Lihat daftar penghuni kompleks.' },
-      { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Bayar IPL beberapa bulan sekaligus via QRIS.' },
+      { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Bayar IPL beberapa bulan sekaligus via transfer bank.' },
     ];
     if (role === 'admin') {
       return [

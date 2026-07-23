@@ -24,7 +24,6 @@ import {
   approveManualPayment,
   rejectManualPayment,
   fetchPayments,
-  createQrisPayment,
   IS_DEMO,
 } from '../services/dataService';
 import {
@@ -65,14 +64,13 @@ export default function PaymentMatrix() {
     ];
   }, [year]);
 
-  // Seleksi sel (warga QRIS). Key pakai bill.id (unik lintas tahun).
+  // Seleksi sel pembayaran warga. Key pakai bill.id (unik lintas tahun).
   const [selected, setSelected] = useState({}); // { [billId]: true }
   const [payModal, setPayModal] = useState(null);
   // Manual payment (staff)
   const [manualModal, setManualModal] = useState(null); // { bill, unitId, monthIdx }
   // Detail bukti bayar (lunas)
   const [detailModal, setDetailModal] = useState(null); // { bill, payment }
-  const [qrisModal, setQrisModal] = useState(null); // Midtrans snap details
 
   // Semua role bisa LIHAT semua unit. Interaksi (bayar) di-gate per baris.
   const isStaff = isStaffRole(role);
@@ -270,7 +268,7 @@ export default function PaymentMatrix() {
   );
 
   // Validasi runut lintas tahun untuk semua seleksi. Dipakai bersama oleh
-  // QRIS (warga) maupun catat manual (staff) — urutan bayar harus konsisten.
+  // Pembayaran warga maupun catat manual (staff) — urutan bayar harus konsisten.
   const validateAndGetSelected = () => {
     const accumulated = [];
     const validBills = [];
@@ -304,21 +302,8 @@ export default function PaymentMatrix() {
     let completedCount = 0;
     try {
       if (method === 'qris') {
-        const billIds = payModal.map(b => b.id);
-        const res = await createQrisPayment(session?.access_token, { bill_ids: billIds });
-        
-        const responseData = res.data || (res.response && res.response.data) || res;
-        const redirectUrl = responseData.redirect_url;
-        
-        if (redirectUrl) {
-          window.open(redirectUrl, '_blank');
-        }
-        
-        setQrisModal({
-          ...responseData,
-          bills: payModal,
-          total: responseData.total_amount || payModal.reduce((sum, b) => sum + Number(b.amount || 0) + Number(b.late_fee || 0), 0)
-        });
+        toast.error('Pembayaran QRIS sedang tidak tersedia. Gunakan Transfer Bank.');
+        return;
       } else {
         if (IS_DEMO) {
           const count = recordResidentPayment(
@@ -442,7 +427,7 @@ export default function PaymentMatrix() {
           }
           toast.success(`Bukti transfer untuk ${manualModal.bills.length} tagihan berhasil dicatat dan menunggu verifikasi bendahara.`);
         } else {
-          toast.error('QRIS melalui panel staff belum didukung. Gunakan Transfer atau Tunai.');
+          toast.error('Pembayaran QRIS sedang tidak tersedia. Gunakan Transfer atau Tunai.');
           return;
         }
       }
@@ -492,7 +477,7 @@ export default function PaymentMatrix() {
           <h2 className="text-lg font-bold text-forest-900">Matriks Pembayaran IPL</h2>
           <p className="text-sm text-forest-500">
             {isStaff
-              ? 'Klik sel belum-bayar untuk memilih, lalu catat pembayaran tunai/transfer/QRIS bendahara.'
+              ? 'Klik sel belum-bayar untuk memilih, lalu catat pembayaran tunai/transfer bendahara.'
               : 'Lihat status semua unit. Bayar IPL untuk rumah Anda (baris disorot) secara berurutan — jika ada tunggakan tahun lalu, selesaikan dulu di tahun terkait.'}
           </p>
         </div>
@@ -620,8 +605,13 @@ export default function PaymentMatrix() {
                               canInteract={canInteract}
                               isLockedOtherUnit={isLockedOtherUnit}
                               onClick={() => {
-                                if (cell?.status === 'paid' || cell?.status === 'pending_verification' || cell?.status === 'rejected') {
-                                  const payment = getPaymentForBillView(cell.bill.id);
+                                if (
+                                  cell?.status === 'paid' ||
+                                  cell?.status === 'pending_verification' ||
+                                  cell?.status === 'rejected' ||
+                                  cell?.payment?.status === 'rejected'
+                                ) {
+                                  const payment = cell.payment || getPaymentForBillView(cell.bill.id);
                                   setDetailModal({ bill: cell.bill, payment });
                                   return;
                                 }
@@ -641,7 +631,7 @@ export default function PaymentMatrix() {
         </div>
       </div>
 
-      {/* Footer bayar — warga (QRIS) atau staff (catat manual) */}
+      {/* Footer bayar — warga (transfer bank) atau staff (catat manual) */}
       {selectedBills.length > 0 && (
         <div className="sticky bottom-4 z-30 pv-card p-4 flex flex-col gap-3 border-gold-300 shadow-elevated sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
@@ -678,14 +668,14 @@ export default function PaymentMatrix() {
               </button>
             ) : (
               <button onClick={handlePay} className="pv-btn-primary text-sm">
-                Bayar via QRIS →
+                Bayar via Transfer →
               </button>
             )}
           </div>
         </div>
       )}
 
-      {/* Modal pembayaran warga (QRIS / Transfer) */}
+      {/* Modal pembayaran warga (Transfer Bank) */}
       {payModal && (
         <ResidentPayModal
           bills={payModal}
@@ -713,16 +703,14 @@ export default function PaymentMatrix() {
           myUnitId={myUnitId}
           session={session}
           onRefresh={() => setRefreshKey(k => k + 1)}
+          onRetry={() => {
+            toggleCell(detailModal.bill);
+            setDetailModal(null);
+          }}
           onClose={() => setDetailModal(null)}
         />
       )}
 
-      {qrisModal && (
-        <QrisCheckoutModal
-          data={qrisModal}
-          onClose={() => setQrisModal(null)}
-        />
-      )}
     </div>
   );
 }
@@ -738,7 +726,7 @@ function Cell({ cell, unitId, isSelected, isStaff, canInteract, isLockedOtherUni
   const isOverdue = status === 'overdue';
   const isPending = status === 'pending';
   const isPendingVerif = status === 'pending_verification';
-  const isRejected = status === 'rejected';
+  const isRejected = status === 'rejected' || cell.payment?.status === 'rejected';
   // Sel non-interaktif (warga lihat unit lain): view-only, tidak bisa diklik
   const isViewOnly = !canInteract;
 
@@ -822,7 +810,7 @@ function Cell({ cell, unitId, isSelected, isStaff, canInteract, isLockedOtherUni
       className={`block h-12 rounded border flex flex-col items-center justify-center transition-colors ${classes}`}
       title={
         isStaff
-          ? 'Klik untuk pilih (catat tunai/transfer/QRIS)'
+          ? 'Klik untuk pilih (catat tunai/transfer)'
           : 'Klik untuk pilih'
       }
     >
@@ -840,9 +828,9 @@ function Cell({ cell, unitId, isSelected, isStaff, canInteract, isLockedOtherUni
   );
 }
 
-// ── Modal pembayaran warga: QRIS / Transfer Bank (dengan bukti) ────
+// ── Modal pembayaran warga: Transfer Bank (dengan bukti) ────
 function ResidentPayModal({ bills, total, onConfirm, onClose }) {
-  const [method, setMethod] = useState('qris'); // 'qris' | 'bank_transfer'
+  const [method, setMethod] = useState('bank_transfer');
   const [receiptFile, setReceiptFile] = useState(null);
   const [uploadError, setUploadError] = useState('');
   const [note, setNote] = useState('');
@@ -922,18 +910,7 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
         {/* Pilihan metode */}
         <div>
           <label className="block text-sm font-medium text-forest-700 mb-1">Metode Pembayaran</label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => { setMethod('qris'); setUploadError(''); }}
-              className={`py-2.5 rounded-lg text-sm font-medium border transition-colors ${
-                method === 'qris'
-                  ? 'bg-forest-800 text-gold-400 border-forest-800'
-                  : 'bg-white text-forest-600 border-forest-200 hover:bg-forest-50'
-              }`}
-            >
-              📱 QRIS
-            </button>
+          <div className="grid grid-cols-1 gap-2">
             <button
               type="button"
               onClick={() => { setMethod('bank_transfer'); setUploadError(''); }}
@@ -947,21 +924,6 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
             </button>
           </div>
         </div>
-
-        {/* QRIS: tampilkan QR code statis (simulasi) */}
-        {method === 'qris' && (
-          <div className="rounded-lg border-2 border-dashed border-gold-300 bg-gold-50 p-6 text-center">
-            <div className="h-32 w-32 bg-forest-800 rounded-lg mx-auto flex items-center justify-center text-gold-400 text-xs">
-              [QR Code]
-            </div>
-            <p className="text-xs text-forest-500 mt-3">
-              Scan QRIS via aplikasi e-wallet/bank senilai{' '}
-              <strong className="text-forest-800">{formatRupiah(total)}</strong>.
-              <br />
-              <span className="text-[10px]">(Integrasi Midtrans aktif saat backend terhubung)</span>
-            </p>
-          </div>
-        )}
 
         {/* Transfer: wajib upload bukti */}
         {method === 'bank_transfer' && (
@@ -1013,7 +975,7 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
             Batal
           </button>
           <button type="submit" disabled={isSubmitting} className="pv-btn-primary flex-1 text-sm disabled:opacity-50">
-            {isSubmitting ? 'Memproses...' : method === 'qris' ? 'Lanjut ke Checkout Midtrans (Simulasi)' : 'Kirim Bukti Transfer'}
+            {isSubmitting ? 'Memproses...' : 'Kirim Bukti Transfer'}
           </button>
         </div>
       </form>
@@ -1100,7 +1062,6 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
 
   // Tombol pilihan metode (dipakai berulang)
   const methodBtn = (value, label) => {
-    if (value === 'qris') return null;
     return (
       <button
         type="button"
@@ -1149,7 +1110,6 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
           <div className={`grid ${canRecordCash ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
             {canRecordCash && methodBtn('cash', '💵 Tunai')}
             {methodBtn('bank_transfer', '🏦 Transfer')}
-            {methodBtn('qris', '📱 QRIS')}
           </div>
         </div>
 
@@ -1227,7 +1187,7 @@ function formatPeriodShort(period) {
 
 // Modal Detail Pembayaran Lunas
 // Modal Detail / Verifikasi / Revisi Pembayaran
-function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh, onClose }) {
+function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh, onRetry, onClose }) {
   const toast = useToast();
   const isMyUnit = bill.unit_id === myUnitId;
   const canViewReceipt = isStaffRole(role) || isMyUnit;
@@ -1467,6 +1427,15 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
 
         {/* Tombol Aksi */}
         <div className="pt-2 flex flex-col gap-2">
+          {payment?.status === 'rejected' && isMyUnit && onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="pv-btn-primary w-full text-xs py-2"
+            >
+              Pilih Tagihan untuk Bayar Ulang
+            </button>
+          )}
           {(bill.status === 'paid' || payment?.status === 'verified' || payment?.status === 'completed') && (
             <div className="grid grid-cols-2 gap-2 pb-1 border-b border-forest-100">
               <button

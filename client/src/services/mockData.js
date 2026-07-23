@@ -347,6 +347,19 @@ export const mockSettings = {
   late_fee_type: 'percent', // 'percent' | 'fixed'
   late_fee_value: 5, // 5% atau nilai fixed (Rp)
   bill_recipient: 'occupant', // 'occupant' | 'owner' — ke siapa tagihan ditujukan
+  smoke_test: {
+    enabled: true,
+    frequency: 'daily',
+    run_hour: 9,
+    timezone: 'Asia/Jakarta',
+    notification_email: 'dyudhiantoro@gmail.com',
+    notify_recovery: true,
+    last_run: {
+      status: 'never',
+      checks: [],
+      notification_sent: false,
+    },
+  },
   ipl_schemas: [
     {
       id: 'schema-komplit',

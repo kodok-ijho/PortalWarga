@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
+  AiOutlineCheckCircle,
+  AiOutlineClockCircle,
+  AiOutlineCloseCircle,
   AiOutlinePlus,
   AiOutlineDelete,
+  AiOutlineMail,
+  AiOutlinePlayCircle,
   AiOutlineSave,
 } from 'react-icons/ai';
 import { useAuth } from '../hooks/useAuth';
@@ -13,7 +18,12 @@ import {
   isAdminRole,
   isBendaharaOrAbove,
 } from '../services/dataHelpers';
-import { fetchSettings, updateSettings } from '../services/dataService';
+import {
+  fetchSettings,
+  runPaymentSmokeTest,
+  updatePaymentSmokeTestSettings,
+  updateSettings,
+} from '../services/dataService';
 
 function computeSchemaAmount(schema) {
   if (!schema || !schema.components) return 0;
@@ -35,6 +45,7 @@ export default function Settings() {
   const [lateFeeValue, setLateFeeValue] = useState(5);
   const [billRecipient, setBillRecipient] = useState('occupant');
   const [schemas, setSchemas] = useState([]);
+  const [smokeTest, setSmokeTest] = useState(null);
 
   const loadSettings = useCallback(async () => {
     setIsLoading(true);
@@ -46,6 +57,15 @@ export default function Settings() {
       setLateFeeType(data.late_fee_type);
       setLateFeeValue(data.late_fee_value);
       setBillRecipient(data.bill_recipient || 'occupant');
+      setSmokeTest({
+        enabled: data.smoke_test?.enabled ?? false,
+        frequency: data.smoke_test?.frequency || 'daily',
+        run_hour: Number(data.smoke_test?.run_hour ?? 9),
+        timezone: data.smoke_test?.timezone || 'Asia/Jakarta',
+        notification_email: data.smoke_test?.notification_email || session?.user?.email || '',
+        notify_recovery: data.smoke_test?.notify_recovery ?? true,
+        last_run: data.smoke_test?.last_run || { status: 'never', checks: [] },
+      });
       setSchemas(
         (data.ipl_schemas || []).map((s) => ({
           ...s,
@@ -59,7 +79,7 @@ export default function Settings() {
     } finally {
       setIsLoading(false);
     }
-  }, [session?.access_token, toast]);
+  }, [session?.access_token, session?.user?.email, toast]);
 
   useEffect(() => {
     if (hasMinRole(role, 'pengurus')) {
@@ -546,6 +566,15 @@ export default function Settings() {
         )}
       </form>
 
+      {canEdit && smokeTest && (
+        <PaymentSmokeTestPanel
+          session={session}
+          value={smokeTest}
+          onChange={setSmokeTest}
+          onRefresh={loadSettings}
+        />
+      )}
+
       {/* Generasi Tagihan Bulanan (Staff Only - Bendahara & Admin) */}
       {isBendaharaOrAbove(role) && (
         <div className="pv-card p-6 mt-8 border-t-4 border-t-forest-800">
@@ -558,6 +587,218 @@ export default function Settings() {
         </div>
       )}
     </div>
+  );
+}
+
+function PaymentSmokeTestPanel({ session, value, onChange, onRefresh }) {
+  const toast = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+
+  const lastRun = value.last_run || { status: 'never', checks: [] };
+  const statusStyles = {
+    pass: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    fail: 'bg-red-50 border-red-200 text-red-700',
+    never: 'bg-forest-50 border-forest-200 text-forest-500',
+  };
+
+  const updateField = (field, nextValue) => {
+    onChange((current) => ({ ...current, [field]: nextValue }));
+  };
+
+  const handleSave = async () => {
+    const email = value.notification_email.trim().toLowerCase();
+    if (value.enabled && !/^\S+@\S+\.\S+$/.test(email)) {
+      toast.error('Masukkan alamat email notifikasi yang valid.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updatePaymentSmokeTestSettings(session?.access_token, {
+        enabled: !!value.enabled,
+        frequency: value.frequency,
+        run_hour: Number(value.run_hour),
+        timezone: value.timezone,
+        notification_email: email,
+        notify_recovery: !!value.notify_recovery,
+      });
+      toast.success('Jadwal smoke test pembayaran berhasil disimpan.');
+      await onRefresh();
+    } catch (err) {
+      toast.error(err.message || 'Gagal menyimpan jadwal smoke test.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRunNow = async () => {
+    setIsRunning(true);
+    try {
+      const result = await runPaymentSmokeTest(session?.access_token);
+      onChange((current) => ({ ...current, last_run: result }));
+      if (result.status === 'pass') {
+        toast.success('Smoke test pembayaran selesai tanpa masalah.');
+      } else {
+        toast.error('Smoke test menemukan kegagalan. Detail dan notifikasi email sudah diproses.');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Smoke test tidak dapat dijalankan.');
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const finishedAt = lastRun.finished_at
+    ? new Intl.DateTimeFormat('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: value.timezone,
+      }).format(new Date(lastRun.finished_at))
+    : 'Belum pernah dijalankan';
+
+  return (
+    <section className="pv-card p-5 border-t-4 border-t-gold-500" aria-labelledby="payment-smoke-test-title">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <AiOutlineClockCircle className="text-gold-600" size={20} />
+            <h3 id="payment-smoke-test-title" className="text-base font-bold text-forest-900">
+              Smoke Test Pembayaran Transfer
+            </h3>
+          </div>
+          <p className="mt-1 text-xs text-forest-500">
+            Memeriksa Supabase serta proses upload, permission, dan cleanup bukti bayar di Google Drive.
+          </p>
+        </div>
+        <div className={`inline-flex min-h-9 items-center gap-2 self-start rounded border px-3 py-2 text-xs font-semibold ${statusStyles[lastRun.status] || statusStyles.never}`}>
+          {lastRun.status === 'pass' ? <AiOutlineCheckCircle size={16} /> : lastRun.status === 'fail' ? <AiOutlineCloseCircle size={16} /> : <AiOutlineClockCircle size={16} />}
+          {lastRun.status === 'pass' ? 'Terakhir PASS' : lastRun.status === 'fail' ? 'Terakhir FAIL' : 'Belum Dijalankan'}
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <label className="flex min-h-16 items-center justify-between gap-4 rounded border border-forest-200 bg-forest-50/50 px-4 py-3">
+          <span>
+            <span className="block text-sm font-semibold text-forest-800">Jalankan Otomatis</span>
+            <span className="block text-[11px] text-forest-500">Workflow tetap berjalan saat portal ditutup.</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={value.enabled}
+            onChange={(event) => updateField('enabled', event.target.checked)}
+            className="h-5 w-5 accent-gold-500"
+          />
+        </label>
+
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-forest-700" htmlFor="smoke-test-email">
+            Email Saat Gagal
+          </label>
+          <div className="relative">
+            <AiOutlineMail className="absolute left-3 top-1/2 -translate-y-1/2 text-forest-400" />
+            <input
+              id="smoke-test-email"
+              type="email"
+              value={value.notification_email}
+              onChange={(event) => updateField('notification_email', event.target.value)}
+              className="w-full rounded border border-forest-200 bg-white py-2.5 pl-9 pr-3 text-sm text-forest-900 outline-none focus:border-gold-500"
+              placeholder="nama@gmail.com"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-forest-700" htmlFor="smoke-test-frequency">
+            Frekuensi
+          </label>
+          <select
+            id="smoke-test-frequency"
+            value={value.frequency}
+            onChange={(event) => updateField('frequency', event.target.value)}
+            className="w-full rounded border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-800 outline-none focus:border-gold-500"
+          >
+            <option value="every_6_hours">Setiap 6 jam</option>
+            <option value="daily">Setiap hari</option>
+            <option value="weekly">Setiap Senin</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-forest-700" htmlFor="smoke-test-hour">
+            Jam Eksekusi ({value.timezone})
+          </label>
+          <select
+            id="smoke-test-hour"
+            value={value.run_hour}
+            onChange={(event) => updateField('run_hour', Number(event.target.value))}
+            disabled={value.frequency === 'every_6_hours'}
+            className="w-full rounded border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-800 outline-none focus:border-gold-500 disabled:bg-forest-50 disabled:text-forest-400"
+          >
+            {Array.from({ length: 24 }, (_, hour) => (
+              <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <label className="mt-4 flex items-center gap-2 text-xs text-forest-600">
+        <input
+          type="checkbox"
+          checked={value.notify_recovery}
+          onChange={(event) => updateField('notify_recovery', event.target.checked)}
+          className="h-4 w-4 accent-gold-500"
+        />
+        Kirim email pemulihan ketika hasil kembali PASS setelah sebelumnya gagal.
+      </label>
+
+      <div className="mt-5 border-t border-forest-100 pt-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs text-forest-500">
+            <span className="font-semibold text-forest-700">Eksekusi terakhir:</span> {finishedAt}
+            {lastRun.duration_ms != null && <span> ({lastRun.duration_ms} ms)</span>}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleRunNow}
+              disabled={isRunning || isSaving}
+              className="inline-flex min-h-10 items-center gap-2 rounded border border-forest-300 bg-white px-4 py-2 text-xs font-semibold text-forest-700 transition-colors hover:bg-forest-50 disabled:opacity-50"
+            >
+              <AiOutlinePlayCircle size={17} />
+              {isRunning ? 'Menjalankan...' : 'Jalankan Sekarang'}
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isRunning || isSaving}
+              className="pv-btn-primary min-h-10 px-4 py-2 text-xs disabled:opacity-50"
+            >
+              <AiOutlineSave size={16} />
+              {isSaving ? 'Menyimpan...' : 'Simpan Jadwal'}
+            </button>
+          </div>
+        </div>
+
+        {Array.isArray(lastRun.checks) && lastRun.checks.length > 0 && (
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {lastRun.checks.map((check) => (
+              <div key={check.key} className="flex min-h-14 items-start gap-2 rounded border border-forest-100 bg-forest-50/50 p-3">
+                {check.status === 'pass' ? (
+                  <AiOutlineCheckCircle className="mt-0.5 shrink-0 text-emerald-600" size={16} />
+                ) : (
+                  <AiOutlineCloseCircle className="mt-0.5 shrink-0 text-red-600" size={16} />
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-forest-800">{check.label}</p>
+                  <p className="mt-0.5 break-words text-[11px] text-forest-500">{check.message}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

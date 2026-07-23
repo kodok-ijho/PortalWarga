@@ -383,6 +383,51 @@ export async function updateSettings(token, settingsData) {
   return { ok: true };
 }
 
+export async function updatePaymentSmokeTestSettings(token, smokeTest) {
+  if (IS_DEMO) {
+    const mock = await getMockData();
+    mock.mockSettings.smoke_test = {
+      ...(mock.mockSettings.smoke_test || {}),
+      ...smokeTest,
+    };
+    return mock.mockSettings.smoke_test;
+  }
+
+  await portalApiPost('/settings/update', {
+    token,
+    body: { smoke_test: smokeTest },
+  });
+  return smokeTest;
+}
+
+export async function runPaymentSmokeTest(token) {
+  if (IS_DEMO) {
+    const mock = await getMockData();
+    const startedAt = new Date().toISOString();
+    const result = {
+      status: 'pass',
+      source: 'manual',
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      duration_ms: 420,
+      notification_sent: false,
+      checks: [
+        { key: 'database', label: 'Database Supabase', status: 'pass', message: 'Konfigurasi dapat dibaca dan status dapat disimpan.' },
+        { key: 'drive_upload', label: 'Upload Google Drive', status: 'pass', message: 'File smoke test berhasil diunggah.' },
+        { key: 'drive_share', label: 'Izin bukti bayar', status: 'pass', message: 'Izin reader-by-link berhasil diterapkan.' },
+        { key: 'drive_cleanup', label: 'Cleanup Google Drive', status: 'pass', message: 'File smoke test dihapus permanen.' },
+      ],
+    };
+    mock.mockSettings.smoke_test = {
+      ...(mock.mockSettings.smoke_test || {}),
+      last_run: result,
+    };
+    return result;
+  }
+
+  return portalApiPost('/monitoring/payment-smoke/run', { token });
+}
+
 export async function generateBills(token, { period, dry_run }) {
   if (IS_DEMO) {
     const mock = await getMockData();

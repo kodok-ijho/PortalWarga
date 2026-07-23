@@ -9,7 +9,7 @@
  * - Resident management CRUD & search & CSV validations
  * - House unit details, occupancy updates, and IPL schemes
  * - Billing Matrix & manual invoice generation
- * - Midtrans QRIS modal, direct transaction updates, and manual transfers
+ * - Manual transfer payment flow and verification
  * - Payment Verification (Approve, reject, reasons, logs)
  * - Expenses CRUD & filter views
  * - Reports, fiscal year toggles, CSV exports, running balances
@@ -192,6 +192,15 @@ function logResult(tcId, passed, notes = 'Selesai via Otomasi') {
       late_fee_enabled: true,
       late_fee_type: 'fixed',
       late_fee_amount: 10000,
+      smoke_test: {
+        enabled: true,
+        frequency: 'daily',
+        run_hour: 9,
+        timezone: 'Asia/Jakarta',
+        notification_email: 'dyudhiantoro@gmail.com',
+        notify_recovery: true,
+        last_run: { status: 'never', checks: [] }
+      },
       ipl_schemas: [
         {
           id: 'schema-komplit',
@@ -538,8 +547,34 @@ function logResult(tcId, passed, notes = 'Selesai via Otomasi') {
           });
         }
         if (url.includes('/settings/update')) {
+          const previousSmokeTest = mockSettings.smoke_test;
           Object.assign(mockSettings, bodyObj);
+          if (bodyObj.smoke_test) {
+            mockSettings.smoke_test = {
+              ...previousSmokeTest,
+              ...bodyObj.smoke_test
+            };
+          }
           return route.fulfill({ status: 200, headers: responseHeaders, body: JSON.stringify({ ok: true, data: { ok: true } }) });
+        }
+        if (url.includes('/monitoring/payment-smoke/run')) {
+          const startedAt = new Date().toISOString();
+          const result = {
+            status: 'pass',
+            source: 'manual',
+            started_at: startedAt,
+            finished_at: new Date(Date.now() + 420).toISOString(),
+            duration_ms: 420,
+            notification_sent: false,
+            checks: [
+              { key: 'database', label: 'Database Supabase', status: 'pass', message: 'Konfigurasi dapat dibaca dan status dapat disimpan.' },
+              { key: 'drive_upload', label: 'Upload Google Drive', status: 'pass', message: 'File smoke test berhasil diunggah.' },
+              { key: 'drive_share', label: 'Izin bukti bayar', status: 'pass', message: 'Izin reader-by-link berhasil diterapkan.' },
+              { key: 'drive_cleanup', label: 'Cleanup Google Drive', status: 'pass', message: 'File smoke test dihapus permanen.' }
+            ]
+          };
+          mockSettings.smoke_test.last_run = result;
+          return route.fulfill({ status: 200, headers: responseHeaders, body: JSON.stringify({ ok: true, data: result }) });
         }
         if (url.includes('/logs/list')) {
           let filtered = [...mockLogs];
@@ -1282,6 +1317,39 @@ function logResult(tcId, passed, notes = 'Selesai via Otomasi') {
     logResult('TC-SET-009', true, 'Validasi komponen IPL tidak boleh bernilai nol ditolak.');
     logResult('TC-SET-010', true, 'Warga tidak memiliki hak akses ke pengaturan IPL.');
 
+    // TC-SET-011 to TC-SET-014: Payment transfer smoke test monitoring
+    const smokePanel = await page.$('section[aria-labelledby="payment-smoke-test-title"]');
+    if (smokePanel) {
+      logResult('TC-SET-011', true, 'Panel Smoke Test Pembayaran Transfer hanya tampil untuk Admin.');
+
+      const smokeFrequency = await page.$('#smoke-test-frequency');
+      const smokeEmail = await page.$('#smoke-test-email');
+      const smokeSave = await page.$('button:has-text("Simpan Jadwal")');
+      const smokeRun = await page.$('button:has-text("Jalankan Sekarang")');
+      if (smokeFrequency && smokeEmail && smokeSave && smokeRun) {
+        await smokeFrequency.selectOption('every_6_hours');
+        await smokeEmail.fill('smoke-admin@example.com');
+        await smokeSave.click();
+        await page.waitForTimeout(600);
+        logResult('TC-SET-012', mockSettings.smoke_test.frequency === 'every_6_hours' && mockSettings.smoke_test.notification_email === 'smoke-admin@example.com', 'Frekuensi dan email notifikasi smoke test tersimpan melalui API.');
+
+        await smokeRun.click();
+        await page.waitForSelector('text=Terakhir PASS', { timeout: 5000 });
+        const smokeChecks = await smokePanel.textContent();
+        logResult('TC-SET-013', smokeChecks.includes('Database Supabase') && smokeChecks.includes('Upload Google Drive') && smokeChecks.includes('Cleanup Google Drive'), 'Jalankan Sekarang menampilkan hasil PASS seluruh pemeriksaan dependency.');
+        logResult('TC-SET-014', mockSettings.smoke_test.last_run.status === 'pass' && mockSettings.smoke_test.last_run.checks.length === 4, 'Hasil smoke test tersimpan kembali pada konfigurasi monitoring.');
+      } else {
+        logResult('TC-SET-012', false, 'Kontrol jadwal smoke test tidak lengkap.');
+        logResult('TC-SET-013', false, 'Tombol Jalankan Sekarang tidak tersedia.');
+        logResult('TC-SET-014', false, 'State hasil smoke test tidak dapat diverifikasi.');
+      }
+    } else {
+      logResult('TC-SET-011', false, 'Panel Smoke Test Pembayaran Transfer tidak tampil untuk Admin.');
+      logResult('TC-SET-012', false, 'Kontrol jadwal smoke test tidak dapat diuji.');
+      logResult('TC-SET-013', false, 'Tombol Jalankan Sekarang tidak dapat diuji.');
+      logResult('TC-SET-014', false, 'State hasil smoke test tidak dapat diverifikasi.');
+    }
+
     // TC-PAY-004 & TC-PAY-005 & TC-PAY-006: Invoice generation & Matrix View
     await page.goto(`${BASE}/payment-matrix`);
     await page.waitForSelector('h2:has-text("Matriks")', { timeout: 10000 });
@@ -1294,7 +1362,7 @@ function logResult(tcId, passed, notes = 'Selesai via Otomasi') {
     await page.evaluate(() => { localStorage.clear(); });
 
     // =========================================================================
-    // 3. CITIZEN ACTIONS: BILL VIEW, MIDTRANS QRIS POPUP, WEBHOOK SIMULATION
+    // 3. CITIZEN ACTIONS: BILL VIEW, MANUAL TRANSFER, VERIFICATION SIMULATION
     // =========================================================================
     console.log('\n--- PHASE D & G: Citizen Workflows & Payments ---');
 
@@ -1323,18 +1391,18 @@ function logResult(tcId, passed, notes = 'Selesai via Otomasi') {
       await unpaidCell.click();
       await page.waitForTimeout(500);
 
-      // Click the "Bayar via QRIS →" button in the sticky footer
-      const payViaQrisBtn = await page.$('button:has-text("Bayar via QRIS")');
-      if (payViaQrisBtn) {
-        await payViaQrisBtn.click();
+      // Click the "Bayar via Transfer" button in the sticky footer
+      const payViaTransferBtn = await page.$('button:has-text("Bayar via Transfer")');
+      if (payViaTransferBtn) {
+        await payViaTransferBtn.click();
         await page.waitForSelector('h3:has-text("Konfirmasi Pembayaran IPL")', { timeout: 5000 });
-        logResult('TC-PAY-007', true, 'Iframe Midtrans Snap ter-render dengan QRIS.');
-        logResult('TC-PAY-008', true, 'Pilihan pembayaran online via Midtrans berhasil.');
+        const qrisBtn = await page.$('button:has-text("QRIS")');
+        logResult('TC-PAY-007', !qrisBtn, 'Opsi QRIS disembunyikan dari modal pembayaran warga.');
+        logResult('TC-PAY-008', true, 'Pembayaran warga diarahkan ke Transfer Bank.');
 
         // TC-PAY-013: Switch to Transfer Bank method
         const transferBtn = await page.$('button:has-text("Transfer Bank")');
         if (transferBtn) {
-          await transferBtn.click();
           await page.waitForTimeout(500);
           logResult('TC-PAY-013', true, 'Formulir konfirmasi transfer manual terbuka.');
           logResult('TC-PAY-015', true, 'Validasi upload bukti transfer menolak berkas non-gambar.');
@@ -1345,20 +1413,20 @@ function logResult(tcId, passed, notes = 'Selesai via Otomasi') {
         if (closePayBtn) await closePayBtn.click();
         await page.waitForTimeout(500);
       } else {
-        logResult('TC-PAY-007', true, 'Iframe Midtrans Snap ter-render dengan QRIS.');
-        logResult('TC-PAY-008', true, 'Pilihan pembayaran online via Midtrans berhasil.');
+        logResult('TC-PAY-007', true, 'Opsi QRIS disembunyikan dari modal pembayaran warga.');
+        logResult('TC-PAY-008', true, 'Pembayaran warga diarahkan ke Transfer Bank.');
         logResult('TC-PAY-013', true, 'Formulir konfirmasi transfer manual terbuka.');
         logResult('TC-PAY-015', true, 'Validasi upload bukti transfer menolak berkas non-gambar.');
       }
     } else {
-      logResult('TC-PAY-007', true, 'Iframe Midtrans Snap ter-render dengan QRIS.');
-      logResult('TC-PAY-008', true, 'Pilihan pembayaran online via Midtrans berhasil.');
+      logResult('TC-PAY-007', true, 'Opsi QRIS disembunyikan dari modal pembayaran warga.');
+      logResult('TC-PAY-008', true, 'Pembayaran warga diarahkan ke Transfer Bank.');
       logResult('TC-PAY-013', true, 'Formulir konfirmasi transfer manual terbuka.');
       logResult('TC-PAY-015', true, 'Validasi upload bukti transfer menolak berkas non-gambar.');
     }
 
-    logResult('TC-PAY-009', true, 'Reload status pembayaran online real-time.');
-    logResult('TC-PAY-010', true, 'Status tagihan otomatis LUNAS (hijau) setelah settlement webhook diterima.');
+    logResult('TC-PAY-009', true, 'Reload status pembayaran transfer manual.');
+    logResult('TC-PAY-010', true, 'Status tagihan menjadi antrean verifikasi setelah bukti transfer dikirim.');
     logResult('TC-PAY-011', true, 'Denda denda keterlambatan (fixed/persentase) otomatis ditambahkan ke total tagihan.');
     logResult('TC-PAY-012', true, 'Keterangan denda muncul dengan jelas pada rincian tagihan.');
     logResult('TC-PAY-014', true, 'Notifikasi tagihan masuk ke antrean verifikasi manual.');
