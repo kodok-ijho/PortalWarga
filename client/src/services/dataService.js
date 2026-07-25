@@ -62,6 +62,8 @@ export async function approveUser(token, payload) {
     token,
     body: {
       profile_id: payload.profile_id,
+      full_name: payload.full_name,
+      phone: payload.phone,
       role: payload.role,
       unit_id: payload.unit_id,
       occupancy_status: payload.occupancy_status,

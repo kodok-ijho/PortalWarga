@@ -10,6 +10,13 @@ Kelola data warga, tagihan IPL (Iuran Pemeliharaan Lingkungan), pembayaran QRIS,
 
 ---
 
+## Changelog v1.2.2
+
+- Approval pendaftaran sekarang menyimpan `full_name`, `phone`, `unit_id`, dan `occupancy_status` secara konsisten.
+- Payload auth `currentUser` ikut membawa `occupancy_status` untuk login dan sesi aktif.
+
+---
+
 <p align="center">
   <a href="#-fitur"><kbd>🚀 Fitur</kbd></a>&nbsp;&nbsp;
   <a href="#-demo"><kbd>🎯 Demo</kbd></a>&nbsp;&nbsp;
