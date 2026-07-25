@@ -116,7 +116,7 @@ Portal Warga Palm Village telah dilengkapi dengan inovasi arsitektur mutakhir un
 | 👥 Manajemen Warga | ✅ | CRUD, CSV import/export, search, multi-filter |
 | 💳 Matriks Pembayaran | ✅ | Multi-tahun, multi-bulan, validasi sequential |
 | 📋 Daftar Tagihan IPL | ✅ | Filter periode/status, detail modal, bukti bayar |
-| 📊 Laporan Keuangan | ✅ | Bar chart, pie chart, neraca, CSV export, print |
+| 📊 Laporan Keuangan | ✅ | Bar chart, pie chart, neraca, thumbnail lampiran pengeluaran, CSV export, print |
 | 💰 Pengeluaran | ✅ | CRUD dengan kwitansi, kategori, filter bulan |
 | ⚙️ Pengaturan IPL | ✅ | Komponen IPL, denda, jatuh tempo, penerima |
 | 📱 PWA (Installable) | ✅ | Service worker, manifest, icon, update prompt |
@@ -658,7 +658,7 @@ Didesain mengikuti logo Palm Village — nuansa **hijau hutan** yang menenangkan
 - [x] Kompresi Gambar otomatis sisi klien (Canvas API, <500 KB)
 - [x] Manajemen warga + CSV & Kelola User oleh Admin
 - [x] Matriks pembayaran multi-tahun & status pending verifikasi
-- [x] Laporan keuangan Running Balance & Neraca Alur Kas
+- [x] Laporan keuangan Running Balance, Neraca Alur Kas, dan thumbnail lampiran pengeluaran
 - [x] Pengeluaran + kwitansi & Audit Log Sistem (Login, Akses, Transaksi)
 - [x] Pengaturan IPL (komponen-based) & Dasbor Proaktif dengan Banner/Badge
 - [x] PWA (installable, offline-ready)

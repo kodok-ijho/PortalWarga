@@ -5,7 +5,7 @@ import {
   PieChart, Pie, Cell as PieCell, Legend,
   AreaChart, Area
 } from 'recharts';
-import { AiOutlinePrinter, AiOutlineDownload } from 'react-icons/ai';
+import { AiOutlinePaperClip, AiOutlinePrinter, AiOutlineDownload, AiOutlineReload } from 'react-icons/ai';
 import Papa from 'papaparse';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -22,12 +22,90 @@ import {
 } from '../services/dataService';
 
 const PIE_COLORS = ['#1a3d2e', '#d4af37', '#e2c462'];
+const FISCAL_YEAR_START = 2026;
+const YEARLY_REQUEST_CONCURRENCY = 3;
+
+function getGoogleDriveThumbnail(url) {
+  if (!url) return null;
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return `https://lh3.googleusercontent.com/d/${match[1]}`;
+  }
+  const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) {
+    return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
+  }
+  return null;
+}
+
+function isHttpUrl(value) {
+  return typeof value === 'string' && /^https?:\/\//i.test(value);
+}
+
+function getExpenseAttachmentUrl(expense) {
+  return (
+    expense?.receipt_file_url ||
+    expense?.receipt_url ||
+    expense?.file_url ||
+    expense?.attachment_url ||
+    expense?.receipt_file ||
+    ''
+  );
+}
+
+function getAttachmentThumbnailUrl(url) {
+  if (!isHttpUrl(url)) return '';
+  return getGoogleDriveThumbnail(url) || url;
+}
+
+function normalizeMonthlyFinance(value) {
+  const data = value?.data || value;
+  if (!data || typeof data !== 'object' || !data.report || typeof data.report !== 'object') {
+    throw new Error('Data laporan keuangan dari API tidak lengkap.');
+  }
+  if (!Array.isArray(data.expenses) || !Array.isArray(data.cashPayments)) {
+    throw new Error('Detail pemasukan atau pengeluaran dari API tidak valid.');
+  }
+  return data;
+}
+
+function normalizeRunningBalance(value) {
+  const data = value?.data || value;
+  if (!data || !Array.isArray(data.chain)) {
+    throw new Error('Data saldo berjalan dari API tidak valid.');
+  }
+  return data.chain;
+}
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker())
+  );
+  return results;
+}
 
 export default function Reports() {
   const { role, session } = useAuth();
   const toast = useToast();
 
-  const years = [2026, 2027, 2028];
+  const years = useMemo(() => {
+    const lastYear = Math.max(new Date().getFullYear() + 2, FISCAL_YEAR_START + 2);
+    return Array.from(
+      { length: lastYear - FISCAL_YEAR_START + 1 },
+      (_, index) => FISCAL_YEAR_START + index
+    );
+  }, []);
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [reportType, setReportType] = useState('monthly'); // 'monthly' | 'yearly'
@@ -47,31 +125,30 @@ export default function Reports() {
     setLoadError('');
     try {
       if (reportType === 'monthly') {
-        // 1. Fetch monthly finance report
-        const finRes = await fetchMonthlyFinance(session?.access_token, { year, month });
-        const finData = finRes.data || finRes;
+        const [finRes, balRes] = await Promise.all([
+          fetchMonthlyFinance(session?.access_token, { year, month }),
+          fetchRunningBalance(session?.access_token, { year, month })
+        ]);
+        const finData = normalizeMonthlyFinance(finRes);
         setReport(finData.report);
-        setExpenses(finData.expenses || []);
-        setCashPayments(finData.cashPayments || []);
-
-        // 2. Fetch running balance chain
-        const balRes = await fetchRunningBalance(session?.access_token, { year, month });
-        const balData = balRes.data || balRes;
-        setRunningChain(balData.chain || []);
+        setExpenses(finData.expenses);
+        setCashPayments(finData.cashPayments);
+        setRunningChain(normalizeRunningBalance(balRes));
       } else {
         // Yearly mode: July Y to June Y+1
         const monthsOfFiscalYear = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
-        const promises = monthsOfFiscalYear.map((m) => {
-          const y = m >= 7 ? year : year + 1;
+        const periods = monthsOfFiscalYear.map((m) => ({
+          year: m >= 7 ? year : year + 1,
+          month: m
+        }));
+
+        const results = await mapWithConcurrency(periods, YEARLY_REQUEST_CONCURRENCY, ({ year: y, month: m }) => {
           return fetchMonthlyFinance(session?.access_token, { year: y, month: m });
         });
-        
-        const results = await Promise.all(promises);
-        
+
         // Fetch running balance up to the end of the fiscal year (June Y+1) to get the correct balance chain
         const balRes = await fetchRunningBalance(session?.access_token, { year: year + 1, month: 6 });
-        const balData = balRes.data || balRes;
-        const allChain = balData.chain || [];
+        const allChain = normalizeRunningBalance(balRes);
         setRunningChain(allChain);
 
         // Aggregate 12 months data
@@ -85,7 +162,7 @@ export default function Reports() {
         const aggregatedPayments = [];
 
         results.forEach((res) => {
-          const data = res.data || res;
+          const data = normalizeMonthlyFinance(res);
           const rep = data.report || {};
           
           totalBilled += Number(rep.totalBilled || 0);
@@ -391,7 +468,7 @@ export default function Reports() {
       <div className="pv-card p-8 text-center space-y-4">
         <p className="text-sm text-red-600 font-semibold">{loadError}</p>
         <button onClick={loadData} className="pv-btn-primary mx-auto text-xs font-semibold px-4 py-2">
-          🔄 Coba Lagi
+          <AiOutlineReload /> Coba Lagi
         </button>
       </div>
     );
@@ -724,23 +801,29 @@ export default function Reports() {
               </p>
             ) : (
               <div className="space-y-2">
-                {expenses.map((exp) => (
+                {expenses.map((exp) => {
+                  const attachmentUrl = getExpenseAttachmentUrl(exp);
+                  return (
                   <div
                     key={exp.id}
                     className="flex items-start justify-between gap-3 py-2 border-b border-forest-50 last:border-0"
                   >
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <AttachmentThumbnail url={attachmentUrl} />
+                      <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="pv-badge bg-forest-50 text-forest-600">{exp.category}</span>
                         <span className="text-[11px] text-forest-400">{formatDate(exp.date)}</span>
                       </div>
-                      <p className="text-xs text-forest-600 mt-1 line-clamp-2">{exp.description}</p>
+                        <p className="text-xs text-forest-600 mt-1 line-clamp-2">{exp.description}</p>
+                      </div>
                     </div>
                     <span className="font-medium text-red-600 text-sm shrink-0">
                       − {formatRupiah(exp.amount)}
                     </span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -826,6 +909,35 @@ function methodBadgeColor(method) {
     default:
       return 'bg-gray-100 text-gray-600';
   }
+}
+
+function AttachmentThumbnail({ url }) {
+  const [imageError, setImageError] = useState(false);
+  const thumbnailUrl = getAttachmentThumbnailUrl(url);
+
+  if (!isHttpUrl(url)) return null;
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group no-print flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-forest-100 bg-forest-50 transition-colors hover:border-gold-400"
+      title="Buka lampiran asli"
+    >
+      {thumbnailUrl && !imageError ? (
+        <img
+          src={thumbnailUrl}
+          alt="Lampiran pengeluaran"
+          referrerPolicy="no-referrer"
+          className="h-full w-full object-cover transition-transform group-hover:scale-105"
+          onError={() => setImageError(true)}
+        />
+      ) : (
+        <AiOutlinePaperClip className="text-lg text-forest-500" />
+      )}
+    </a>
+  );
 }
 
 function SummaryCard({ label, value, icon, color }) {
