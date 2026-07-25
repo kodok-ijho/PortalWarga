@@ -108,6 +108,27 @@ export default function PaymentMatrix() {
     return productionPayments.find((payment) => payment.ipl_bill_id === billId) || null;
   }, [productionPayments]);
 
+  const mergePaymentDetails = useCallback((cellPayment, billId) => {
+    const listPayment = getPaymentForBillView(billId);
+    if (!cellPayment) return listPayment;
+    if (!listPayment) return cellPayment;
+
+    return {
+      ...listPayment,
+      ...cellPayment,
+      method: cellPayment.method || listPayment.method,
+      status: cellPayment.status || listPayment.status,
+      proof_file_id: cellPayment.proof_file_id || listPayment.proof_file_id,
+      proof_file_url: cellPayment.proof_file_url || listPayment.proof_file_url,
+      proof_file_name: cellPayment.proof_file_name || listPayment.proof_file_name,
+      receipt_file: cellPayment.receipt_file || listPayment.receipt_file,
+      metadata: {
+        ...(listPayment.metadata || {}),
+        ...(cellPayment.metadata || {}),
+      },
+    };
+  }, [getPaymentForBillView]);
+
   useEffect(() => {
     loadMatrix();
   }, [loadMatrix, refreshKey]);
@@ -611,7 +632,7 @@ export default function PaymentMatrix() {
                                   cell?.status === 'rejected' ||
                                   cell?.payment?.status === 'rejected'
                                 ) {
-                                  const payment = cell.payment || getPaymentForBillView(cell.bill.id);
+                                  const payment = mergePaymentDetails(cell.payment, cell.bill.id);
                                   setDetailModal({ bill: cell.bill, payment });
                                   return;
                                 }
@@ -1192,6 +1213,21 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
   const isMyUnit = bill.unit_id === myUnitId;
   const canViewReceipt = isStaffRole(role) || isMyUnit;
   const canVerify = isBendaharaOrAbove(role);
+  const paymentMethod = payment?.method || payment?.payment_method || payment?.paymentMethod;
+  const proofFileUrl = payment?.proof_file_url || payment?.receipt_file_url || payment?.proof_url || '';
+  const proofFileName =
+    payment?.proof_file_name ||
+    payment?.receipt_file_name ||
+    payment?.receipt_file ||
+    payment?.receiptFile ||
+    '';
+  const hasProofFile = Boolean(proofFileUrl || proofFileName);
+  const missingProofText =
+    paymentMethod === 'qris'
+      ? 'Tidak ada file bukti karena pembayaran QRIS diproses otomatis.'
+      : paymentMethod === 'cash'
+      ? 'Tidak ada file bukti untuk pembayaran tunai.'
+      : 'Tidak ada file bukti transfer yang tersimpan.';
 
   const [isRevising, setIsRevising] = useState(false);
   const [newReceipt, setNewReceipt] = useState(null);
@@ -1367,7 +1403,7 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
             <div>
               <p className="text-xs text-forest-500 font-medium mb-1">Metode Pembayaran</p>
               <span className="pv-badge bg-forest-100 text-forest-700 font-medium">
-                {payment?.method === 'qris' ? '📱 QRIS' : payment?.method === 'cash' ? '💵 Tunai' : '🏦 Transfer Bank'}
+                {paymentMethod === 'qris' ? '📱 QRIS' : paymentMethod === 'cash' ? '💵 Tunai' : '🏦 Transfer Bank'}
               </span>
             </div>
 
@@ -1389,22 +1425,22 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
             <div>
               <p className="text-xs text-forest-500 font-medium mb-1.5">Bukti Bayar</p>
               {canViewReceipt ? (
-                payment?.proof_file_url || payment?.receipt_file ? (
+                hasProofFile ? (
                   <div className="rounded-lg border border-forest-200 bg-white p-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xl">📎</span>
                       <span className="truncate text-xs font-medium text-forest-700">
-                        {payment.proof_file_name || payment.receipt_file || 'Bukti Lampiran'}
+                        {proofFileName || 'Bukti Lampiran'}
                       </span>
                     </div>
                     <a
-                      href={payment.proof_file_url || '#'}
+                      href={proofFileUrl || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => {
-                        if (!payment.proof_file_url) {
+                        if (!proofFileUrl) {
                           e.preventDefault();
-                          alert(`Mengunduh file: ${payment.receipt_file}`);
+                          alert(`File bukti tercatat: ${proofFileName}`);
                         }
                       }}
                       className="text-xs font-semibold text-forest-800 hover:text-gold-600 transition-colors"
@@ -1413,7 +1449,7 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
                     </a>
                   </div>
                 ) : (
-                  <p className="text-xs text-forest-400 italic">Tidak ada file bukti (pembayaran otomatis QRIS).</p>
+                  <p className="text-xs text-forest-400 italic">{missingProofText}</p>
                 )
               ) : (
                 <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-red-700 text-xs flex items-center gap-2">

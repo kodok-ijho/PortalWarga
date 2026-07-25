@@ -504,6 +504,65 @@ function toNumberOrOriginal(value) {
   return Number.isFinite(numberValue) ? numberValue : value;
 }
 
+function parseMetadata(metadata) {
+  if (!metadata) return {};
+  if (typeof metadata === 'string') {
+    try {
+      return JSON.parse(metadata);
+    } catch {
+      return {};
+    }
+  }
+  return metadata;
+}
+
+function normalizePaymentRecord(payment) {
+  if (!payment) return payment;
+
+  const metadata = parseMetadata(payment.metadata);
+  const proofFileUrl =
+    payment.proof_file_url ||
+    payment.proofFileUrl ||
+    payment.proof_url ||
+    payment.receipt_file_url ||
+    payment.receiptFileUrl ||
+    payment.receipt_url ||
+    payment.file_url ||
+    metadata.proof_file_url ||
+    metadata.receipt_file_url ||
+    metadata.file_url ||
+    metadata.drive_url ||
+    '';
+  const proofFileName =
+    payment.proof_file_name ||
+    payment.proofFileName ||
+    payment.receipt_file_name ||
+    payment.receiptFileName ||
+    payment.receipt_file ||
+    payment.receiptFile ||
+    metadata.proof_file_name ||
+    metadata.receipt_file_name ||
+    '';
+
+  return {
+    ...payment,
+    method: payment.method || payment.payment_method || payment.paymentMethod || metadata.method,
+    status: payment.status === 'completed' ? 'verified' : payment.status,
+    metadata,
+    proof_file_id:
+      payment.proof_file_id ||
+      payment.proofFileId ||
+      payment.receipt_file_id ||
+      payment.receiptFileId ||
+      metadata.proof_file_id ||
+      metadata.receipt_file_id ||
+      '',
+    proof_file_url: proofFileUrl,
+    proof_file_name: proofFileName,
+    receipt_file: payment.receipt_file || payment.receiptFile || proofFileName,
+  };
+}
+
 const unitCollator = new Intl.Collator('id-ID', {
   numeric: true,
   sensitivity: 'base',
@@ -551,6 +610,7 @@ function normalizeBillMatrixRows(rows) {
           ...cell,
           status: cell.status || bill.status,
           bill,
+          payment: normalizePaymentRecord(cell.payment),
         };
       });
 
@@ -652,16 +712,11 @@ export async function fetchPayments(token) {
   const result = await portalApiPost('/payments/list', { token });
   const rawPayments = result?.payments || [];
 
-  return rawPayments.map(p => {
-    return {
-      ...p,
-      // Map database 'completed' status to 'verified' for the UI expectations
-      status: p.status === 'completed' ? 'verified' : p.status,
-      metadata: typeof p.metadata === 'string' ? JSON.parse(p.metadata) : (p.metadata || {}),
-      _bill: p.ipl_bills,
-      _profile: p.profiles,
-    };
-  });
+  return rawPayments.map(p => ({
+    ...normalizePaymentRecord(p),
+    _bill: p.ipl_bills,
+    _profile: p.profiles,
+  }));
 }
 
 export async function createQrisPayment(token, { bill_ids }) {
