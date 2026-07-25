@@ -1330,51 +1330,97 @@ function getResolvedPaymentDate(payment, bill) {
 function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, session, onRefresh, onRetry, onClose }) {
   const toast = useToast();
   const [asyncPayment, setAsyncPayment] = useState(null);
+  const [fetchAttempted, setFetchAttempted] = useState(false);
 
-  const hasDirectProof = Boolean(
-    payment?.proof_file_url ||
-    payment?.proof_file_name ||
-    payment?.proof_file_path ||
-    payment?.receipt_file ||
-    payment?.metadata?.recorded_by ||
-    payment?.metadata?.proof_file_url
-  );
-
+  // ALWAYS attempt to fetch full payment data from backend
   useEffect(() => {
     let isMounted = true;
-    if (!hasDirectProof && (bill?.id || bill?.period) && !IS_DEMO) {
+    setFetchAttempted(false);
+
+    if ((bill?.id || bill?.period) && !IS_DEMO) {
       const context = { unit_id: unit?.id || bill?.unit_id, period: bill?.period };
+      console.log('[PaymentDetailModal] 🔍 Fetching payment data...', { billId: bill?.id, context, hasPaymentProp: !!payment });
       fetchPaymentByBillId(session?.access_token, bill?.id, context)
         .then((fetched) => {
-          if (isMounted && fetched) {
-            setAsyncPayment(fetched);
+          if (isMounted) {
+            console.log('[PaymentDetailModal] 📦 fetchPaymentByBillId result:', JSON.stringify(fetched, null, 2)?.substring(0, 1000));
+            setAsyncPayment(fetched || null);
+            setFetchAttempted(true);
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('[PaymentDetailModal] ❌ fetchPaymentByBillId error:', err);
+          if (isMounted) setFetchAttempted(true);
+        });
     } else {
-      setAsyncPayment(null);
+      setFetchAttempted(true);
     }
     return () => { isMounted = false; };
-  }, [hasDirectProof, bill?.id, bill?.period, bill?.unit_id, unit?.id, payment, session?.access_token]);
+  }, [bill?.id, bill?.period, bill?.unit_id, unit?.id, session?.access_token]);
 
+  // Merge: asyncPayment fields take priority over cellPayment for proof/date fields
   const activePayment = useMemo(() => {
-    if (!payment) return asyncPayment;
-    if (!asyncPayment) return payment;
-    return {
-      ...asyncPayment,
-      ...payment,
-      method: payment.method || asyncPayment.method,
-      status: payment.status || asyncPayment.status,
-      paid_at: asyncPayment.paid_at || payment.paid_at,
-      proof_file_url: payment.proof_file_url || asyncPayment.proof_file_url,
-      proof_file_name: payment.proof_file_name || asyncPayment.proof_file_name,
-      receipt_file: payment.receipt_file || asyncPayment.receipt_file,
+    const base = payment || {};
+    const fetched = asyncPayment || {};
+    const merged = {
+      ...base,
+      ...fetched,
+      // For these critical fields, prefer fetched (async) over cell payment
+      id: fetched.id || base.id,
+      status: fetched.status || base.status,
+      method: fetched.method || base.method || fetched.payment_method || base.payment_method,
+      paid_at: fetched.paid_at || base.paid_at,
+      created_at: fetched.created_at || base.created_at,
+      proof_file_url: fetched.proof_file_url || base.proof_file_url,
+      proof_file_name: fetched.proof_file_name || base.proof_file_name,
+      proof_file_path: fetched.proof_file_path || base.proof_file_path,
+      receipt_file: fetched.receipt_file || base.receipt_file,
+      receipt_file_url: fetched.receipt_file_url || base.receipt_file_url,
+      ipl_bill_id: fetched.ipl_bill_id || base.ipl_bill_id,
+      resident_id: fetched.resident_id || base.resident_id,
       metadata: {
-        ...(asyncPayment.metadata || {}),
-        ...(payment.metadata || {}),
+        ...(base.metadata || {}),
+        ...(fetched.metadata || {}),
       },
     };
+    // If neither payment nor asyncPayment has any data, return null
+    if (!payment && !asyncPayment) return null;
+    return merged;
   }, [payment, asyncPayment]);
+
+  // Deep diagnostic logging
+  useEffect(() => {
+    console.log('[PaymentDetailModal] 🏷️ Props received:', {
+      'bill.id': bill?.id,
+      'bill.period': bill?.period,
+      'bill.status': bill?.status,
+      'bill.due_date': bill?.due_date,
+      'bill.paid_at': bill?.paid_at,
+      'payment (prop)': payment ? {
+        id: payment.id,
+        status: payment.status,
+        paid_at: payment.paid_at,
+        created_at: payment.created_at,
+        proof_file_url: payment.proof_file_url,
+        proof_file_name: payment.proof_file_name,
+        proof_file_path: payment.proof_file_path,
+        receipt_file: payment.receipt_file,
+        metadata: payment.metadata,
+        _allKeys: Object.keys(payment),
+      } : null,
+      'asyncPayment': asyncPayment ? {
+        id: asyncPayment.id,
+        paid_at: asyncPayment.paid_at,
+        created_at: asyncPayment.created_at,
+        proof_file_url: asyncPayment.proof_file_url,
+        proof_file_name: asyncPayment.proof_file_name,
+        metadata: asyncPayment.metadata,
+      } : null,
+      fetchAttempted,
+      role,
+    });
+  }, [bill, payment, asyncPayment, fetchAttempted, role]);
+
   const resolvedBill = bill;
   const targetUnit = unit || (bill?.unit_id ? getUnitById(bill.unit_id) : null);
   const resolvedUnitId = targetUnit?.id ?? bill?.unit_id ?? activePayment?.unit_id;
@@ -1426,6 +1472,18 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
   const proofPreviewUrl = getPaymentProofPreviewUrl(proofPreviewPayment);
   const canPreviewProofImage = Boolean(proofPreviewUrl && isImagePaymentProof(proofPreviewPayment));
   const resolvedPaidAt = getResolvedPaymentDate(activePayment, resolvedBill);
+
+  // Log resolved display values
+  console.log('[PaymentDetailModal] 🎯 Resolved display:', {
+    proofFileUrl: proofFileUrl || '(empty)',
+    proofFileName: proofFileName || '(empty)',
+    proofPreviewUrl: proofPreviewUrl || '(empty)',
+    hasProofFile,
+    canPreviewProofImage,
+    canViewReceipt,
+    isMyUnit,
+    resolvedPaidAt: resolvedPaidAt || '(empty)',
+  });
   const missingProofText =
     paymentMethod === 'qris'
       ? 'Tidak ada file bukti karena pembayaran QRIS diproses otomatis.'
