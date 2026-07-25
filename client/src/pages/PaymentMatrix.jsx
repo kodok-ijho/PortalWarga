@@ -1299,9 +1299,18 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
   const toast = useToast();
   const [asyncPayment, setAsyncPayment] = useState(null);
 
+  const hasDirectProof = Boolean(
+    payment?.proof_file_url ||
+    payment?.proof_file_name ||
+    payment?.proof_file_path ||
+    payment?.receipt_file ||
+    payment?.metadata?.recorded_by ||
+    payment?.metadata?.proof_file_url
+  );
+
   useEffect(() => {
     let isMounted = true;
-    if (!payment && (bill?.id || bill?.period) && !IS_DEMO) {
+    if (!hasDirectProof && (bill?.id || bill?.period) && !IS_DEMO) {
       const context = { unit_id: unit?.id || bill?.unit_id, period: bill?.period };
       fetchPaymentByBillId(session?.access_token, bill?.id, context)
         .then((fetched) => {
@@ -1314,9 +1323,26 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
       setAsyncPayment(null);
     }
     return () => { isMounted = false; };
-  }, [bill?.id, bill?.period, bill?.unit_id, unit?.id, payment, session?.access_token]);
+  }, [hasDirectProof, bill?.id, bill?.period, bill?.unit_id, unit?.id, payment, session?.access_token]);
 
-  const activePayment = payment || asyncPayment;
+  const activePayment = useMemo(() => {
+    if (!payment) return asyncPayment;
+    if (!asyncPayment) return payment;
+    return {
+      ...asyncPayment,
+      ...payment,
+      method: payment.method || asyncPayment.method,
+      status: payment.status || asyncPayment.status,
+      paid_at: asyncPayment.paid_at || payment.paid_at,
+      proof_file_url: payment.proof_file_url || asyncPayment.proof_file_url,
+      proof_file_name: payment.proof_file_name || asyncPayment.proof_file_name,
+      receipt_file: payment.receipt_file || asyncPayment.receipt_file,
+      metadata: {
+        ...(asyncPayment.metadata || {}),
+        ...(payment.metadata || {}),
+      },
+    };
+  }, [payment, asyncPayment]);
   const resolvedBill = bill;
   const targetUnit = unit || (bill?.unit_id ? getUnitById(bill.unit_id) : null);
   const resolvedUnitId = targetUnit?.id ?? bill?.unit_id ?? activePayment?.unit_id;
