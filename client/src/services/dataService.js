@@ -804,7 +804,7 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
     const mock = await getMockData();
     const p = mock.mockPayments.find(item =>
       (billId && String(item.ipl_bill_id) === String(billId)) ||
-      (billContext?.period && item._bill?.period === billContext.period && item._bill?.unit_id === billContext.unit_id)
+      (billContext?.period && item._bill?.period === billContext.period && String(item._bill?.unit_id) === String(billContext.unit_id))
     );
     return p ? normalizePaymentRecord(p) : null;
   }
@@ -818,52 +818,68 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
       (billId && String(p._bill?.id) === String(billId)) ||
       (billContext.period && p._bill?.period === billContext.period && String(p._bill?.unit_id) === String(billContext.unit_id))
     );
-    if (found) return found;
+    if (found) return normalizePaymentRecord(found);
   } catch {
     // fallback
   }
 
-  // 2. Direct Supabase query fallback for single bill payment by ipl_bill_id
+  // 2. Direct Supabase query with Bearer token header
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mzjgliclzihrdjaqzmqg.supabase.co';
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  const authedClient = (token && supabaseUrl && supabaseAnonKey)
+    ? createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: `Bearer ${token}` } } })
+    : supabase;
+
   if (billId) {
     try {
-      const { data: supaPayment } = await supabase
+      const { data: supaPayment } = await authedClient
         .from('payments')
         .select('*, ipl_bills(*), profiles(*)')
         .eq('ipl_bill_id', billId)
         .maybeSingle();
 
       if (supaPayment) {
-        return {
-          ...normalizePaymentRecord(supaPayment),
+        return normalizePaymentRecord({
+          ...supaPayment,
           _bill: supaPayment.ipl_bills,
           _profile: supaPayment.profiles,
-        };
+        });
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
-  // 3. Direct Supabase query fallback by period & unit_id
   if (billContext.unit_id && billContext.period) {
     try {
-      const { data: supaPayments } = await supabase
+      const { data: supaPayments } = await authedClient
         .from('payments')
         .select('*, ipl_bills!inner(*), profiles(*)')
         .eq('ipl_bills.unit_id', billContext.unit_id)
         .eq('ipl_bills.period', billContext.period);
 
       if (Array.isArray(supaPayments) && supaPayments.length > 0) {
-        const found = supaPayments[0];
-        return {
-          ...normalizePaymentRecord(found),
-          _bill: found.ipl_bills,
-          _profile: found.profiles,
-        };
+        return normalizePaymentRecord({
+          ...supaPayments[0],
+          _bill: supaPayments[0].ipl_bills,
+          _profile: supaPayments[0].profiles,
+        });
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
+  }
+
+  if (billContext.unit_id) {
+    try {
+      const { data: supaPayments } = await authedClient
+        .from('payments')
+        .select('*')
+        .eq('unit_id', billContext.unit_id);
+
+      if (Array.isArray(supaPayments) && supaPayments.length > 0) {
+        const match = supaPayments.find(p => p.ipl_bill_id === billId || p.metadata?.period === billContext.period);
+        if (match) return normalizePaymentRecord(match);
+        return normalizePaymentRecord(supaPayments[0]);
+      }
+    } catch {}
   }
 
   return null;
