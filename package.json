@@ -1,6 +1,6 @@
 {
   "name": "portal-palm-village",
-  "version": "1.2.2",
+  "version": "1.2.4",
   "private": true,
   "scripts": {
     "dev": "npm --prefix client run dev",

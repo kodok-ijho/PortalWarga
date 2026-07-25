@@ -55,6 +55,7 @@ export default function Houses() {
   const [filterStatus, setFilterStatus] = useState('');
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [formUnit, setFormUnit] = useState(null);
+  const [isMapPreviewOpen, setIsMapPreviewOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -143,6 +144,14 @@ export default function Houses() {
 
   const openAdd = () => {
     setFormUnit({ ...EMPTY_FORM });
+  };
+
+  const openMapPreview = () => {
+    setIsMapPreviewOpen(true);
+  };
+
+  const closeMapPreview = () => {
+    setIsMapPreviewOpen(false);
   };
 
   const openEdit = (unit) => {
@@ -271,14 +280,13 @@ export default function Houses() {
                   Referensi visual blok CB1, CB2, CB3, CB4.
                 </p>
               </div>
-              <a
-                href="/Mapsite%20Palm%20Village.jpeg"
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={openMapPreview}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-gold-300 hover:bg-white/15"
               >
                 <AiOutlineEye /> Perbesar
-              </a>
+              </button>
             </div>
           </div>
           <div className="bg-white p-3">
@@ -297,6 +305,19 @@ export default function Houses() {
           <StatCard label="Blok" value={stats.blocks} tone="gold" />
         </div>
       </section>
+
+      <Modal open={isMapPreviewOpen} onClose={closeMapPreview} title="Mapsite Palm Village" size="xl">
+        <div className="space-y-3">
+          <p className="text-sm text-forest-500">
+            Preview peta perumahan untuk referensi blok dan posisi rumah.
+          </p>
+          <img
+            src="/Mapsite%20Palm%20Village.jpeg"
+            alt="Mapsite Palm Village versi besar"
+            className="max-h-[75vh] w-full rounded-lg border border-forest-100 object-contain"
+          />
+        </div>
+      </Modal>
 
       <section className="pv-card p-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
