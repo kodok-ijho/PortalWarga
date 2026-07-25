@@ -1597,6 +1597,52 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
     <>
     <Modal open onClose={onClose} title="Detail Bukti Pembayaran IPL" size="md">
       <div className="space-y-4 text-sm text-forest-900">
+        {/* 🔬 DEBUG PANEL - TEMPORARY - akan dihapus setelah fix */}
+        <details open className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-[10px] font-mono text-red-900">
+          <summary className="font-bold text-xs cursor-pointer text-red-700">🔬 DEBUG v1.3.3-diag (screenshot ini lalu kirim)</summary>
+          <div className="mt-2 space-y-1 break-all">
+            <p><b>role:</b> {role}</p>
+            <p><b>isMyUnit:</b> {String(isMyUnit)}</p>
+            <p><b>canViewReceipt:</b> {String(canViewReceipt)}</p>
+            <p><b>fetchAttempted:</b> {String(fetchAttempted)}</p>
+            <p><b>bill.id:</b> {bill?.id || '(null)'}</p>
+            <p><b>bill.period:</b> {bill?.period || '(null)'}</p>
+            <p><b>bill.status:</b> {bill?.status || '(null)'}</p>
+            <p><b>bill.due_date:</b> {bill?.due_date || '(null)'}</p>
+            <p><b>bill.paid_at:</b> {bill?.paid_at || '(null)'}</p>
+            <hr className="border-red-300"/>
+            <p><b>payment prop:</b> {payment ? 'EXISTS' : 'NULL'}</p>
+            {payment && <p><b>payment keys:</b> {Object.keys(payment).join(', ')}</p>}
+            {payment && <p><b>payment.id:</b> {payment.id || '(null)'}</p>}
+            {payment && <p><b>payment.paid_at:</b> {payment.paid_at || '(null)'}</p>}
+            {payment && <p><b>payment.created_at:</b> {payment.created_at || '(null)'}</p>}
+            {payment && <p><b>payment.proof_file_url:</b> {payment.proof_file_url || '(null)'}</p>}
+            {payment && <p><b>payment.proof_file_name:</b> {payment.proof_file_name || '(null)'}</p>}
+            {payment && <p><b>payment.proof_file_path:</b> {payment.proof_file_path || '(null)'}</p>}
+            {payment && <p><b>payment.receipt_file:</b> {payment.receipt_file || '(null)'}</p>}
+            {payment && <p><b>payment.metadata:</b> {JSON.stringify(payment.metadata || null)}</p>}
+            <hr className="border-red-300"/>
+            <p><b>asyncPayment:</b> {asyncPayment ? 'EXISTS' : 'NULL'}</p>
+            {asyncPayment && <p><b>async.id:</b> {asyncPayment.id || '(null)'}</p>}
+            {asyncPayment && <p><b>async.paid_at:</b> {asyncPayment.paid_at || '(null)'}</p>}
+            {asyncPayment && <p><b>async.proof_file_url:</b> {asyncPayment.proof_file_url || '(null)'}</p>}
+            {asyncPayment && <p><b>async.metadata:</b> {JSON.stringify(asyncPayment.metadata || null)}</p>}
+            <hr className="border-red-300"/>
+            <p><b>activePayment:</b> {activePayment ? 'EXISTS' : 'NULL'}</p>
+            {activePayment && <p><b>active.paid_at:</b> {activePayment.paid_at || '(null)'}</p>}
+            {activePayment && <p><b>active.created_at:</b> {activePayment.created_at || '(null)'}</p>}
+            {activePayment && <p><b>active.proof_file_url:</b> {activePayment.proof_file_url || '(null)'}</p>}
+            {activePayment && <p><b>active.proof_file_name:</b> {activePayment.proof_file_name || '(null)'}</p>}
+            {activePayment && <p><b>active.metadata:</b> {JSON.stringify(activePayment.metadata || null)}</p>}
+            <hr className="border-red-300"/>
+            <p><b>resolvedPaidAt:</b> {resolvedPaidAt || '(empty)'}</p>
+            <p><b>proofFileUrl:</b> {proofFileUrl || '(empty)'}</p>
+            <p><b>proofFileName:</b> {proofFileName || '(empty)'}</p>
+            <p><b>proofPreviewUrl:</b> {proofPreviewUrl || '(empty)'}</p>
+            <p><b>hasProofFile:</b> {String(hasProofFile)}</p>
+            <p><b>canPreviewProofImage:</b> {String(canPreviewProofImage)}</p>
+          </div>
+        </details>
         {/* Banner Status */}
         {payment?.status === 'pending_verification' && (
           <div className="rounded-lg bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800 flex items-center gap-2">
