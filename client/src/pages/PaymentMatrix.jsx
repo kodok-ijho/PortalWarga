@@ -88,8 +88,8 @@ export default function PaymentMatrix() {
     try {
       const [data, paymentData] = await Promise.all([
         fetchBillMatrix(session?.access_token, year),
-        !IS_DEMO && isBendaharaOrAbove(role)
-          ? fetchPayments(session?.access_token)
+        !IS_DEMO
+          ? fetchPayments(session?.access_token).catch(() => [])
           : Promise.resolve([]),
       ]);
       setMatrix(data);
@@ -1217,6 +1217,37 @@ function formatPeriodShort(period) {
   return `${MONTHS_LONG[parseInt(m, 10) - 1]} ${y}`;
 }
 
+function isImagePaymentProof(payment) {
+  const mimeType = String(payment?.proof_file_mime_type || payment?.receipt_file_mime_type || '').toLowerCase();
+  const fileName = String(
+    payment?.proof_file_name ||
+    payment?.receipt_file_name ||
+    payment?.receipt_file ||
+    payment?.receiptFile ||
+    ''
+  ).toLowerCase();
+  const fileUrl = String(payment?.proof_file_url || payment?.receipt_file_url || payment?.proof_url || '').toLowerCase();
+
+  return (
+    mimeType.startsWith('image/') ||
+    /\.(png|jpe?g|webp|gif)(\?.*)?$/.test(fileName) ||
+    /\.(png|jpe?g|webp|gif)(\?.*)?$/.test(fileUrl) ||
+    /drive\.google\.com\/file\/d\/[^/]+/i.test(fileUrl)
+  );
+}
+
+function getPaymentProofPreviewUrl(payment) {
+  const sourceUrl = payment?.proof_file_url || payment?.receipt_file_url || payment?.proof_url;
+  if (!sourceUrl) return null;
+
+  const driveMatch = String(sourceUrl).match(/drive\.google\.com\/file\/d\/([^/]+)/i);
+  if (driveMatch?.[1] && driveMatch[1] !== 'undefined') {
+    return `https://drive.google.com/thumbnail?id=${encodeURIComponent(driveMatch[1])}&sz=w1200`;
+  }
+
+  return sourceUrl;
+}
+
 // Modal Detail Pembayaran Lunas
 // Modal Detail / Verifikasi / Revisi Pembayaran
 function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh, onRetry, onClose }) {
@@ -1233,6 +1264,9 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
     payment?.receiptFile ||
     '';
   const hasProofFile = Boolean(proofFileUrl || proofFileName);
+  const proofPreviewPayment = { ...payment, proof_file_url: proofFileUrl, proof_file_name: proofFileName };
+  const proofPreviewUrl = getPaymentProofPreviewUrl(proofPreviewPayment);
+  const canPreviewProofImage = Boolean(proofPreviewUrl && isImagePaymentProof(proofPreviewPayment));
   const missingProofText =
     paymentMethod === 'qris'
       ? 'Tidak ada file bukti karena pembayaran QRIS diproses otomatis.'
@@ -1245,6 +1279,13 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
   const [reviseNote, setReviseNote] = useState(payment?.metadata?.note || '');
   const [uploadError, setUploadError] = useState('');
   const [isActing, setIsActing] = useState(false);
+  const [proofPreviewError, setProofPreviewError] = useState(false);
+  const [isProofPreviewOpen, setIsProofPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    setProofPreviewError(false);
+    setIsProofPreviewOpen(false);
+  }, [payment?.id, proofFileUrl]);
 
   const handleVerify = async () => {
     if (!payment || isActing) return;
@@ -1336,6 +1377,7 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
   };
 
   return (
+    <>
     <Modal open onClose={onClose} title="Detail Bukti Pembayaran IPL" size="md">
       <div className="space-y-4 text-sm text-forest-900">
         {/* Banner Status */}
@@ -1437,6 +1479,33 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
               <p className="text-xs text-forest-500 font-medium mb-1.5">Bukti Bayar</p>
               {canViewReceipt ? (
                 hasProofFile ? (
+                  <>
+                    {canPreviewProofImage && !proofPreviewError && (
+                      <button
+                        type="button"
+                        onClick={() => setIsProofPreviewOpen(true)}
+                        className="group mb-2 block w-full overflow-hidden rounded-lg border border-forest-200 bg-forest-50 text-left transition-colors hover:border-gold-300 focus:outline-none focus:ring-2 focus:ring-gold-400/40"
+                        aria-label="Perbesar bukti transfer"
+                      >
+                        <div className="flex min-h-36 items-center justify-center bg-forest-100 p-2">
+                          <img
+                            src={proofPreviewUrl}
+                            alt={proofFileName || 'Bukti transfer'}
+                            className="max-h-52 w-full rounded-md object-contain transition-transform group-hover:scale-[1.01]"
+                            onError={() => setProofPreviewError(true)}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-2 border-t border-forest-200 px-3 py-2">
+                          <span className="truncate text-xs font-medium text-forest-700">
+                            {proofFileName || 'Bukti transfer'}
+                          </span>
+                          <span className="shrink-0 text-xs font-semibold text-gold-700">
+                            Perbesar
+                          </span>
+                        </div>
+                      </button>
+                    )}
+                    {(!canPreviewProofImage || proofPreviewError) && (
                   <div className="rounded-lg border border-forest-200 bg-white p-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xl">📎</span>
@@ -1459,6 +1528,8 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
                       Unduh / Buka 🔗
                     </a>
                   </div>
+                    )}
+                  </>
                 ) : (
                   <p className="text-xs text-forest-400 italic">{missingProofText}</p>
                 )
@@ -1538,6 +1609,35 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
         </div>
       </div>
     </Modal>
+
+      {isProofPreviewOpen && proofPreviewUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-3 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Preview bukti transfer"
+          onClick={() => setIsProofPreviewOpen(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setIsProofPreviewOpen(false)}
+            className="absolute right-3 top-3 rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold text-forest-900 shadow-lg hover:bg-white sm:right-5 sm:top-5"
+          >
+            Tutup
+          </button>
+          <img
+            src={proofPreviewUrl}
+            alt={proofFileName || 'Bukti transfer'}
+            className="max-h-[92vh] max-w-[96vw] rounded-lg bg-white object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            onError={() => {
+              setProofPreviewError(true);
+              setIsProofPreviewOpen(false);
+            }}
+          />
+        </div>
+      )}
+    </>
   );
 }
 
