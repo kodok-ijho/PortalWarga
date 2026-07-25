@@ -1253,26 +1253,55 @@ function isImagePaymentProof(payment) {
     payment?.receiptFile ||
     ''
   ).toLowerCase();
-  const fileUrl = String(payment?.proof_file_url || payment?.receipt_file_url || payment?.proof_url || '').toLowerCase();
+  const fileUrl = String(
+    payment?.proof_file_url ||
+    payment?.receipt_file_url ||
+    payment?.proof_url ||
+    payment?.proof_file_path ||
+    ''
+  ).toLowerCase();
 
   return (
     mimeType.startsWith('image/') ||
-    /\.(png|jpe?g|webp|gif)(\?.*)?$/.test(fileName) ||
-    /\.(png|jpe?g|webp|gif)(\?.*)?$/.test(fileUrl) ||
-    /drive\.google\.com\/file\/d\/[^/]+/i.test(fileUrl)
+    /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(fileName) ||
+    /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(fileUrl) ||
+    /drive\.google\.com\/file\/d\/[^/]+/i.test(fileUrl) ||
+    /drive\.google\.com\/thumbnail/i.test(fileUrl) ||
+    /googleusercontent\.com/i.test(fileUrl) ||
+    Boolean(fileUrl && !fileUrl.endsWith('.pdf'))
   );
 }
 
 function getPaymentProofPreviewUrl(payment) {
-  const sourceUrl = payment?.proof_file_url || payment?.receipt_file_url || payment?.proof_url;
+  let sourceUrl =
+    payment?.proof_file_url ||
+    payment?.receipt_file_url ||
+    payment?.proof_url ||
+    payment?.proof_file_path ||
+    payment?.receipt_file ||
+    payment?.metadata?.proof_file_url ||
+    payment?.metadata?.drive_url ||
+    payment?.metadata?.file_url;
+
   if (!sourceUrl) return null;
 
-  const driveMatch = String(sourceUrl).match(/drive\.google\.com\/file\/d\/([^/]+)/i);
+  sourceUrl = String(sourceUrl).trim();
+
+  // 1. Google Drive link
+  const driveMatch = sourceUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/i);
   if (driveMatch?.[1] && driveMatch[1] !== 'undefined') {
     return `https://drive.google.com/thumbnail?id=${encodeURIComponent(driveMatch[1])}&sz=w1200`;
   }
 
-  return sourceUrl;
+  // 2. Full HTTP/HTTPS URL
+  if (sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://')) {
+    return sourceUrl;
+  }
+
+  // 3. Supabase Storage relative file path (e.g. "2026-09__unit-13__payment-...")
+  const cleanPath = sourceUrl.replace(/^payments\//, '');
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mzjgliclzihrdjaqzmqg.supabase.co';
+  return `${supabaseUrl.replace(/\/+$/, '')}/storage/v1/object/public/payments/${encodeURIComponent(cleanPath)}`;
 }
 
 function getResolvedPaymentDate(payment, bill) {
@@ -1283,11 +1312,14 @@ function getResolvedPaymentDate(payment, bill) {
     payment?.completedAt ||
     payment?.verified_at ||
     payment?.verifiedAt ||
+    payment?.created_at ||
+    payment?.createdAt ||
     payment?.metadata?.paid_at ||
     payment?.metadata?.completed_at ||
     payment?.metadata?.verified_at ||
     bill?.paid_at ||
     bill?.paidAt ||
+    bill?.created_at ||
     bill?.due_date ||
     ''
   );
