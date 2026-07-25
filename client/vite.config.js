@@ -7,8 +7,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
-      injectRegister: false, // register manual via komponen PWAUpdatePrompt
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
 
       // Service worker mati saat dev → hot-reload tetap mulus
       devOptions: {
