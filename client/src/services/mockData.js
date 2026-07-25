@@ -436,8 +436,11 @@ const periods = [
   // 2025 — sebagian besar lunas (tahun lalu)
   '2025-01','2025-02','2025-03','2025-04','2025-05','2025-06',
   '2025-07','2025-08','2025-09','2025-10','2025-11','2025-12',
-  // 2026 — campuran (tahun berjalan)
+  // 2026 — 2027 (tahun berjalan & tahun buku)
   '2026-01','2026-02','2026-03','2026-04','2026-05','2026-06',
+  '2026-07','2026-08','2026-09','2026-10','2026-11','2026-12',
+  '2027-01','2027-02','2027-03','2027-04','2027-05','2027-06',
+  '2027-07','2027-08','2027-09','2027-10','2027-11','2027-12',
 ];
 
 export const mockIPLBills = [];
@@ -477,10 +480,8 @@ for (const period of periods) {
     const dueDate = new Date(y, m - 1, mockSettings.due_day);
     const amount = computeIPLAmount(unit.id);
 
-    // Jangan generate tagihan untuk periode masa depan yang belum ada
     const isPast = now > new Date(y, m, 0); // akhir bulan periode
     const isCurrent = y === currentYear && m === currentMonth;
-    if (!isPast && !isCurrent) continue;
 
     // Status sekuensial kontinu: bandingkan index periode dengan cutoff
     const idx = periodToIndex(period);
@@ -547,6 +548,8 @@ export const mockPayments = mockIPLBills
       transaction_id: `TRF-pending-${i + 1}`,
       status: 'pending_verification',
       paid_at: new Date().toISOString().split('T')[0],
+      proof_file_name: `bukti-transfer-${bill.period}.jpg`,
+      proof_file_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800',
       receipt_file: `bukti-transfer-${bill.period}.jpg`,
       metadata: {
         note: 'Transfer via BCA Mobile',
@@ -927,24 +930,34 @@ export function getAvailableYears() {
  */
 export function getBillMatrix(year, opts = {}) {
   const { scopeUnitId } = opts;
-  const units = scopeUnitId
-    ? mockUnits.filter((u) => u.id === scopeUnitId)
+  const targetUnitId = scopeUnitId ? Number(scopeUnitId) : null;
+  const units = targetUnitId
+    ? mockUnits.filter((u) => u.id === targetUnitId)
     : mockUnits; // Tampilkan seluruh unit (termasuk rumah kosong) di dalam matriks
 
-  const billsForYear = getBillsForYear(year);
+  // Periode 12 bulan tahun buku (Juli YYYY s.d. Juni YYYY+1)
+  const matrixPeriods = [
+    `${year}-07`, `${year}-08`, `${year}-09`, `${year}-10`, `${year}-11`, `${year}-12`,
+    `${year + 1}-01`, `${year + 1}-02`, `${year + 1}-03`, `${year + 1}-04`, `${year + 1}-05`, `${year + 1}-06`
+  ];
 
   return units.map((unit) => {
-    // Resident pada baris matriks = penerima tagihan sesuai setting.
-    // (bisa owner atau occupant — lihat getBillRecipient)
     const resident = getBillRecipient(unit.id);
-    const cells = [];
-    for (let m = 1; m <= 12; m++) {
-      const period = `${year}-${String(m).padStart(2, '0')}`;
-      const bill = billsForYear.find(
-        (b) => b.unit_id === unit.id && b.period === period
+    const cells = matrixPeriods.map((period) => {
+      const bill = mockIPLBills.find(
+        (b) => Number(b.unit_id) === Number(unit.id) && b.period === period
       );
-      cells.push(bill ? { status: bill.status, bill } : null);
-    }
+      if (!bill) return null;
+      const payment = bill.payment_id
+        ? mockPayments.find((p) => p.id === bill.payment_id)
+        : mockPayments.find((p) => p.ipl_bill_id === bill.id) || null;
+
+      return {
+        status: bill.status,
+        bill,
+        payment: payment ? payment : null,
+      };
+    });
     return {
       unit,
       resident: resident || null,

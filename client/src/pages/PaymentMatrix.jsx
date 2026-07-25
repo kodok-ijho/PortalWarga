@@ -643,11 +643,18 @@ export default function PaymentMatrix() {
                         )}
                       </td>
                       {row.cells.map((cell, mIdx) => {
-                        const isSelected = cell?.bill ? isBillSelected(cell.bill.id) : false;
+                        const targetPeriod = matrixMonths[mIdx]?.period;
+                        const matchedCell =
+                          (cell && cell.bill && cell.bill.period === targetPeriod)
+                            ? cell
+                            : (Array.isArray(row.cells)
+                                ? row.cells.find((c) => c?.bill?.period === targetPeriod)
+                                : null) || cell;
+                        const isSelected = matchedCell?.bill ? isBillSelected(matchedCell.bill.id) : false;
                         return (
                           <td key={mIdx} className="px-1 py-1 text-center">
                             <Cell
-                              cell={cell}
+                              cell={matchedCell}
                               unitId={row.unit.id}
                               isSelected={isSelected}
                               isStaff={isStaff}
@@ -655,17 +662,17 @@ export default function PaymentMatrix() {
                               isLockedOtherUnit={isLockedOtherUnit}
                               onClick={() => {
                                 if (
-                                  cell?.status === 'paid' ||
-                                  cell?.status === 'pending_verification' ||
-                                  cell?.status === 'rejected' ||
-                                  cell?.payment?.status === 'rejected'
+                                  matchedCell?.status === 'paid' ||
+                                  matchedCell?.status === 'pending_verification' ||
+                                  matchedCell?.status === 'rejected' ||
+                                  matchedCell?.payment?.status === 'rejected'
                                 ) {
-                                  const payment = mergePaymentDetails(cell.payment, cell.bill.id);
-                                  setDetailModal({ bill: cell.bill, payment });
+                                  const payment = mergePaymentDetails(matchedCell.payment, matchedCell.bill.id);
+                                  setDetailModal({ bill: matchedCell.bill, payment, unit: row.unit });
                                   return;
                                 }
                                 if (!canInteract || isLockedOtherUnit) return;
-                                toggleCell(cell?.bill);
+                                toggleCell(matchedCell?.bill);
                               }}
                             />
                           </td>
@@ -748,6 +755,7 @@ export default function PaymentMatrix() {
         <PaymentDetailModal
           bill={detailModal.bill}
           payment={detailModal.payment}
+          unit={detailModal.unit}
           role={role}
           myUnitId={myUnitId}
           session={session}
@@ -1278,29 +1286,18 @@ function getResolvedPaymentDate(payment, bill) {
     payment?.metadata?.verified_at ||
     bill?.paid_at ||
     bill?.paidAt ||
-    bill?.completed_at ||
-    bill?.completedAt ||
-    bill?.verified_at ||
-    bill?.created_at ||
-    bill?.updated_at ||
+    bill?.due_date ||
     ''
   );
 }
 
 // Modal Detail Pembayaran Lunas
 // Modal Detail / Verifikasi / Revisi Pembayaran
-function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh, onRetry, onClose }) {
+function PaymentDetailModal({ bill, payment, unit, role, myUnitId, session, onRefresh, onRetry, onClose }) {
   const toast = useToast();
-  const resolvedBill = payment?._bill
-    ? {
-        ...bill,
-        ...payment._bill,
-        unit_id: payment._bill.unit_id ?? bill.unit_id,
-        amount: payment._bill.amount ?? bill.amount,
-        period: payment._bill.period ?? bill.period,
-      }
-    : bill;
-  const resolvedUnitId = resolvedBill?.unit_id ?? payment?.unit_id ?? bill?.unit_id;
+  const resolvedBill = bill;
+  const targetUnit = unit || (bill?.unit_id ? getUnitById(bill.unit_id) : null);
+  const resolvedUnitId = targetUnit?.id ?? bill?.unit_id ?? payment?.unit_id;
   const isMyUnit = String(resolvedUnitId) === String(myUnitId);
   const canViewReceipt = isStaffRole(role) || isMyUnit;
   const canVerify = isBendaharaOrAbove(role);
@@ -1483,10 +1480,12 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
               <div>
                 <p className="text-xs text-forest-500 font-medium">Rumah / Unit</p>
                 <p className="font-semibold text-forest-800">
-                  {(() => {
-                    const u = getUnitById(resolvedUnitId);
-                    return u ? `Blok ${u.block}/${u.unit_number}` : '-';
-                  })()}
+                  {targetUnit
+                    ? `Blok ${targetUnit.block}/${targetUnit.unit_number}`
+                    : (() => {
+                        const u = getUnitById(resolvedUnitId);
+                        return u ? `Blok ${u.block}/${u.unit_number}` : '-';
+                      })()}
                 </p>
               </div>
               <div>

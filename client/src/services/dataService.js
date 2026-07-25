@@ -627,9 +627,8 @@ function normalizeBillMatrixRows(rows) {
         : null;
 
       const rawCells = Array.isArray(row?.cells) ? row.cells : [];
-      const cells = Array.from({ length: 12 }, (_, index) => {
-        const cell = rawCells[index] || null;
-        if (!cell?.bill) return null;
+      const cells = rawCells.map((cell) => {
+        if (!cell || !cell.bill) return cell;
 
         const bill = {
           ...cell.bill,
