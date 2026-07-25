@@ -546,6 +546,20 @@ function normalizePaymentRecord(payment) {
 
   return {
     ...payment,
+    ipl_bill_id:
+      payment.ipl_bill_id ||
+      payment.iplBillId ||
+      payment.ipl_bill ||
+      payment.bill_id ||
+      payment.billId ||
+      payment._bill?.id ||
+      '',
+    resident_id:
+      payment.resident_id ||
+      payment.residentId ||
+      payment.resident ||
+      payment._profile?.id ||
+      '',
     method: payment.method || payment.payment_method || payment.paymentMethod || metadata.method,
     status: payment.status === 'completed' ? 'verified' : payment.status,
     metadata,

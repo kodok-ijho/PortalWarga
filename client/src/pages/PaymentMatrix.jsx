@@ -105,7 +105,18 @@ export default function PaymentMatrix() {
 
   const getPaymentForBillView = useCallback((billId) => {
     if (IS_DEMO) return getPaymentForBill(billId);
-    return productionPayments.find((payment) => payment.ipl_bill_id === billId) || null;
+    return (
+      productionPayments.find((payment) => {
+        const paymentBillId =
+          payment.ipl_bill_id ||
+          payment.iplBillId ||
+          payment.bill_id ||
+          payment.billId ||
+          payment._bill?.id ||
+          payment.ipl_bill?.id;
+        return String(paymentBillId) === String(billId);
+      }) || null
+    );
   }, [productionPayments]);
 
   const mergePaymentDetails = useCallback((cellPayment, billId) => {
