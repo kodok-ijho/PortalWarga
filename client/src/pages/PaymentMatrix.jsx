@@ -1301,8 +1301,9 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
 
   useEffect(() => {
     let isMounted = true;
-    if (!payment && bill?.id && !IS_DEMO) {
-      fetchPaymentByBillId(session?.access_token, bill.id)
+    if (!payment && (bill?.id || bill?.period) && !IS_DEMO) {
+      const context = { unit_id: unit?.id || bill?.unit_id, period: bill?.period };
+      fetchPaymentByBillId(session?.access_token, bill?.id, context)
         .then((fetched) => {
           if (isMounted && fetched) {
             setAsyncPayment(fetched);
@@ -1313,7 +1314,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
       setAsyncPayment(null);
     }
     return () => { isMounted = false; };
-  }, [bill?.id, payment, session?.access_token]);
+  }, [bill?.id, bill?.period, bill?.unit_id, unit?.id, payment, session?.access_token]);
 
   const activePayment = payment || asyncPayment;
   const resolvedBill = bill;

@@ -798,40 +798,72 @@ export async function fetchPayments(token, opts = {}) {
   }));
 }
 
-export async function fetchPaymentByBillId(token, billId) {
-  if (!billId) return null;
+export async function fetchPaymentByBillId(token, billId, billContext = {}) {
+  if (!billId && !billContext?.period) return null;
   if (IS_DEMO) {
     const mock = await getMockData();
-    const p = mock.mockPayments.find(item => String(item.ipl_bill_id) === String(billId));
+    const p = mock.mockPayments.find(item =>
+      (billId && String(item.ipl_bill_id) === String(billId)) ||
+      (billContext?.period && item._bill?.period === billContext.period && item._bill?.unit_id === billContext.unit_id)
+    );
     return p ? normalizePaymentRecord(p) : null;
   }
 
   // 1. Try from all payments list first
   try {
-    const all = await fetchPayments(token);
-    const found = all.find(p => String(p.ipl_bill_id) === String(billId) || String(p.bill_id) === String(billId) || String(p._bill?.id) === String(billId));
+    const all = await fetchPayments(token, billContext.unit_id ? { scopeUnitId: billContext.unit_id } : {});
+    const found = all.find(p =>
+      (billId && String(p.ipl_bill_id) === String(billId)) ||
+      (billId && String(p.bill_id) === String(billId)) ||
+      (billId && String(p._bill?.id) === String(billId)) ||
+      (billContext.period && p._bill?.period === billContext.period && String(p._bill?.unit_id) === String(billContext.unit_id))
+    );
     if (found) return found;
   } catch {
     // fallback
   }
 
-  // 2. Direct Supabase query fallback for single bill payment
-  try {
-    const { data: supaPayment } = await supabase
-      .from('payments')
-      .select('*, ipl_bills(*), profiles(*)')
-      .eq('ipl_bill_id', billId)
-      .maybeSingle();
+  // 2. Direct Supabase query fallback for single bill payment by ipl_bill_id
+  if (billId) {
+    try {
+      const { data: supaPayment } = await supabase
+        .from('payments')
+        .select('*, ipl_bills(*), profiles(*)')
+        .eq('ipl_bill_id', billId)
+        .maybeSingle();
 
-    if (supaPayment) {
-      return {
-        ...normalizePaymentRecord(supaPayment),
-        _bill: supaPayment.ipl_bills,
-        _profile: supaPayment.profiles,
-      };
+      if (supaPayment) {
+        return {
+          ...normalizePaymentRecord(supaPayment),
+          _bill: supaPayment.ipl_bills,
+          _profile: supaPayment.profiles,
+        };
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
+  }
+
+  // 3. Direct Supabase query fallback by period & unit_id
+  if (billContext.unit_id && billContext.period) {
+    try {
+      const { data: supaPayments } = await supabase
+        .from('payments')
+        .select('*, ipl_bills!inner(*), profiles(*)')
+        .eq('ipl_bills.unit_id', billContext.unit_id)
+        .eq('ipl_bills.period', billContext.period);
+
+      if (Array.isArray(supaPayments) && supaPayments.length > 0) {
+        const found = supaPayments[0];
+        return {
+          ...normalizePaymentRecord(found),
+          _bill: found.ipl_bills,
+          _profile: found.profiles,
+        };
+      }
+    } catch {
+      // ignore
+    }
   }
 
   return null;
