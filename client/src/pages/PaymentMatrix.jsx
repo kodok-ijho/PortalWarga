@@ -86,13 +86,30 @@ export default function PaymentMatrix() {
     setIsLoading(true);
     setLoadError('');
     try {
-      const [data, paymentData] = await Promise.all([
+      const scopedMatrixPromise =
+        !IS_DEMO && !isStaff && myUnitId
+          ? fetchBillMatrix(session?.access_token, year, { scopeUnitId: myUnitId }).catch(() => [])
+          : Promise.resolve([]);
+
+      const [data, paymentData, scopedData] = await Promise.all([
         fetchBillMatrix(session?.access_token, year),
         !IS_DEMO
           ? fetchPayments(session?.access_token).catch(() => [])
           : Promise.resolve([]),
+        scopedMatrixPromise,
       ]);
-      setMatrix(data);
+
+      if (!IS_DEMO && !isStaff && myUnitId && Array.isArray(scopedData) && scopedData.length > 0) {
+        const scopedByUnit = new Map(scopedData.map((row) => [String(row?.unit?.id), row]));
+        setMatrix(
+          data.map((row) => {
+            const scopedRow = scopedByUnit.get(String(row?.unit?.id));
+            return scopedRow ? scopedRow : row;
+          })
+        );
+      } else {
+        setMatrix(data);
+      }
       setProductionPayments(paymentData);
     } catch (err) {
       const msg = err.message || 'Gagal memuat matriks pembayaran.';
@@ -101,7 +118,7 @@ export default function PaymentMatrix() {
     } finally {
       setIsLoading(false);
     }
-  }, [session?.access_token, year, role, toast]);
+  }, [session?.access_token, year, role, toast, isStaff, myUnitId]);
 
   const getPaymentForBillView = useCallback((billId) => {
     if (IS_DEMO) return getPaymentForBill(billId);
@@ -1248,11 +1265,43 @@ function getPaymentProofPreviewUrl(payment) {
   return sourceUrl;
 }
 
+function getResolvedPaymentDate(payment, bill) {
+  return (
+    payment?.paid_at ||
+    payment?.paidAt ||
+    payment?.completed_at ||
+    payment?.completedAt ||
+    payment?.verified_at ||
+    payment?.verifiedAt ||
+    payment?.metadata?.paid_at ||
+    payment?.metadata?.completed_at ||
+    payment?.metadata?.verified_at ||
+    bill?.paid_at ||
+    bill?.paidAt ||
+    bill?.completed_at ||
+    bill?.completedAt ||
+    bill?.verified_at ||
+    bill?.created_at ||
+    bill?.updated_at ||
+    ''
+  );
+}
+
 // Modal Detail Pembayaran Lunas
 // Modal Detail / Verifikasi / Revisi Pembayaran
 function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh, onRetry, onClose }) {
   const toast = useToast();
-  const isMyUnit = bill.unit_id === myUnitId;
+  const resolvedBill = payment?._bill
+    ? {
+        ...bill,
+        ...payment._bill,
+        unit_id: payment._bill.unit_id ?? bill.unit_id,
+        amount: payment._bill.amount ?? bill.amount,
+        period: payment._bill.period ?? bill.period,
+      }
+    : bill;
+  const resolvedUnitId = resolvedBill?.unit_id ?? payment?.unit_id ?? bill?.unit_id;
+  const isMyUnit = String(resolvedUnitId) === String(myUnitId);
   const canViewReceipt = isStaffRole(role) || isMyUnit;
   const canVerify = isBendaharaOrAbove(role);
   const paymentMethod = payment?.method || payment?.payment_method || payment?.paymentMethod;
@@ -1267,6 +1316,7 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
   const proofPreviewPayment = { ...payment, proof_file_url: proofFileUrl, proof_file_name: proofFileName };
   const proofPreviewUrl = getPaymentProofPreviewUrl(proofPreviewPayment);
   const canPreviewProofImage = Boolean(proofPreviewUrl && isImagePaymentProof(proofPreviewPayment));
+  const resolvedPaidAt = getResolvedPaymentDate(payment, resolvedBill);
   const missingProofText =
     paymentMethod === 'qris'
       ? 'Tidak ada file bukti karena pembayaran QRIS diproses otomatis.'
@@ -1429,27 +1479,27 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
           </form>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 rounded-lg bg-forest-50 p-3">
+              <div className="grid grid-cols-2 gap-4 rounded-lg bg-forest-50 p-3">
               <div>
                 <p className="text-xs text-forest-500 font-medium">Rumah / Unit</p>
                 <p className="font-semibold text-forest-800">
                   {(() => {
-                    const u = getUnitById(bill.unit_id);
+                    const u = getUnitById(resolvedUnitId);
                     return u ? `Blok ${u.block}/${u.unit_number}` : '-';
                   })()}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-forest-500 font-medium">Periode IPL</p>
-                <p className="font-semibold text-forest-800">{formatPeriod(bill.period)}</p>
+                <p className="font-semibold text-forest-800">{formatPeriod(resolvedBill.period)}</p>
               </div>
               <div>
                 <p className="text-xs text-forest-500 font-medium">Jumlah Tagihan</p>
-                <p className="font-bold text-forest-900">{formatRupiah(bill.amount)}</p>
+                <p className="font-bold text-forest-900">{formatRupiah(resolvedBill.amount)}</p>
               </div>
               <div>
                 <p className="text-xs text-forest-500 font-medium">Tanggal Bayar</p>
-                <p className="font-semibold text-forest-800">{payment ? formatDate(payment.paid_at) : '-'}</p>
+                <p className="font-semibold text-forest-800">{resolvedPaidAt ? formatDate(resolvedPaidAt) : '-'}</p>
               </div>
             </div>
 
@@ -1554,13 +1604,13 @@ function PaymentDetailModal({ bill, payment, role, myUnitId, session, onRefresh,
               Pilih Tagihan untuk Bayar Ulang
             </button>
           )}
-          {(bill.status === 'paid' || payment?.status === 'verified' || payment?.status === 'completed') && (
+          {(resolvedBill.status === 'paid' || payment?.status === 'verified' || payment?.status === 'completed') && (
             <div className="grid grid-cols-2 gap-2 pb-1 border-b border-forest-100">
               <button
                 type="button"
                 onClick={() => {
-                  const u = getUnitById(bill.unit_id);
-                  downloadDigitalReceipt({ bill, unit: u });
+                  const u = getUnitById(resolvedUnitId);
+                  downloadDigitalReceipt({ bill: resolvedBill, unit: u });
                 }}
                 className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-forest-300 bg-white px-3 py-2 text-xs font-semibold text-forest-800 shadow-sm hover:bg-forest-50 transition-colors"
               >

@@ -490,12 +490,17 @@ export async function generateBills(token, { period, dry_run }) {
   return data;
 }
 
-export async function fetchBillMatrix(token, year) {
+export async function fetchBillMatrix(token, year, opts = {}) {
   if (IS_DEMO) {
     const mock = await getMockData();
-    return normalizeBillMatrixRows(mock.getBillMatrix(year));
+    return normalizeBillMatrixRows(mock.getBillMatrix(year, opts));
   }
-  const data = await portalApiPost('/bills/matrix', { token, body: { year } });
+  const body = { year };
+  if (opts?.scopeUnitId !== undefined && opts.scopeUnitId !== null) {
+    body.scopeUnitId = opts.scopeUnitId;
+    body.unit_id = opts.scopeUnitId;
+  }
+  const data = await portalApiPost('/bills/matrix', { token, body });
   return normalizeBillMatrixRows(data?.matrix || []);
 }
 
@@ -562,6 +567,19 @@ function normalizePaymentRecord(payment) {
       '',
     method: payment.method || payment.payment_method || payment.paymentMethod || metadata.method,
     status: payment.status === 'completed' ? 'verified' : payment.status,
+    paid_at:
+      payment.paid_at ||
+      payment.paidAt ||
+      payment.completed_at ||
+      payment.completedAt ||
+      payment.verified_at ||
+      payment.verifiedAt ||
+      metadata.paid_at ||
+      metadata.completed_at ||
+      metadata.verified_at ||
+      payment.created_at ||
+      payment.updated_at ||
+      '',
     metadata,
     proof_file_id:
       payment.proof_file_id ||
