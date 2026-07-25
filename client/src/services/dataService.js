@@ -525,7 +525,7 @@ function normalizePaymentRecord(payment) {
   if (!payment) return payment;
 
   const metadata = parseMetadata(payment.metadata);
-  const proofFileUrl =
+  let proofFileUrl =
     payment.proof_file_url ||
     payment.proofFileUrl ||
     payment.proof_url ||
@@ -533,12 +533,20 @@ function normalizePaymentRecord(payment) {
     payment.receiptFileUrl ||
     payment.receipt_url ||
     payment.file_url ||
+    payment.proof_file_path ||
+    payment.proof_path ||
+    payment.receipt_file_path ||
+    payment.receipt_path ||
+    payment.file_path ||
     metadata.proof_file_url ||
     metadata.receipt_file_url ||
     metadata.file_url ||
     metadata.drive_url ||
+    metadata.proof_file_path ||
+    metadata.proof_url ||
     '';
-  const proofFileName =
+
+  let proofFileName =
     payment.proof_file_name ||
     payment.proofFileName ||
     payment.receipt_file_name ||
@@ -548,6 +556,16 @@ function normalizePaymentRecord(payment) {
     metadata.proof_file_name ||
     metadata.receipt_file_name ||
     '';
+
+  if (!proofFileName && proofFileUrl) {
+    const cleanUrl = String(proofFileUrl).split('?')[0];
+    const segment = cleanUrl.split('/').pop();
+    proofFileName = (segment && segment.includes('.')) ? segment : 'Bukti Transfer';
+  }
+
+  if (!proofFileUrl && proofFileName && (proofFileName.startsWith('http://') || proofFileName.startsWith('https://'))) {
+    proofFileUrl = proofFileName;
+  }
 
   return {
     ...payment,
@@ -741,12 +759,14 @@ export async function fetchPayments(token) {
     return mock.mockPayments;
   }
   const result = await portalApiPost('/payments/list', { token });
-  const rawPayments = result?.payments || [];
+  const rawPayments = Array.isArray(result)
+    ? result
+    : result?.payments || result?.data || [];
 
   return rawPayments.map(p => ({
     ...normalizePaymentRecord(p),
-    _bill: p.ipl_bills,
-    _profile: p.profiles,
+    _bill: p.ipl_bills || p.bill || p._bill,
+    _profile: p.profiles || p.profile || p._profile,
   }));
 }
 

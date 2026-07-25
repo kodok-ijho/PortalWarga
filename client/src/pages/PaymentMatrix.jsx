@@ -758,6 +758,7 @@ export default function PaymentMatrix() {
           unit={detailModal.unit}
           role={role}
           myUnitId={myUnitId}
+          profile={profile}
           session={session}
           onRefresh={() => setRefreshKey(k => k + 1)}
           onRetry={() => {
@@ -1293,22 +1294,54 @@ function getResolvedPaymentDate(payment, bill) {
 
 // Modal Detail Pembayaran Lunas
 // Modal Detail / Verifikasi / Revisi Pembayaran
-function PaymentDetailModal({ bill, payment, unit, role, myUnitId, session, onRefresh, onRetry, onClose }) {
+function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, session, onRefresh, onRetry, onClose }) {
   const toast = useToast();
   const resolvedBill = bill;
   const targetUnit = unit || (bill?.unit_id ? getUnitById(bill.unit_id) : null);
   const resolvedUnitId = targetUnit?.id ?? bill?.unit_id ?? payment?.unit_id;
-  const isMyUnit = String(resolvedUnitId) === String(myUnitId);
+
+  const isMyUnit =
+    (myUnitId && String(resolvedUnitId) === String(myUnitId)) ||
+    (profile?.email && targetUnit?._occupant?.email && String(profile.email).toLowerCase() === String(targetUnit._occupant.email).toLowerCase()) ||
+    (profile?.id && bill?.resident_id && String(bill.resident_id) === String(profile.id)) ||
+    (profile?.id && payment?.resident_id && String(payment.resident_id) === String(profile.id));
+
   const canViewReceipt = isStaffRole(role) || isMyUnit;
   const canVerify = isBendaharaOrAbove(role);
   const paymentMethod = payment?.method || payment?.payment_method || payment?.paymentMethod;
-  const proofFileUrl = payment?.proof_file_url || payment?.receipt_file_url || payment?.proof_url || '';
-  const proofFileName =
+
+  let proofFileUrl =
+    payment?.proof_file_url ||
+    payment?.receipt_file_url ||
+    payment?.proof_url ||
+    payment?.proof_file_path ||
+    payment?.file_url ||
+    payment?.metadata?.proof_file_url ||
+    payment?.metadata?.receipt_file_url ||
+    payment?.metadata?.file_url ||
+    payment?.metadata?.drive_url ||
+    payment?.metadata?.proof_file_path ||
+    '';
+
+  let proofFileName =
     payment?.proof_file_name ||
     payment?.receipt_file_name ||
     payment?.receipt_file ||
     payment?.receiptFile ||
+    payment?.metadata?.proof_file_name ||
+    payment?.metadata?.receipt_file_name ||
     '';
+
+  if (!proofFileName && proofFileUrl) {
+    const cleanUrl = String(proofFileUrl).split('?')[0];
+    const segment = cleanUrl.split('/').pop();
+    proofFileName = (segment && segment.includes('.')) ? segment : 'Bukti Transfer';
+  }
+
+  if (!proofFileUrl && proofFileName && (proofFileName.startsWith('http://') || proofFileName.startsWith('https://'))) {
+    proofFileUrl = proofFileName;
+  }
+
   const hasProofFile = Boolean(proofFileUrl || proofFileName);
   const proofPreviewPayment = { ...payment, proof_file_url: proofFileUrl, proof_file_name: proofFileName };
   const proofPreviewUrl = getPaymentProofPreviewUrl(proofPreviewPayment);
