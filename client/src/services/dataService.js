@@ -27,6 +27,7 @@ async function getMockData() {
 
 // ── API imports ──────────────────────────────────────────────────
 import { portalApiPost, portalApiUpload } from './apiClient';
+import { supabase } from './supabaseClient';
 
 // =====================================================================
 // USER APPROVAL
@@ -753,21 +754,87 @@ export async function rejectManualPayment(token, { payment_id, note }) {
   });
 }
 
-export async function fetchPayments(token) {
+export async function fetchPayments(token, opts = {}) {
   if (IS_DEMO) {
     const mock = await getMockData();
     return mock.mockPayments;
   }
-  const result = await portalApiPost('/payments/list', { token });
-  const rawPayments = Array.isArray(result)
-    ? result
-    : result?.payments || result?.data || [];
 
-  return rawPayments.map(p => ({
+  let rawPayments = [];
+  try {
+    const body = {};
+    if (opts?.scopeUnitId !== undefined && opts.scopeUnitId !== null) {
+      body.scopeUnitId = opts.scopeUnitId;
+      body.unit_id = opts.scopeUnitId;
+    }
+    const result = await portalApiPost('/payments/list', { token, body });
+    rawPayments = Array.isArray(result)
+      ? result
+      : result?.payments || result?.data || [];
+  } catch (err) {
+    rawPayments = [];
+  }
+
+  // Fallback direct Supabase query if API returned empty
+  if (!Array.isArray(rawPayments) || rawPayments.length === 0) {
+    try {
+      let query = supabase.from('payments').select('*, ipl_bills(*), profiles(*)');
+      if (opts?.scopeUnitId) {
+        query = query.eq('ipl_bills.unit_id', opts.scopeUnitId);
+      }
+      const { data: supaPayments } = await query;
+      if (Array.isArray(supaPayments) && supaPayments.length > 0) {
+        rawPayments = supaPayments;
+      }
+    } catch {
+      // ignore fallback error
+    }
+  }
+
+  return (rawPayments || []).map(p => ({
     ...normalizePaymentRecord(p),
     _bill: p.ipl_bills || p.bill || p._bill,
     _profile: p.profiles || p.profile || p._profile,
   }));
+}
+
+export async function fetchPaymentByBillId(token, billId) {
+  if (!billId) return null;
+  if (IS_DEMO) {
+    const mock = await getMockData();
+    const p = mock.mockPayments.find(item => String(item.ipl_bill_id) === String(billId));
+    return p ? normalizePaymentRecord(p) : null;
+  }
+
+  // 1. Try from all payments list first
+  try {
+    const all = await fetchPayments(token);
+    const found = all.find(p => String(p.ipl_bill_id) === String(billId) || String(p.bill_id) === String(billId) || String(p._bill?.id) === String(billId));
+    if (found) return found;
+  } catch {
+    // fallback
+  }
+
+  // 2. Direct Supabase query fallback for single bill payment
+  try {
+    const { data: supaPayment } = await supabase
+      .from('payments')
+      .select('*, ipl_bills(*), profiles(*)')
+      .eq('ipl_bill_id', billId)
+      .maybeSingle();
+
+    if (supaPayment) {
+      return {
+        ...normalizePaymentRecord(supaPayment),
+        _bill: supaPayment.ipl_bills,
+        _profile: supaPayment.profiles,
+      };
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
 }
 
 export async function createQrisPayment(token, { bill_ids }) {

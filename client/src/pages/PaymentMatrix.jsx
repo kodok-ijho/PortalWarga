@@ -24,6 +24,7 @@ import {
   approveManualPayment,
   rejectManualPayment,
   fetchPayments,
+  fetchPaymentByBillId,
   IS_DEMO,
 } from '../services/dataService';
 import {
@@ -94,7 +95,7 @@ export default function PaymentMatrix() {
       const [data, paymentData, scopedData] = await Promise.all([
         fetchBillMatrix(session?.access_token, year),
         !IS_DEMO
-          ? fetchPayments(session?.access_token).catch(() => [])
+          ? fetchPayments(session?.access_token, myUnitId ? { scopeUnitId: myUnitId } : {}).catch(() => [])
           : Promise.resolve([]),
         scopedMatrixPromise,
       ]);
@@ -1296,40 +1297,59 @@ function getResolvedPaymentDate(payment, bill) {
 // Modal Detail / Verifikasi / Revisi Pembayaran
 function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, session, onRefresh, onRetry, onClose }) {
   const toast = useToast();
+  const [asyncPayment, setAsyncPayment] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!payment && bill?.id && !IS_DEMO) {
+      fetchPaymentByBillId(session?.access_token, bill.id)
+        .then((fetched) => {
+          if (isMounted && fetched) {
+            setAsyncPayment(fetched);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setAsyncPayment(null);
+    }
+    return () => { isMounted = false; };
+  }, [bill?.id, payment, session?.access_token]);
+
+  const activePayment = payment || asyncPayment;
   const resolvedBill = bill;
   const targetUnit = unit || (bill?.unit_id ? getUnitById(bill.unit_id) : null);
-  const resolvedUnitId = targetUnit?.id ?? bill?.unit_id ?? payment?.unit_id;
+  const resolvedUnitId = targetUnit?.id ?? bill?.unit_id ?? activePayment?.unit_id;
 
   const isMyUnit =
     (myUnitId && String(resolvedUnitId) === String(myUnitId)) ||
     (profile?.email && targetUnit?._occupant?.email && String(profile.email).toLowerCase() === String(targetUnit._occupant.email).toLowerCase()) ||
     (profile?.id && bill?.resident_id && String(bill.resident_id) === String(profile.id)) ||
-    (profile?.id && payment?.resident_id && String(payment.resident_id) === String(profile.id));
+    (profile?.id && activePayment?.resident_id && String(activePayment.resident_id) === String(profile.id));
 
   const canViewReceipt = isStaffRole(role) || isMyUnit;
   const canVerify = isBendaharaOrAbove(role);
-  const paymentMethod = payment?.method || payment?.payment_method || payment?.paymentMethod;
+  const paymentMethod = activePayment?.method || activePayment?.payment_method || activePayment?.paymentMethod;
 
   let proofFileUrl =
-    payment?.proof_file_url ||
-    payment?.receipt_file_url ||
-    payment?.proof_url ||
-    payment?.proof_file_path ||
-    payment?.file_url ||
-    payment?.metadata?.proof_file_url ||
-    payment?.metadata?.receipt_file_url ||
-    payment?.metadata?.file_url ||
-    payment?.metadata?.drive_url ||
-    payment?.metadata?.proof_file_path ||
+    activePayment?.proof_file_url ||
+    activePayment?.receipt_file_url ||
+    activePayment?.proof_url ||
+    activePayment?.proof_file_path ||
+    activePayment?.file_url ||
+    activePayment?.metadata?.proof_file_url ||
+    activePayment?.metadata?.receipt_file_url ||
+    activePayment?.metadata?.file_url ||
+    activePayment?.metadata?.drive_url ||
+    activePayment?.metadata?.proof_file_path ||
     '';
 
   let proofFileName =
-    payment?.proof_file_name ||
-    payment?.receipt_file_name ||
-    payment?.receipt_file ||
-    payment?.receiptFile ||
-    payment?.metadata?.proof_file_name ||
-    payment?.metadata?.receipt_file_name ||
+    activePayment?.proof_file_name ||
+    activePayment?.receipt_file_name ||
+    activePayment?.receipt_file ||
+    activePayment?.receiptFile ||
+    activePayment?.metadata?.proof_file_name ||
+    activePayment?.metadata?.receipt_file_name ||
     '';
 
   if (!proofFileName && proofFileUrl) {
@@ -1343,10 +1363,10 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
   }
 
   const hasProofFile = Boolean(proofFileUrl || proofFileName);
-  const proofPreviewPayment = { ...payment, proof_file_url: proofFileUrl, proof_file_name: proofFileName };
+  const proofPreviewPayment = { ...activePayment, proof_file_url: proofFileUrl, proof_file_name: proofFileName };
   const proofPreviewUrl = getPaymentProofPreviewUrl(proofPreviewPayment);
   const canPreviewProofImage = Boolean(proofPreviewUrl && isImagePaymentProof(proofPreviewPayment));
-  const resolvedPaidAt = getResolvedPaymentDate(payment, resolvedBill);
+  const resolvedPaidAt = getResolvedPaymentDate(activePayment, resolvedBill);
   const missingProofText =
     paymentMethod === 'qris'
       ? 'Tidak ada file bukti karena pembayaran QRIS diproses otomatis.'
@@ -1542,17 +1562,17 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
               </span>
             </div>
 
-            {payment?.metadata?.recorded_by && (
+            {activePayment?.metadata?.recorded_by && (
               <div>
                 <p className="text-xs text-forest-500 font-medium mb-0.5">Dicatat Oleh</p>
-                <p className="text-forest-700">{payment.metadata.recorded_by}</p>
+                <p className="text-forest-700 text-xs">{activePayment.metadata.recorded_by}</p>
               </div>
             )}
 
-            {payment?.metadata?.note && (
+            {activePayment?.metadata?.note && (
               <div>
                 <p className="text-xs text-forest-500 font-medium mb-0.5">Catatan</p>
-                <p className="text-forest-700 italic">"{payment.metadata.note}"</p>
+                <p className="text-forest-700 text-xs italic">"{activePayment.metadata.note}"</p>
               </div>
             )}
 
