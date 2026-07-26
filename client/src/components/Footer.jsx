@@ -10,7 +10,7 @@ export default function Footer() {
             Palm Village
           </span>
           <span className="inline-flex items-center rounded bg-gold-500/20 text-gold-300 px-2 py-0.5 text-xs font-mono font-bold border border-gold-400/30">
-            v1.3.3
+            v1.3.4
           </span>
           {IS_DEMO_MODE && (
             <span className="inline-flex items-center rounded bg-amber-400/20 text-amber-300 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ring-amber-400/30">
@@ -20,7 +20,7 @@ export default function Footer() {
         </div>
         <div className="flex items-center gap-3 text-xs text-forest-400">
           <span>&copy; {new Date().getFullYear()} Palm Village. All rights reserved.</span>
-          <span className="font-mono text-gold-400/80">v1.3.3</span>
+          <span className="font-mono text-gold-400/80">v1.3.4</span>
         </div>
       </div>
     </footer>

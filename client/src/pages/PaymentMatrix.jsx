@@ -1331,62 +1331,18 @@ function getResolvedPaymentDate(payment, bill) {
 function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, session, onRefresh, onRetry, onClose }) {
   const toast = useToast();
   const [asyncPayment, setAsyncPayment] = useState(null);
-  const [fetchAttempted, setFetchAttempted] = useState(false);
-  const [fetchLog, setFetchLog] = useState('...');
 
-  // ALWAYS attempt to fetch full payment data from backend
+  // Selalu fetch data payment lengkap dari backend
   useEffect(() => {
     let isMounted = true;
-    setFetchAttempted(false);
-    setFetchLog('fetching...');
 
     if ((bill?.id || bill?.period) && !IS_DEMO) {
       const context = { unit_id: unit?.id || bill?.unit_id, period: bill?.period };
-
-      // Per-strategy diagnostic
-      const runDiag = async () => {
-        const log = [];
-        // Strategy 1: bill_id
-        if (bill?.id) {
-          try {
-            const r = await portalApiPost('/payments/list', { token: session?.access_token, body: { bill_id: bill.id, ipl_bill_id: bill.id } });
-            const list = Array.isArray(r) ? r : r?.payments || r?.data || [];
-            log.push(`S1(bill_id): ${list.length} rows`);
-          } catch(e) { log.push(`S1 ERR: ${e?.message?.substring(0,40)}`); }
-        }
-        // Strategy 2: scopeUnitId
-        if (context.unit_id) {
-          try {
-            const r = await portalApiPost('/payments/list', { token: session?.access_token, body: { scopeUnitId: context.unit_id, unit_id: context.unit_id } });
-            const list = Array.isArray(r) ? r : r?.payments || r?.data || [];
-            log.push(`S2(unitId=${context.unit_id}): ${list.length} rows, keys=${list[0]?Object.keys(list[0]).join(','):'-'}`);
-          } catch(e) { log.push(`S2 ERR: ${e?.message?.substring(0,40)}`); }
-        }
-        // Strategy 3: period+unit_id
-        if (context.period && context.unit_id) {
-          try {
-            const r = await portalApiPost('/payments/list', { token: session?.access_token, body: { period: context.period, unit_id: context.unit_id } });
-            const list = Array.isArray(r) ? r : r?.payments || r?.data || [];
-            log.push(`S3(period=${context.period}): ${list.length} rows`);
-          } catch(e) { log.push(`S3 ERR: ${e?.message?.substring(0,40)}`); }
-        }
-        if (isMounted) setFetchLog(log.join(' | '));
-      };
-      runDiag();
-
       fetchPaymentByBillId(session?.access_token, bill?.id, context)
         .then((fetched) => {
-          if (isMounted) {
-            setAsyncPayment(fetched || null);
-            setFetchAttempted(true);
-          }
+          if (isMounted) setAsyncPayment(fetched || null);
         })
-        .catch((err) => {
-          if (isMounted) setFetchAttempted(true);
-        });
-    } else {
-      setFetchAttempted(true);
-      setFetchLog('skipped (no bill)');
+        .catch(() => {});
     }
     return () => { isMounted = false; };
   }, [bill?.id, bill?.period, bill?.unit_id, unit?.id, session?.access_token]);
@@ -1421,38 +1377,6 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
     return merged;
   }, [payment, asyncPayment]);
 
-  // Deep diagnostic logging
-  useEffect(() => {
-    console.log('[PaymentDetailModal] 🏷️ Props received:', {
-      'bill.id': bill?.id,
-      'bill.period': bill?.period,
-      'bill.status': bill?.status,
-      'bill.due_date': bill?.due_date,
-      'bill.paid_at': bill?.paid_at,
-      'payment (prop)': payment ? {
-        id: payment.id,
-        status: payment.status,
-        paid_at: payment.paid_at,
-        created_at: payment.created_at,
-        proof_file_url: payment.proof_file_url,
-        proof_file_name: payment.proof_file_name,
-        proof_file_path: payment.proof_file_path,
-        receipt_file: payment.receipt_file,
-        metadata: payment.metadata,
-        _allKeys: Object.keys(payment),
-      } : null,
-      'asyncPayment': asyncPayment ? {
-        id: asyncPayment.id,
-        paid_at: asyncPayment.paid_at,
-        created_at: asyncPayment.created_at,
-        proof_file_url: asyncPayment.proof_file_url,
-        proof_file_name: asyncPayment.proof_file_name,
-        metadata: asyncPayment.metadata,
-      } : null,
-      fetchAttempted,
-      role,
-    });
-  }, [bill, payment, asyncPayment, fetchAttempted, role]);
 
   const resolvedBill = bill;
   const targetUnit = unit || (bill?.unit_id ? getUnitById(bill.unit_id) : null);
@@ -1506,17 +1430,6 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
   const canPreviewProofImage = Boolean(proofPreviewUrl && isImagePaymentProof(proofPreviewPayment));
   const resolvedPaidAt = getResolvedPaymentDate(activePayment, resolvedBill);
 
-  // Log resolved display values
-  console.log('[PaymentDetailModal] 🎯 Resolved display:', {
-    proofFileUrl: proofFileUrl || '(empty)',
-    proofFileName: proofFileName || '(empty)',
-    proofPreviewUrl: proofPreviewUrl || '(empty)',
-    hasProofFile,
-    canPreviewProofImage,
-    canViewReceipt,
-    isMyUnit,
-    resolvedPaidAt: resolvedPaidAt || '(empty)',
-  });
   const missingProofText =
     paymentMethod === 'qris'
       ? 'Tidak ada file bukti karena pembayaran QRIS diproses otomatis.'
@@ -1630,55 +1543,6 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
     <>
     <Modal open onClose={onClose} title="Detail Bukti Pembayaran IPL" size="md">
       <div className="space-y-4 text-sm text-forest-900">
-        {/* 🔬 DEBUG PANEL - TEMPORARY - akan dihapus setelah fix */}
-        <details open className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-[10px] font-mono text-red-900">
-          <summary className="font-bold text-xs cursor-pointer text-red-700">🔬 DEBUG v1.3.3-diag (screenshot ini lalu kirim)</summary>
-          <div className="mt-2 space-y-1 break-all">
-            <p><b>role:</b> {role}</p>
-            <p><b>isMyUnit:</b> {String(isMyUnit)}</p>
-            <p><b>canViewReceipt:</b> {String(canViewReceipt)}</p>
-            <p><b>fetchAttempted:</b> {String(fetchAttempted)}</p>
-            <p><b>bill.id:</b> {bill?.id || '(null)'}</p>
-            <p><b>bill.period:</b> {bill?.period || '(null)'}</p>
-            <p><b>bill.status:</b> {bill?.status || '(null)'}</p>
-            <p><b>bill.due_date:</b> {bill?.due_date || '(null)'}</p>
-            <p><b>bill.paid_at:</b> {bill?.paid_at || '(null)'}</p>
-            <hr className="border-red-300"/>
-            <p><b>payment prop:</b> {payment ? 'EXISTS' : 'NULL'}</p>
-            {payment && <p><b>payment keys:</b> {Object.keys(payment).join(', ')}</p>}
-            {payment && <p><b>payment.id:</b> {payment.id || '(null)'}</p>}
-            {payment && <p><b>payment.paid_at:</b> {payment.paid_at || '(null)'}</p>}
-            {payment && <p><b>payment.created_at:</b> {payment.created_at || '(null)'}</p>}
-            {payment && <p><b>payment.proof_file_url:</b> {payment.proof_file_url || '(null)'}</p>}
-            {payment && <p><b>payment.proof_file_name:</b> {payment.proof_file_name || '(null)'}</p>}
-            {payment && <p><b>payment.proof_file_path:</b> {payment.proof_file_path || '(null)'}</p>}
-            {payment && <p><b>payment.receipt_file:</b> {payment.receipt_file || '(null)'}</p>}
-            {payment && <p><b>payment.metadata:</b> {JSON.stringify(payment.metadata || null)}</p>}
-            <hr className="border-red-300"/>
-            <p><b>asyncPayment:</b> {asyncPayment ? 'EXISTS' : 'NULL'}</p>
-            {asyncPayment && <p><b>async.id:</b> {asyncPayment.id || '(null)'}</p>}
-            {asyncPayment && <p><b>async.paid_at:</b> {asyncPayment.paid_at || '(null)'}</p>}
-            {asyncPayment && <p><b>async.proof_file_url:</b> {asyncPayment.proof_file_url || '(null)'}</p>}
-            {asyncPayment && <p><b>async.metadata:</b> {JSON.stringify(asyncPayment.metadata || null)}</p>}
-            <hr className="border-red-300"/>
-            <p><b>activePayment:</b> {activePayment ? 'EXISTS' : 'NULL'}</p>
-            {activePayment && <p><b>active.paid_at:</b> {activePayment.paid_at || '(null)'}</p>}
-            {activePayment && <p><b>active.created_at:</b> {activePayment.created_at || '(null)'}</p>}
-            {activePayment && <p><b>active.proof_file_url:</b> {activePayment.proof_file_url || '(null)'}</p>}
-            {activePayment && <p><b>active.proof_file_name:</b> {activePayment.proof_file_name || '(null)'}</p>}
-            {activePayment && <p><b>active.metadata:</b> {JSON.stringify(activePayment.metadata || null)}</p>}
-            <hr className="border-red-300"/>
-            <p><b>resolvedPaidAt:</b> {resolvedPaidAt || '(empty)'}</p>
-            <p><b>proofFileUrl:</b> {proofFileUrl || '(empty)'}</p>
-            <p><b>proofFileName:</b> {proofFileName || '(empty)'}</p>
-            <p><b>proofPreviewUrl:</b> {proofPreviewUrl || '(empty)'}</p>
-            <p><b>hasProofFile:</b> {String(hasProofFile)}</p>
-            <p><b>canPreviewProofImage:</b> {String(canPreviewProofImage)}</p>
-            <hr className="border-red-300"/>
-            <p><b>🔧 API Strategy Log:</b></p>
-            <p className="text-[9px] break-all">{fetchLog}</p>
-          </div>
-        </details>
         {/* Banner Status */}
         {payment?.status === 'pending_verification' && (
           <div className="rounded-lg bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800 flex items-center gap-2">
