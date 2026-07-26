@@ -809,21 +809,53 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
     return p ? normalizePaymentRecord(p) : null;
   }
 
-  // 1. Try from all payments list first
-  try {
-    const all = await fetchPayments(token, billContext.unit_id ? { scopeUnitId: billContext.unit_id } : {});
-    const found = all.find(p =>
-      (billId && String(p.ipl_bill_id) === String(billId)) ||
-      (billId && String(p.bill_id) === String(billId)) ||
-      (billId && String(p._bill?.id) === String(billId)) ||
-      (billContext.period && p._bill?.period === billContext.period && String(p._bill?.unit_id) === String(billContext.unit_id))
-    );
-    if (found) return normalizePaymentRecord(found);
-  } catch {
-    // fallback
+  // Strategy 1: /payments/list with bill_id directly
+  if (billId) {
+    try {
+      const result = await portalApiPost('/payments/list', {
+        token,
+        body: { bill_id: billId, ipl_bill_id: billId },
+      });
+      const list = Array.isArray(result) ? result : result?.payments || result?.data || [];
+      const found = list.find(p =>
+        String(p.ipl_bill_id) === String(billId) ||
+        String(p.bill_id) === String(billId)
+      );
+      if (found) return normalizePaymentRecord(found);
+    } catch { /* try next */ }
   }
 
-  // 2. Direct Supabase query with Bearer token header
+  // Strategy 2: /payments/list with scopeUnitId
+  if (billContext.unit_id) {
+    try {
+      const result = await portalApiPost('/payments/list', {
+        token,
+        body: { scopeUnitId: billContext.unit_id, unit_id: billContext.unit_id },
+      });
+      const list = Array.isArray(result) ? result : result?.payments || result?.data || [];
+      const found = list.find(p =>
+        (billId && (String(p.ipl_bill_id) === String(billId) || String(p.bill_id) === String(billId))) ||
+        (billContext.period && p._bill?.period === billContext.period)
+      );
+      if (found) return normalizePaymentRecord(found);
+    } catch { /* try next */ }
+  }
+
+  // Strategy 3: /payments/list with period
+  if (billContext.period && billContext.unit_id) {
+    try {
+      const result = await portalApiPost('/payments/list', {
+        token,
+        body: { period: billContext.period, unit_id: billContext.unit_id },
+      });
+      const list = Array.isArray(result) ? result : result?.payments || result?.data || [];
+      if (Array.isArray(list) && list.length > 0) {
+        return normalizePaymentRecord(list[0]);
+      }
+    } catch { /* try next */ }
+  }
+
+  // Strategy 4: Direct Supabase with Bearer token (app_jwt as Authorization header)
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mzjgliclzihrdjaqzmqg.supabase.co';
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -867,23 +899,9 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
     } catch {}
   }
 
-  if (billContext.unit_id) {
-    try {
-      const { data: supaPayments } = await authedClient
-        .from('payments')
-        .select('*')
-        .eq('unit_id', billContext.unit_id);
-
-      if (Array.isArray(supaPayments) && supaPayments.length > 0) {
-        const match = supaPayments.find(p => p.ipl_bill_id === billId || p.metadata?.period === billContext.period);
-        if (match) return normalizePaymentRecord(match);
-        return normalizePaymentRecord(supaPayments[0]);
-      }
-    } catch {}
-  }
-
   return null;
 }
+
 
 export async function createQrisPayment(token, { bill_ids }) {
   if (IS_DEMO) {

@@ -27,6 +27,7 @@ import {
   fetchPaymentByBillId,
   IS_DEMO,
 } from '../services/dataService';
+import { portalApiPost } from '../services/apiClient';
 import {
   getPaymentForBill,
   getUnitById,
@@ -1331,29 +1332,61 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
   const toast = useToast();
   const [asyncPayment, setAsyncPayment] = useState(null);
   const [fetchAttempted, setFetchAttempted] = useState(false);
+  const [fetchLog, setFetchLog] = useState('...');
 
   // ALWAYS attempt to fetch full payment data from backend
   useEffect(() => {
     let isMounted = true;
     setFetchAttempted(false);
+    setFetchLog('fetching...');
 
     if ((bill?.id || bill?.period) && !IS_DEMO) {
       const context = { unit_id: unit?.id || bill?.unit_id, period: bill?.period };
-      console.log('[PaymentDetailModal] 🔍 Fetching payment data...', { billId: bill?.id, context, hasPaymentProp: !!payment });
+
+      // Per-strategy diagnostic
+      const runDiag = async () => {
+        const log = [];
+        // Strategy 1: bill_id
+        if (bill?.id) {
+          try {
+            const r = await portalApiPost('/payments/list', { token: session?.access_token, body: { bill_id: bill.id, ipl_bill_id: bill.id } });
+            const list = Array.isArray(r) ? r : r?.payments || r?.data || [];
+            log.push(`S1(bill_id): ${list.length} rows`);
+          } catch(e) { log.push(`S1 ERR: ${e?.message?.substring(0,40)}`); }
+        }
+        // Strategy 2: scopeUnitId
+        if (context.unit_id) {
+          try {
+            const r = await portalApiPost('/payments/list', { token: session?.access_token, body: { scopeUnitId: context.unit_id, unit_id: context.unit_id } });
+            const list = Array.isArray(r) ? r : r?.payments || r?.data || [];
+            log.push(`S2(unitId=${context.unit_id}): ${list.length} rows, keys=${list[0]?Object.keys(list[0]).join(','):'-'}`);
+          } catch(e) { log.push(`S2 ERR: ${e?.message?.substring(0,40)}`); }
+        }
+        // Strategy 3: period+unit_id
+        if (context.period && context.unit_id) {
+          try {
+            const r = await portalApiPost('/payments/list', { token: session?.access_token, body: { period: context.period, unit_id: context.unit_id } });
+            const list = Array.isArray(r) ? r : r?.payments || r?.data || [];
+            log.push(`S3(period=${context.period}): ${list.length} rows`);
+          } catch(e) { log.push(`S3 ERR: ${e?.message?.substring(0,40)}`); }
+        }
+        if (isMounted) setFetchLog(log.join(' | '));
+      };
+      runDiag();
+
       fetchPaymentByBillId(session?.access_token, bill?.id, context)
         .then((fetched) => {
           if (isMounted) {
-            console.log('[PaymentDetailModal] 📦 fetchPaymentByBillId result:', JSON.stringify(fetched, null, 2)?.substring(0, 1000));
             setAsyncPayment(fetched || null);
             setFetchAttempted(true);
           }
         })
         .catch((err) => {
-          console.warn('[PaymentDetailModal] ❌ fetchPaymentByBillId error:', err);
           if (isMounted) setFetchAttempted(true);
         });
     } else {
       setFetchAttempted(true);
+      setFetchLog('skipped (no bill)');
     }
     return () => { isMounted = false; };
   }, [bill?.id, bill?.period, bill?.unit_id, unit?.id, session?.access_token]);
@@ -1641,6 +1674,9 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
             <p><b>proofPreviewUrl:</b> {proofPreviewUrl || '(empty)'}</p>
             <p><b>hasProofFile:</b> {String(hasProofFile)}</p>
             <p><b>canPreviewProofImage:</b> {String(canPreviewProofImage)}</p>
+            <hr className="border-red-300"/>
+            <p><b>🔧 API Strategy Log:</b></p>
+            <p className="text-[9px] break-all">{fetchLog}</p>
           </div>
         </details>
         {/* Banner Status */}
