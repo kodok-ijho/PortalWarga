@@ -497,6 +497,37 @@ export default function PaymentMatrix() {
     }
   };
 
+  const handleCleanupAllData = async () => {
+    const confirmMsg =
+      '⚠️ APAPUN YANG DIHAPUS TIDAK DAPAT DIKEMBALIKAN!\n\n' +
+      'Apakah Anda yakin ingin menghapus:\n' +
+      '1. Semua data transaksi pembayaran IPL masuk\n' +
+      '2. Semua data pengeluaran (expenses)\n' +
+      '3. Semua file bukti transfer/kwitansi di Google Drive\n' +
+      '4. Reset status seluruh tagihan IPL menjadi unpaid?\n\n' +
+      'Ketik OK untuk melanjutkan.';
+
+    const userResponse = window.prompt(confirmMsg);
+    if (userResponse !== 'OK') {
+      toast.info('Pembersihan data dibatalkan.');
+      return;
+    }
+
+    try {
+      toast.info('Pembersihan total sedang berjalan...');
+      const result = await portalApiPost('/payments/list', {
+        token: session?.access_token,
+        body: { action: 'CLEANUP_ALL' }
+      });
+      console.log('Cleanup result:', result);
+      toast.success('Pembersihan total berhasil! Seluruh transaksi dan file GDrive telah dihapus.');
+      loadMatrix();
+    } catch (err) {
+      console.error('Cleanup error:', err);
+      toast.error('Pembersihan gagal: ' + (err.message || 'Error tidak diketahui'));
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center p-20 space-y-4">
@@ -532,17 +563,29 @@ export default function PaymentMatrix() {
               : 'Lihat status semua unit. Bayar IPL untuk rumah Anda (baris disorot) secara berurutan — jika ada tunggakan tahun lalu, selesaikan dulu di tahun terkait.'}
           </p>
         </div>
-        <select
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-          className="pv-input w-auto"
-        >
-          {years.map((y) => (
-            <option key={y} value={y}>
-              Tahun Buku {y}/{y+1}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          {isBendaharaOrAbove(role) && (
+            <button
+              onClick={handleCleanupAllData}
+              className="pv-btn bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm"
+              title="Hapus semua transaksi & file bukti di Google Drive"
+            >
+              <span>🗑️</span>
+              <span>Reset & Hapus Semua Transaksi</span>
+            </button>
+          )}
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="pv-input w-auto"
+          >
+            {years.map((y) => (
+              <option key={y} value={y}>
+                Tahun Buku {y}/{y+1}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Legenda */}
