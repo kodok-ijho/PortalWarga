@@ -69,11 +69,13 @@ export async function portalApiPost(path, { token, body } = {}) {
     triggerUnauthorized();
   }
 
+  const rawText = await response.clone().text().catch(() => '');
   const payload = await response.json().catch(() => null);
   if (!payload) {
-    throw new PortalApiError('Respons API tidak valid.', {
+    throw new PortalApiError(`Respons API tidak valid. (HTTP ${response.status}: ${rawText.substring(0, 100)})`, {
       code: 'INVALID_API_RESPONSE',
       status: response.status,
+      details: rawText,
     });
   }
 
