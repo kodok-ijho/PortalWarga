@@ -998,7 +998,7 @@ export const MONTHS_LONG = [
  */
 export function computeRunningBalance(targetYear, targetMonth) {
   const result = [];
-  let cumulativeBalance = 15000000; // Saldo awal Januari 2025 = Rp 15.000.000 (Kas peralihan periode pengurus sebelumnya)
+  let cumulativeBalance = 0; // Saldo awal Kas = Rp 0 (Aplikasi baru)
 
   const startYear = 2025;
   const startMonth = 1;
