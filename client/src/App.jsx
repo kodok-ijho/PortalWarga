@@ -75,7 +75,7 @@ export default function App() {
                   path="/houses"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin']}>
+                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin', 'admin_viewer']}>
                         <Houses />
                       </RoleGuard>
                     </Suspense>
@@ -93,7 +93,7 @@ export default function App() {
                   path="/reports"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin']}>
+                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin', 'admin_viewer']}>
                         <Reports />
                       </RoleGuard>
                     </Suspense>
@@ -103,7 +103,7 @@ export default function App() {
                   path="/settings"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin']}>
+                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin', 'admin_viewer']}>
                         <Settings />
                       </RoleGuard>
                     </Suspense>
@@ -113,7 +113,7 @@ export default function App() {
                   path="/expenses"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['bendahara', 'admin']}>
+                      <RoleGuard allowed={['bendahara', 'admin', 'admin_viewer']}>
                         <Expenses />
                       </RoleGuard>
                     </Suspense>
@@ -123,7 +123,7 @@ export default function App() {
                   path="/users"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin']}>
+                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin', 'admin_viewer']}>
                         <Users />
                       </RoleGuard>
                     </Suspense>
@@ -133,7 +133,7 @@ export default function App() {
                   path="/logs"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['admin']}>
+                      <RoleGuard allowed={['admin', 'admin_viewer']}>
                         <Logs />
                       </RoleGuard>
                     </Suspense>
@@ -143,7 +143,7 @@ export default function App() {
                   path="/user-approval"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin']}>
+                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin', 'admin_viewer']}>
                         <UserApproval />
                       </RoleGuard>
                     </Suspense>
@@ -153,7 +153,7 @@ export default function App() {
                   path="/payment-verification"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['bendahara', 'admin']}>
+                      <RoleGuard allowed={['bendahara', 'admin', 'admin_viewer']}>
                         <PaymentVerification />
                       </RoleGuard>
                     </Suspense>

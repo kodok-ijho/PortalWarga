@@ -24,6 +24,7 @@ import {
   formatRupiah,
   computeSchemaAmount,
   getSchemaById,
+  canModifyData,
 } from '../services/dataHelpers';
 
 const EMPTY_FORM = {
@@ -38,10 +39,11 @@ const EMPTY_FORM = {
 };
 
 export default function Houses() {
-  const { role, session } = useAuth();
+  const { role, session, isReadOnly } = useAuth();
   const token = session?.access_token;
   const toast = useToast();
   const isStaff = isStaffRole(role);
+  const canWrite = canModifyData(role) && !isReadOnly;
 
   // Data states
   const [units, setUnits] = useState([]);
@@ -265,7 +267,7 @@ export default function Houses() {
             Rawat master data unit rumah Palm Village dan tempelkan profil skema biaya IPL.
           </p>
         </div>
-        <button type="button" onClick={openAdd} className="pv-btn-primary text-xs">
+        <button type="button" onClick={openAdd} disabled={!canWrite} className="pv-btn-primary text-xs disabled:opacity-50">
           <AiOutlinePlus /> Tambah Rumah
         </button>
       </div>
@@ -446,7 +448,8 @@ export default function Houses() {
                           <button
                             type="button"
                             onClick={() => openEdit(unit)}
-                            className="rounded-lg p-2 text-forest-500 hover:bg-gold-50 hover:text-gold-700"
+                            disabled={!canWrite}
+                            className="rounded-lg p-2 text-forest-500 hover:bg-gold-50 hover:text-gold-700 disabled:opacity-50"
                             aria-label="Edit rumah"
                           >
                             <AiOutlineEdit />
@@ -454,7 +457,8 @@ export default function Houses() {
                           <button
                             type="button"
                             onClick={() => handleDelete(unit)}
-                            className="rounded-lg p-2 text-red-400 hover:bg-red-50 hover:text-red-600"
+                            disabled={!canWrite}
+                            className="rounded-lg p-2 text-red-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                             aria-label="Hapus atau nonaktifkan rumah"
                           >
                             <AiOutlineDelete />
@@ -481,10 +485,12 @@ export default function Houses() {
           role={role}
           onClose={() => setSelectedUnit(null)}
           onEdit={() => {
+            if (!canWrite) return;
             openEdit(selectedUnit);
             setSelectedUnit(null);
           }}
-          onDelete={() => handleDelete(selectedUnit)}
+          onDelete={() => canWrite && handleDelete(selectedUnit)}
+          canWrite={canWrite}
         />
       )}
 
@@ -492,7 +498,7 @@ export default function Houses() {
         <UnitFormModal
           unit={formUnit}
           owners={profiles.filter((profile) => profile.role !== 'admin')}
-          canEditSchema={isBendaharaOrAbove(role)}
+          canEditSchema={isBendaharaOrAbove(role) && canWrite}
           iplSchemas={iplSchemas}
           onClose={() => setFormUnit(null)}
           onSave={handleSave}
@@ -522,7 +528,7 @@ function StatCard({ label, value, tone }) {
   );
 }
 
-function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSchemas, token, role, onClose, onEdit, onDelete }) {
+function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSchemas, token, role, onClose, onEdit, onDelete, canWrite }) {
   const owner = getUnitOwner(unit.id);
   const occupant = getUnitOccupant(unit.id);
   const relatedProfiles = profiles.filter((profile) => profile.unit_id === unit.id);
@@ -587,10 +593,10 @@ function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSch
         {unit.notes && <InfoRow label="Catatan" value={unit.notes} />}
       </div>
       <div className="mt-6 flex gap-2 border-t border-forest-100 pt-4">
-        <button type="button" onClick={onEdit} className="pv-btn-ghost flex-1 text-xs">
+        <button type="button" onClick={onEdit} disabled={!canWrite} className="pv-btn-ghost flex-1 text-xs disabled:opacity-50">
           <AiOutlineEdit /> Edit
         </button>
-        <button type="button" onClick={onDelete} className="pv-btn-danger flex-1 text-xs">
+        <button type="button" onClick={onDelete} disabled={!canWrite} className="pv-btn-danger flex-1 text-xs disabled:opacity-50">
           <AiOutlineDelete /> Hapus
         </button>
       </div>

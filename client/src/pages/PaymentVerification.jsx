@@ -14,6 +14,7 @@ import {
   formatDate,
   formatPeriod,
   isBendaharaOrAbove,
+  canModifyData,
 } from '../services/dataHelpers';
 import {
   getUnitById,
@@ -56,6 +57,7 @@ function getReceiptPreviewUrl(payment) {
 export default function PaymentVerification() {
   const { role, profile, session, isReadOnly } = useAuth();
   const toast = useToast();
+  const canWrite = canModifyData(role) && !isReadOnly;
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState('pending');
   const [selectedPayment, setSelectedPayment] = useState(null);
@@ -143,8 +145,8 @@ export default function PaymentVerification() {
       : rejectedPayments;
 
   const handleVerify = async (payment) => {
-    if (isReadOnly) {
-      toast.warning('⚠️ Verifikasi pembayaran dinonaktifkan untuk akun Admin Demo (View-Only).');
+    if (!canWrite) {
+      toast.error('Akun read-only tidak dapat memverifikasi pembayaran.');
       return;
     }
     if (!payment || activeActionId) return;
@@ -167,8 +169,8 @@ export default function PaymentVerification() {
   };
 
   const openRejectModal = (payment) => {
-    if (isReadOnly) {
-      toast.warning('⚠️ Penolakan pembayaran dinonaktifkan untuk akun Admin Demo (View-Only).');
+    if (!canWrite) {
+      toast.error('Akun read-only tidak dapat menolak pembayaran.');
       return;
     }
     setSelectedPayment(payment);
@@ -177,7 +179,7 @@ export default function PaymentVerification() {
   };
 
   const handleReject = async () => {
-    if (!selectedPayment || activeActionId) return;
+    if (!canWrite || !selectedPayment || activeActionId) return;
     if (!rejectReason.trim()) {
       toast.error('Silakan isi alasan penolakan.');
       return;
@@ -371,14 +373,14 @@ export default function PaymentVerification() {
                       <>
                         <button
                           onClick={() => handleVerify(payment)}
-                          disabled={Boolean(activeActionId)}
+                          disabled={Boolean(activeActionId) || !canWrite}
                           className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
                         >
                           <AiOutlineCheck /> Verifikasi
                         </button>
                         <button
                           onClick={() => openRejectModal(payment)}
-                          disabled={Boolean(activeActionId)}
+                          disabled={Boolean(activeActionId) || !canWrite}
                           className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60"
                         >
                           <AiOutlineClose /> Tolak
@@ -516,13 +518,18 @@ export default function PaymentVerification() {
                   </button>
                   <button
                     onClick={async () => {
+                      if (!canWrite) {
+                        toast.error('Akun read-only tidak dapat mengirim kuitansi email.');
+                        return;
+                      }
                       const bill = mockIPLBills.find((b) => b.id === selectedPayment.bill_id) || { id: selectedPayment.bill_id, period: selectedPayment.period || '2026-01', amount: selectedPayment.amount };
                       const unit = getUnit(selectedPayment.unit_id || bill.unit_id);
                       toast.info('Mengirim kuitansi digital ke email...');
                       const res = await sendEmailReceipt({ bill, unit });
                       toast.success(res.message);
                     }}
-                    className="inline-flex items-center justify-center gap-1 rounded-lg border border-gold-300 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 shadow-sm hover:bg-gold-100 transition-colors"
+                    disabled={!canWrite}
+                    className="inline-flex items-center justify-center gap-1 rounded-lg border border-gold-300 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 shadow-sm hover:bg-gold-100 transition-colors disabled:opacity-50"
                   >
                     📧 Kirim ke Email
                   </button>
@@ -533,7 +540,7 @@ export default function PaymentVerification() {
                   <>
                     <button
                       onClick={() => handleVerify(selectedPayment)}
-                      disabled={Boolean(activeActionId)}
+                      disabled={Boolean(activeActionId) || !canWrite}
                       className="flex-1 pv-btn-primary py-2.5 rounded-lg text-sm"
                     >
                       ✅ Verifikasi
@@ -580,7 +587,7 @@ export default function PaymentVerification() {
             <div className="mt-6 flex flex-col gap-2 sm:flex-row">
               <button
                 onClick={handleReject}
-                disabled={Boolean(activeActionId)}
+                disabled={Boolean(activeActionId) || !canWrite}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 text-white py-2.5 text-sm font-medium hover:bg-red-700 transition-colors"
               >
                 ❌ Tolak Pembayaran

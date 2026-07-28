@@ -18,6 +18,7 @@ import {
   MONTHS_LONG,
   isStaffRole,
   isBendaharaOrAbove,
+  hasMinRole,
   roleLabel,
   roleColor,
 } from '../services/dataHelpers';
@@ -60,7 +61,7 @@ export default function Home() {
       { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Lihat daftar penghuni kompleks.' },
       { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Bayar IPL beberapa bulan sekaligus via transfer bank.' },
     ];
-    if (role === 'admin') {
+    if (hasMinRole(role, 'admin')) {
       return [
         { to: '/user-approval', icon: AiOutlineUserAdd, title: 'Approval User', desc: 'Verifikasi pendaftaran warga baru.', badge: pendingRegCount },
         { to: '/payment-verification', icon: AiOutlineCheckCircle, title: 'Verifikasi Bayar', desc: 'Verifikasi bukti transfer IPL.', badge: pendingPayCount },

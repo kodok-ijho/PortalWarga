@@ -23,12 +23,15 @@ import { useToast } from '../hooks/useToast';
 import {
   isStaffRole,
   isBendaharaOrAbove,
+  hasMinRole,
+  canModifyData,
   roleLabel,
 } from '../services/dataHelpers';
 import { fetchDashboardData } from '../services/dataService';
 
 export default function Header() {
   const { isAuthenticated, profile, role, isReadOnly, signOut, updateProfile, session } = useAuth();
+  const canWrite = canModifyData(role) && !isReadOnly;
   const location = useLocation();
   const toast = useToast();
   const [openDropdown, setOpenDropdown] = useState(null); // null | 'keuangan' | 'warga' | 'sistem'
@@ -39,6 +42,10 @@ export default function Header() {
   const dropdownRef = useRef(null);
 
   const openProfileModal = () => {
+    if (!canWrite) {
+      toast.info('Akun read-only tidak dapat mengubah profil.');
+      return;
+    }
     setEditName(profile?.full_name || '');
     setEditPhone(profile?.phone || '');
     setProfileModalOpen(true);
@@ -47,6 +54,10 @@ export default function Header() {
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
+    if (!canWrite) {
+      toast.error('Akun read-only tidak dapat mengubah profil.');
+      return;
+    }
     if (!editName.trim()) {
       toast.error('Nama lengkap tidak boleh kosong.');
       return;
@@ -167,9 +178,9 @@ export default function Header() {
             activePaths: ['/settings', '/logs'],
             items: [
               { to: '/settings', label: 'Pengaturan', icon: AiOutlineSetting, desc: 'Atur tarif IPL dan denda' },
-              ...(role === 'admin'
-                ? [{ to: '/logs', label: 'Log Sistem', icon: AiOutlineFileText, desc: 'Audit log aktivitas portal' }]
-                : []),
+                ...(hasMinRole(role, 'admin')
+                  ? [{ to: '/logs', label: 'Log Sistem', icon: AiOutlineFileText, desc: 'Audit log aktivitas portal' }]
+                  : []),
             ],
           },
         ]
@@ -320,8 +331,9 @@ export default function Header() {
               {profile?.full_name && (
                 <button
                   onClick={openProfileModal}
+                  disabled={!canWrite}
                   className="text-right flex items-center gap-2 hover:bg-forest-700/40 p-1.5 rounded-lg transition-colors group text-left"
-                  title="Klik untuk Edit Profil / No. HP"
+                  title={canWrite ? 'Klik untuk Edit Profil / No. HP' : 'Akun read-only'}
                 >
                   <div>
                     <p className="text-xs font-semibold text-white leading-tight group-hover:text-gold-400 transition-colors">{profile.full_name}</p>
@@ -389,7 +401,8 @@ export default function Header() {
                 </div>
                 <button
                   onClick={openProfileModal}
-                  className="flex items-center gap-1.5 bg-forest-800 hover:bg-forest-700 text-gold-400 px-3 py-1.5 rounded-xl text-xs font-semibold border border-forest-700 transition-colors shadow"
+                  disabled={!canWrite}
+                  className="flex items-center gap-1.5 bg-forest-800 hover:bg-forest-700 text-gold-400 px-3 py-1.5 rounded-xl text-xs font-semibold border border-forest-700 transition-colors shadow disabled:opacity-50"
                 >
                   <AiOutlineEdit /> Edit
                 </button>

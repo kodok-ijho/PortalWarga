@@ -20,6 +20,7 @@ import {
   formatDate,
   hasMinRole,
   isBendaharaOrAbove,
+  canModifyData,
 } from '../services/dataHelpers';
 import { compressImage } from '../utils/imageCompressor';
 
@@ -52,6 +53,7 @@ export default function Expenses() {
   const toast = useToast();
   const isStaff = hasMinRole(role, 'pengurus');
   const canEdit = isBendaharaOrAbove(role);
+  const canWrite = canModifyData(role) && !isReadOnly;
 
   const [expenses, setExpenses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -156,7 +158,7 @@ export default function Expenses() {
             {filtered.length} transaksi · Total {formatRupiah(totalAmount)}
           </p>
         </div>
-        {canEdit && (
+        {canEdit && canWrite && (
           <button onClick={() => setModalForm('add')} className="pv-btn-primary text-xs">
             <AiOutlinePlus /> Catat Pengeluaran
           </button>
@@ -229,7 +231,7 @@ export default function Expenses() {
                   </button>
                 )}
                 <p className="font-bold text-forest-900 text-sm">{formatRupiah(exp.amount)}</p>
-                {canEdit && (
+                {canEdit && canWrite && (
                   <div className="flex gap-1">
                     <button
                       onClick={() => setModalForm(exp)}
@@ -254,7 +256,7 @@ export default function Expenses() {
       )}
 
       {/* Modal form */}
-      {modalForm && (
+      {modalForm && canWrite && (
         <ExpenseFormModal
           expense={modalForm === 'add' ? null : modalForm}
           isSaving={isLoading}

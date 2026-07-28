@@ -76,10 +76,15 @@ export function billStatusColor(status) {
 }
 
 // ── ROLE HELPERS ─────────────────────────────────────────────────
-const ROLE_HIERARCHY = ['warga', 'pengurus', 'bendahara', 'admin'];
+const ROLE_HIERARCHY = ['warga', 'pengurus', 'bendahara', 'admin', 'admin_viewer'];
+const READ_ONLY_ROLES = new Set(['admin_viewer']);
 
 export function hasMinRole(userRole, minRole) {
   return ROLE_HIERARCHY.indexOf(userRole) >= ROLE_HIERARCHY.indexOf(minRole);
+}
+
+export function canModifyData(role) {
+  return ROLE_HIERARCHY.includes(role) && !READ_ONLY_ROLES.has(role);
 }
 
 export function isStaffRole(role) {
@@ -95,13 +100,14 @@ export function isAdminRole(role) {
 }
 
 export function roleLabel(role) {
-  const map = { warga: 'Warga', pengurus: 'Pengurus RT', bendahara: 'Bendahara', admin: 'Admin' };
+  const map = { warga: 'Warga', pengurus: 'Pengurus RT', bendahara: 'Bendahara', admin: 'Admin', admin_viewer: 'Admin Viewer' };
   return map[role] || role || '-';
 }
 
 export function roleColor(role) {
   const map = {
     admin: 'bg-purple-100 text-purple-700 border-purple-200',
+    admin_viewer: 'bg-slate-100 text-slate-700 border-slate-200',
     bendahara: 'bg-teal-100 text-teal-700 border-teal-200',
     pengurus: 'bg-blue-100 text-blue-700 border-blue-200',
     warga: 'bg-forest-100 text-forest-700 border-forest-200',

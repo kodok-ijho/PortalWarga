@@ -56,6 +56,18 @@ export const mockProfiles = [
     registered_at: '2025-01-01T00:00:00Z',
   },
   {
+    id: 'demo-admin-viewer',
+    full_name: 'Admin Viewer (Read Only)',
+    phone: '0812-1000-0099',
+    role: 'admin_viewer',
+    unit_id: null,
+    occupancy_status: null,
+    is_active: true,
+    email: 'admin.viewer@palmvillage.id',
+    approval_status: 'approved',
+    registered_at: '2025-01-01T00:00:00Z',
+  },
+  {
     id: 'demo-bendahara',
     full_name: 'Budi Santoso (Bendahara)',
     phone: '0813-2000-0002',
@@ -685,10 +697,15 @@ export function billStatusColor(status) {
   return map[status] || 'bg-gray-100 text-gray-600 border-gray-200';
 }
 
-const ROLE_LEVEL = { warga: 1, pengurus: 2, bendahara: 3, admin: 4 };
+const ROLE_LEVEL = { warga: 1, pengurus: 2, bendahara: 3, admin: 4, admin_viewer: 4 };
+const READ_ONLY_ROLES = new Set(['admin_viewer']);
 
 export function hasMinRole(userRole, minRole) {
   return (ROLE_LEVEL[userRole] || 0) >= (ROLE_LEVEL[minRole] || 0);
+}
+
+export function canModifyData(role) {
+  return Boolean(ROLE_LEVEL[role]) && !READ_ONLY_ROLES.has(role);
 }
 
 export function isStaffRole(role) {
@@ -707,6 +724,7 @@ export function isAdminRole(role) {
 export function roleLabel(role) {
   const map = {
     admin: 'Admin',
+    admin_viewer: 'Admin Viewer',
     bendahara: 'Bendahara',
     pengurus: 'Pengurus',
     warga: 'Warga',
@@ -718,6 +736,7 @@ export function roleLabel(role) {
 export function roleColor(role) {
   const map = {
     admin: 'bg-gold-500 text-forest-900',
+    admin_viewer: 'bg-slate-100 text-slate-700 border border-slate-200',
     bendahara: 'bg-emerald-600 text-white',
     pengurus: 'bg-forest-800 text-gold-400',
     warga: 'bg-forest-100 text-forest-700 border border-forest-200',

@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { fetchAuditLogs, IS_DEMO } from '../services/dataService';
-import { formatDateTime, formatRupiah, isAdminRole } from '../services/dataHelpers';
+import { formatDateTime, formatRupiah, hasMinRole } from '../services/dataHelpers';
 import {
   AiOutlineSearch,
   AiOutlineFilter,
@@ -43,7 +43,7 @@ export default function Logs() {
   const limit = 50;
 
   // Guard: Admin-only
-  if (!isAdminRole(role)) {
+  if (!hasMinRole(role, 'admin')) {
     return <Navigate to="/" replace />;
   }
 

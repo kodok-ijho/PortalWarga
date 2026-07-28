@@ -15,8 +15,8 @@ import { useToast } from '../hooks/useToast';
 import {
   formatRupiah,
   hasMinRole,
-  isAdminRole,
   isBendaharaOrAbove,
+  canModifyData,
 } from '../services/dataHelpers';
 import {
   fetchSettings,
@@ -92,8 +92,9 @@ export default function Settings() {
     return <Navigate to="/" replace />;
   }
 
-  const canEdit = isAdminRole(role);
-  const canEditSchema = isBendaharaOrAbove(role);
+  const canWrite = canModifyData(role) && !isReadOnly;
+  const canEdit = role === 'admin' && canWrite;
+  const canEditSchema = isBendaharaOrAbove(role) && canWrite;
 
   const handleAddSchema = () => {
     const newId = `schema-${Date.now()}`;
@@ -166,10 +167,6 @@ export default function Settings() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (isReadOnly) {
-      toast.warning('⚠️ Pengubahan pengaturan dinonaktifkan untuk akun Admin Demo (View-Only).');
-      return;
-    }
     if (!canEdit && !canEditSchema) {
       toast.error('Anda tidak memiliki hak untuk mengubah pengaturan ini.');
       return;
@@ -570,7 +567,7 @@ export default function Settings() {
         )}
       </form>
 
-      {canEdit && smokeTest && (
+      {canEdit && canWrite && smokeTest && (
         <PaymentSmokeTestPanel
           session={session}
           value={smokeTest}
@@ -580,7 +577,7 @@ export default function Settings() {
       )}
 
       {/* Generasi Tagihan Bulanan (Staff Only - Bendahara & Admin) */}
-      {isBendaharaOrAbove(role) && (
+      {isBendaharaOrAbove(role) && canWrite && (
         <div className="pv-card p-6 mt-8 border-t-4 border-t-forest-800">
           <h3 className="text-base font-bold text-forest-900 mb-1">Generasi Tagihan IPL Massal</h3>
           <p className="text-xs text-forest-500 mb-5">

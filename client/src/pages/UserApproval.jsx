@@ -6,6 +6,7 @@ import {
   roleLabel,
   formatDate,
   OCCUPANCY_STATUS,
+  canModifyData,
 } from '../services/dataHelpers';
 import {
   fetchPendingUsers,
@@ -21,6 +22,7 @@ import { useToast } from '../hooks/useToast';
 export default function UserApproval() {
   const { role, profile, session, isReadOnly } = useAuth();
   const toast = useToast();
+  const canWrite = canModifyData(role) && !isReadOnly;
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingUsers, setPendingUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -250,14 +252,14 @@ export default function UserApproval() {
                 <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-shrink-0">
                   <button
                     onClick={() => openApproveModal(user)}
-                    disabled={!!actionKey}
+                    disabled={!!actionKey || !canWrite}
                     className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <AiOutlineCheck /> Setujui
                   </button>
                   <button
                     onClick={() => openRejectModal(user)}
-                    disabled={!!actionKey}
+                    disabled={!!actionKey || !canWrite}
                     className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <AiOutlineClose /> Tolak
@@ -361,7 +363,7 @@ export default function UserApproval() {
             <div className="mt-6 flex flex-col gap-2 sm:flex-row">
               <button
                 onClick={handleApprove}
-                disabled={actionKey === `approve:${selectedUser.id}`}
+                disabled={actionKey === `approve:${selectedUser.id}` || !canWrite}
                 className="flex-1 pv-btn-primary py-2.5 rounded-lg text-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {actionKey === `approve:${selectedUser.id}` ? 'Memproses...' : 'Setujui & Aktifkan'}
@@ -400,7 +402,7 @@ export default function UserApproval() {
             <div className="mt-6 flex flex-col gap-2 sm:flex-row">
               <button
                 onClick={handleReject}
-                disabled={actionKey === `reject:${selectedUser.id}`}
+                disabled={actionKey === `reject:${selectedUser.id}` || !canWrite}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 text-white py-2.5 text-sm font-medium hover:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {actionKey === `reject:${selectedUser.id}` ? 'Memproses...' : 'Tolak Pendaftaran'}

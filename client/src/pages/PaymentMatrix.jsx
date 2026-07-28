@@ -16,6 +16,7 @@ import {
   billStatusColor,
   isStaffRole,
   isBendaharaOrAbove,
+  canModifyData,
 } from '../services/dataHelpers';
 import {
   fetchBillMatrix,
@@ -76,6 +77,7 @@ export default function PaymentMatrix() {
 
   // Semua role bisa LIHAT semua unit. Interaksi (bayar) di-gate per baris.
   const isStaff = isStaffRole(role);
+  const canWrite = canModifyData(role) && !isReadOnly;
   const myUnitId = profile?.unit_id;
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -340,6 +342,10 @@ export default function PaymentMatrix() {
   };
 
   const handlePay = () => {
+    if (!canWrite) {
+      toast.error('Akun read-only tidak dapat membuat pembayaran.');
+      return;
+    }
     if (selectedBills.length === 0) {
       toast.warning('Pilih minimal 1 bulan untuk dibayar.');
       return;
@@ -400,6 +406,10 @@ export default function PaymentMatrix() {
   // Staff memakai mekanisme seleksi yang sama dengan warga: klik untuk
   // memilih beberapa bulan (runut, lintas tahun), lalu klik tombol di footer.
   const handleStaffPay = () => {
+    if (!canWrite) {
+      toast.error('Akun read-only tidak dapat mencatat pembayaran.');
+      return;
+    }
     if (selectedBills.length === 0) {
       toast.warning('Pilih minimal 1 bulan untuk dicatat.');
       return;
@@ -768,7 +778,7 @@ export default function PaymentMatrix() {
               ✕ Kosongkan
             </button>
             {isStaff ? (
-              <button onClick={handleStaffPay} className="pv-btn-primary text-sm">
+              <button onClick={handleStaffPay} disabled={!canWrite} className="pv-btn-primary text-sm disabled:opacity-50">
                 Catat Pembayaran →
               </button>
             ) : (
@@ -1094,7 +1104,7 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
 // Staff can record transfer proof for residents who cannot use the app yet.
 // Cash remains limited to bendahara/admin.
 function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
-  const canRecordCash = isBendaharaOrAbove(role);
+  const canRecordCash = isBendaharaOrAbove(role) && canModifyData(role);
   const [method, setMethod] = useState(canRecordCash ? 'cash' : 'bank_transfer');
   const [paidAt, setPaidAt] = useState(new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState('');
@@ -1436,7 +1446,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
     (profile?.id && activePayment?.resident_id && String(activePayment.resident_id) === String(profile.id));
 
   const canViewReceipt = isStaffRole(role) || isMyUnit;
-  const canVerify = isBendaharaOrAbove(role);
+  const canVerify = isBendaharaOrAbove(role) && canModifyData(role);
   const paymentMethod = activePayment?.method || activePayment?.payment_method || activePayment?.paymentMethod;
 
   let proofFileUrl =
@@ -1781,12 +1791,17 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
               <button
                 type="button"
                 onClick={async () => {
+                  if (!canModifyData(role)) {
+                    toast.error('Akun read-only tidak dapat mengirim kuitansi email.');
+                    return;
+                  }
                   const u = getUnitById(bill.unit_id);
                   toast.info('Mengirim kuitansi digital ke email...');
                   const res = await sendEmailReceipt({ bill, unit: u });
                   toast.success(res.message);
                 }}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gold-300 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 shadow-sm hover:bg-gold-100 transition-colors"
+                disabled={!canModifyData(role)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gold-300 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 shadow-sm hover:bg-gold-100 transition-colors disabled:opacity-50"
               >
                 📧 Kirim ke Email
               </button>
@@ -1804,7 +1819,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
             </div>
           )}
 
-          {payment?.status === 'rejected' && (isMyUnit || isStaffRole(role)) && !isRevising && (
+          {payment?.status === 'rejected' && (isMyUnit || isStaffRole(role)) && !isRevising && canModifyData(role) && (
             <div className="flex gap-2">
               <button type="button" onClick={() => setIsRevising(true)} className="pv-btn-primary flex-1 text-xs">
                 🔄 Revisi & Upload Ulang

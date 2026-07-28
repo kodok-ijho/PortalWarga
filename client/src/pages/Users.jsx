@@ -14,13 +14,15 @@ import {
   roleLabel,
   roleColor,
   isStaffRole,
+  canModifyData,
 } from '../services/dataHelpers';
 import { AiOutlinePlus, AiOutlineEdit, AiOutlineUserDelete } from 'react-icons/ai';
 
 export default function Users() {
-  const { role, session } = useAuth();
+  const { role, session, isReadOnly } = useAuth();
   const token = session?.access_token;
   const toast = useToast();
+  const canWrite = canModifyData(role) && !isReadOnly;
 
   const [users, setUsers] = useState([]);
   const [units, setUnits] = useState([]);
@@ -200,7 +202,7 @@ export default function Users() {
             {filteredUsers.length} pengguna terdaftar
           </p>
         </div>
-        <button onClick={openAddModal} className="pv-btn-primary text-xs flex items-center gap-1">
+        <button onClick={openAddModal} disabled={!canWrite} className="pv-btn-primary text-xs flex items-center gap-1 disabled:opacity-50">
           <AiOutlinePlus /> Tambah User
         </button>
       </div>
@@ -294,13 +296,13 @@ export default function Users() {
                       <div className="flex justify-center items-center gap-1.5">
                         <button
                           onClick={() => openEditModal(u)}
-                          disabled={isSaving}
+                          disabled={isSaving || !canWrite}
                           className="p-1.5 text-forest-500 hover:text-forest-800 hover:bg-forest-50 rounded-lg transition-colors disabled:opacity-50"
                           title="Edit User"
                         >
                           <AiOutlineEdit className="text-base" />
                         </button>
-                        {u.is_active !== false && u.role !== 'admin' && (
+                        {canWrite && u.is_active !== false && u.role !== 'admin' && (
                           <button
                             onClick={() => handleDeactivate(u)}
                             disabled={isSaving}
@@ -362,9 +364,9 @@ export default function Users() {
                 <label className="block text-sm font-medium text-forest-700 mb-1">Role Akses</label>
                 <select value={userRole} onChange={(e) => setUserRole(e.target.value)} className="pv-input">
                   <option value="warga">Warga</option>
-                  {(role === 'bendahara' || role === 'admin') && <option value="pengurus">Pengurus</option>}
-                  {role === 'admin' && <option value="bendahara">Bendahara</option>}
-                  {role === 'admin' && <option value="admin">Admin</option>}
+                  {(role === 'bendahara' || role === 'admin') && canWrite && <option value="pengurus">Pengurus</option>}
+                  {role === 'admin' && canWrite && <option value="bendahara">Bendahara</option>}
+                  {role === 'admin' && canWrite && <option value="admin">Admin</option>}
                 </select>
               </div>
               <div>
@@ -444,9 +446,9 @@ export default function Users() {
                 <label className="block text-sm font-medium text-forest-700 mb-1">Role Akses</label>
                 <select value={userRole} onChange={(e) => setUserRole(e.target.value)} className="pv-input">
                   <option value="warga">Warga</option>
-                  {(role === 'bendahara' || role === 'admin') && <option value="pengurus">Pengurus</option>}
-                  {role === 'admin' && <option value="bendahara">Bendahara</option>}
-                  {role === 'admin' && <option value="admin">Admin</option>}
+                  {(role === 'bendahara' || role === 'admin') && canWrite && <option value="pengurus">Pengurus</option>}
+                  {role === 'admin' && canWrite && <option value="bendahara">Bendahara</option>}
+                  {role === 'admin' && canWrite && <option value="admin">Admin</option>}
                 </select>
               </div>
               <div>

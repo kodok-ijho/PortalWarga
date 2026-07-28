@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { registerUnauthorizedHandler, portalApiPost } from '../services/apiClient';
 import { updateProfileApi } from '../services/dataService';
+import { supabase } from '../services/supabaseClient';
 
 const AuthContext = createContext(null);
 
@@ -29,6 +30,19 @@ const DEMO_ACCOUNTS = {
       occupancy_status: null,
       is_active: true,
       email: 'admin@palmvillage.id',
+    },
+  },
+  'admin.viewer@palmvillage.id': {
+    password: 'demo123',
+    profile: {
+      id: 'demo-admin-viewer',
+      full_name: 'Admin Viewer (Read Only)',
+      phone: '0812-1000-0099',
+      role: 'admin_viewer',
+      unit_id: null,
+      occupancy_status: null,
+      is_active: true,
+      email: 'admin.viewer@palmvillage.id',
     },
   },
   'bendahara@palmvillage.id': {
@@ -189,6 +203,9 @@ function useDemoAuth() {
   const updateProfile = useCallback(async (newProps) => {
     const { updateMockUser } = await import('../services/mockData');
     if (profile) {
+      if (profile.is_read_only || profile.role === 'admin_viewer') {
+        throw new Error('Akun read-only tidak diizinkan memperbarui profil.');
+      }
       const updated = updateMockUser(profile.id, newProps);
       if (updated) {
         persist(updated);
@@ -205,6 +222,7 @@ function useDemoAuth() {
     user: profile ? { id: profile.id } : null,
     profile,
     role: profile?.role ?? null,
+    isReadOnly: Boolean(profile?.is_read_only || profile?.role === 'admin_viewer'),
     isAuthenticated: !!profile,
     loading,
     signIn,
@@ -437,6 +455,34 @@ function useProductionAuth() {
     throw new Error('Pendaftaran production dilakukan melalui login Google.');
   }, []);
 
+  const loginDemoAdmin = useCallback(async () => {
+    if (!ENABLE_DEMO_ADMIN) {
+      throw new Error('Login Admin Demo tidak diaktifkan.');
+    }
+
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+      email: DEMO_ADMIN_EMAIL,
+      password: DEMO_ADMIN_PASS,
+    });
+    if (error || !authData?.session?.access_token) {
+      throw new Error(error?.message || 'Gagal masuk sebagai Admin Demo.');
+    }
+
+    const token = authData.session.access_token;
+    const data = await portalApiPost('/auth/me', { token });
+    const currentUser = extractCurrentUser(data);
+    if (!currentUser) {
+      throw new Error('Profil Admin Demo tidak diterima dari server.');
+    }
+
+    const readOnlyProfile = { ...currentUser, is_read_only: true };
+    const expiresAt = authData.session.expires_at
+      ? new Date(authData.session.expires_at * 1000).toISOString()
+      : resolveTokenExpiry(token, null);
+    persist(token, readOnlyProfile, expiresAt);
+    return { currentUser: readOnlyProfile };
+  }, [persist]);
+
   const signOut = useCallback(async () => {
     persist(null, null);
   }, [persist]);
@@ -449,7 +495,11 @@ function useProductionAuth() {
 
   const updateProfile = useCallback(async (newProps) => {
     if (!profile) return null;
-    if (profile.is_read_only || (ENABLE_DEMO_ADMIN && profile.email?.toLowerCase() === DEMO_ADMIN_EMAIL)) {
+    if (
+      profile.is_read_only ||
+      profile.role === 'admin_viewer' ||
+      (ENABLE_DEMO_ADMIN && profile.email?.toLowerCase() === DEMO_ADMIN_EMAIL)
+    ) {
       throw new Error('⚠️ Akun Admin Demo (View Only) tidak diizinkan memperbarui profil.');
     }
     const editableProps = {
@@ -467,7 +517,11 @@ function useProductionAuth() {
     return updated;
   }, [persist, profile, session?.access_token, tokenExpiresAt]);
 
-  const isReadOnly = Boolean(profile?.is_read_only || (ENABLE_DEMO_ADMIN && profile?.email?.toLowerCase() === DEMO_ADMIN_EMAIL));
+  const isReadOnly = Boolean(
+    profile?.is_read_only ||
+    profile?.role === 'admin_viewer' ||
+    (ENABLE_DEMO_ADMIN && profile?.email?.toLowerCase() === DEMO_ADMIN_EMAIL)
+  );
 
   return {
     session,
