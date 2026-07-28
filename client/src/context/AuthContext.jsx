@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { registerUnauthorizedHandler, portalApiPost } from '../services/apiClient';
 import { updateProfileApi } from '../services/dataService';
-import { supabase } from '../services/supabaseClient';
 
 const AuthContext = createContext(null);
 
@@ -460,25 +459,20 @@ function useProductionAuth() {
       throw new Error('Login Admin Demo tidak diaktifkan.');
     }
 
-    const { data: authData, error } = await supabase.auth.signInWithPassword({
-      email: DEMO_ADMIN_EMAIL,
-      password: DEMO_ADMIN_PASS,
+    const data = await portalApiPost('/auth/demo', {
+      body: {
+        email: DEMO_ADMIN_EMAIL,
+        password: DEMO_ADMIN_PASS,
+      },
     });
-    if (error || !authData?.session?.access_token) {
-      throw new Error(error?.message || 'Gagal masuk sebagai Admin Demo.');
-    }
-
-    const token = authData.session.access_token;
-    const data = await portalApiPost('/auth/me', { token });
     const currentUser = extractCurrentUser(data);
-    if (!currentUser) {
+    const token = data?.app_jwt || data?.appJwt || data?.token || data?.access_token;
+    if (!currentUser || !token) {
       throw new Error('Profil Admin Demo tidak diterima dari server.');
     }
 
     const readOnlyProfile = { ...currentUser, is_read_only: true };
-    const expiresAt = authData.session.expires_at
-      ? new Date(authData.session.expires_at * 1000).toISOString()
-      : resolveTokenExpiry(token, null);
+    const expiresAt = data?.expires_at || data?.expiresAt || resolveTokenExpiry(token, null);
     persist(token, readOnlyProfile, expiresAt);
     return { currentUser: readOnlyProfile };
   }, [persist]);
