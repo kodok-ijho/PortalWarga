@@ -28,7 +28,7 @@ import {
 import { fetchDashboardData } from '../services/dataService';
 
 export default function Header() {
-  const { isAuthenticated, profile, role, signOut, updateProfile, session } = useAuth();
+  const { isAuthenticated, profile, role, isReadOnly, signOut, updateProfile, session } = useAuth();
   const location = useLocation();
   const toast = useToast();
   const [openDropdown, setOpenDropdown] = useState(null); // null | 'keuangan' | 'warga' | 'sistem'
@@ -196,6 +196,11 @@ export default function Header() {
               {IS_DEMO_MODE && (
                 <span className="bg-amber-400/90 text-forest-900 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider scale-90 origin-left">
                   Demo
+                </span>
+              )}
+              {isReadOnly && (
+                <span className="bg-amber-400 text-forest-950 text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm flex items-center gap-0.5">
+                  <span>👁️</span> View Only
                 </span>
               )}
             </h1>

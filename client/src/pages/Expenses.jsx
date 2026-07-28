@@ -47,7 +47,7 @@ function getGoogleDriveThumbnail(url) {
 }
 
 export default function Expenses() {
-  const { role, profile, session } = useAuth();
+  const { role, profile, session, isReadOnly } = useAuth();
   const token = session?.access_token;
   const toast = useToast();
   const isStaff = hasMinRole(role, 'pengurus');
@@ -121,6 +121,10 @@ export default function Expenses() {
   };
 
   const handleDelete = async (exp) => {
+    if (isReadOnly) {
+      toast.warning('⚠️ Penghapusan pengeluaran dinonaktifkan untuk akun Admin Demo (View-Only).');
+      return;
+    }
     if (!confirm(`Hapus pengeluaran "${exp.description.substring(0, 40)}..."?`)) return;
     try {
       setIsLoading(true);

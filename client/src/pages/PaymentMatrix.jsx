@@ -42,7 +42,7 @@ import {
 import { compressImage } from '../utils/imageCompressor';
 
 export default function PaymentMatrix() {
-  const { profile, role, session } = useAuth();
+  const { profile, role, session, isReadOnly } = useAuth();
   const toast = useToast();
   const years = [2026, 2027, 2028];
   const [year, setYear] = useState(2026); // Default to billing start year 2026
@@ -498,6 +498,10 @@ export default function PaymentMatrix() {
   };
 
   const handleCleanupAllData = async () => {
+    if (isReadOnly) {
+      toast.warning('⚠️ Tindakan pembersihan data dinonaktifkan untuk akun Admin Demo (View-Only).');
+      return;
+    }
     const confirmMsg =
       '⚠️ APAPUN YANG DIHAPUS TIDAK DAPAT DIKEMBALIKAN!\n\n' +
       'Apakah Anda yakin ingin menghapus:\n' +

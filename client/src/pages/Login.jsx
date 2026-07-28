@@ -18,6 +18,8 @@ export default function Login() {
     signIn,
     signUp,
     signInWithGoogle,
+    loginDemoAdmin,
+    enableDemoAdmin,
     isAuthenticated,
     loading,
     accountStatus,
@@ -283,6 +285,35 @@ export default function Login() {
                     : 'Akses masuk diamankan menggunakan sistem autentikasi terverifikasi.'}
                 </p>
               </div>
+
+              {/* Demo Admin View-Only Button (Controlled via .env) */}
+              {enableDemoAdmin && (
+                <div className="pt-2 text-center border-t border-forest-800/80">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setError('');
+                      setSubmitting(true);
+                      try {
+                        await loginDemoAdmin();
+                        navigate(from, { replace: true });
+                      } catch (err) {
+                        setError(err.message || 'Gagal masuk sebagai Admin Demo.');
+                      } finally {
+                        setSubmitting(false);
+                      }
+                    }}
+                    disabled={submitting}
+                    className="w-full py-2.5 px-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/40 text-amber-300 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 transition shadow-sm"
+                  >
+                    <span>👁️</span>
+                    <span>Masuk sebagai Admin Demo (View Only)</span>
+                  </button>
+                  <p className="mt-1.5 text-[10px] text-forest-400">
+                    Mode pratinjau hak akses Admin tanpa izin pengubahan/penghapusan data.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <form onSubmit={handleGoogleRegisterSubmit} className="space-y-4">

@@ -54,7 +54,7 @@ function getReceiptPreviewUrl(payment) {
 }
 
 export default function PaymentVerification() {
-  const { role, profile, session } = useAuth();
+  const { role, profile, session, isReadOnly } = useAuth();
   const toast = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState('pending');
@@ -143,6 +143,10 @@ export default function PaymentVerification() {
       : rejectedPayments;
 
   const handleVerify = async (payment) => {
+    if (isReadOnly) {
+      toast.warning('⚠️ Verifikasi pembayaran dinonaktifkan untuk akun Admin Demo (View-Only).');
+      return;
+    }
     if (!payment || activeActionId) return;
     setActiveActionId(payment.id);
     try {
@@ -163,6 +167,10 @@ export default function PaymentVerification() {
   };
 
   const openRejectModal = (payment) => {
+    if (isReadOnly) {
+      toast.warning('⚠️ Penolakan pembayaran dinonaktifkan untuk akun Admin Demo (View-Only).');
+      return;
+    }
     setSelectedPayment(payment);
     setModalMode('reject');
     setRejectReason('');

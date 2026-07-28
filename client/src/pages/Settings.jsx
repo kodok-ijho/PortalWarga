@@ -31,7 +31,7 @@ function computeSchemaAmount(schema) {
 }
 
 export default function Settings() {
-  const { role, session } = useAuth();
+  const { role, session, isReadOnly } = useAuth();
   const toast = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -166,6 +166,10 @@ export default function Settings() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (isReadOnly) {
+      toast.warning('⚠️ Pengubahan pengaturan dinonaktifkan untuk akun Admin Demo (View-Only).');
+      return;
+    }
     if (!canEdit && !canEditSchema) {
       toast.error('Anda tidak memiliki hak untuk mengubah pengaturan ini.');
       return;

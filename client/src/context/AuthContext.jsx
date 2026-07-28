@@ -5,6 +5,9 @@ import { updateProfileApi } from '../services/dataService';
 const AuthContext = createContext(null);
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+const ENABLE_DEMO_ADMIN = import.meta.env.VITE_ENABLE_DEMO_ADMIN === 'true';
+const DEMO_ADMIN_EMAIL = (import.meta.env.VITE_DEMO_ADMIN_EMAIL || 'admin.demo@palmvillage.id').toLowerCase();
+const DEMO_ADMIN_PASS = import.meta.env.VITE_DEMO_ADMIN_PASS || 'demoview123';
 const DEMO_STORAGE_KEY = 'pv_demo_session';
 const APP_TOKEN_STORAGE_KEY = 'pv_app_jwt';
 const APP_USER_STORAGE_KEY = 'pv_current_user';
@@ -436,44 +439,44 @@ function useProductionAuth() {
 
   const signOut = useCallback(async () => {
     persist(null, null);
-    setAccountStatus(null);
-    setAuthError(null);
-    if (window.google?.accounts?.id?.disableAutoSelect) {
-      window.google.accounts.id.disableAutoSelect();
-    }
   }, [persist]);
 
   useEffect(() => {
     registerUnauthorizedHandler(() => {
-      signOut();
+      persist(null, null);
     });
-  }, [signOut]);
+  }, [signOut, persist]);
 
   const updateProfile = useCallback(async (newProps) => {
     if (!profile) return null;
+    if (profile.is_read_only || (ENABLE_DEMO_ADMIN && profile.email?.toLowerCase() === DEMO_ADMIN_EMAIL)) {
+      throw new Error('⚠️ Akun Admin Demo (View Only) tidak diizinkan memperbarui profil.');
+    }
     const editableProps = {
       ...(Object.prototype.hasOwnProperty.call(newProps, 'full_name') ? { full_name: newProps.full_name } : {}),
       ...(Object.prototype.hasOwnProperty.call(newProps, 'phone') ? { phone: newProps.phone } : {}),
       ...(Object.prototype.hasOwnProperty.call(newProps, 'avatar_url') ? { avatar_url: newProps.avatar_url } : {}),
     };
-    // Call n8n API to persist changes to Supabase
     try {
       await updateProfileApi(session?.access_token, editableProps);
     } catch (err) {
-      // Re-throw so callers can show error toast
       throw err;
     }
-    // Update local state + localStorage only after API success
     const updated = { ...profile, ...editableProps };
     persist(session?.access_token, updated, tokenExpiresAt);
     return updated;
   }, [persist, profile, session?.access_token, tokenExpiresAt]);
+
+  const isReadOnly = Boolean(profile?.is_read_only || (ENABLE_DEMO_ADMIN && profile?.email?.toLowerCase() === DEMO_ADMIN_EMAIL));
 
   return {
     session,
     user: session?.user ?? null,
     profile,
     role: profile?.role ?? null,
+    isReadOnly,
+    enableDemoAdmin: ENABLE_DEMO_ADMIN,
+    demoAdminEmail: DEMO_ADMIN_EMAIL,
     isAuthenticated: !!session,
     loading,
     accountStatus,
@@ -482,6 +485,7 @@ function useProductionAuth() {
     signIn,
     signUp,
     signInWithGoogle,
+    loginDemoAdmin,
     signOut,
     updateProfile,
   };
@@ -500,6 +504,8 @@ export function useAuth() {
 
 // Export konstanta untuk dipakai di komponen lain (mis. Login menampilkan info akun demo).
 export const IS_DEMO_MODE = DEMO_MODE;
+export const ENABLE_DEMO_ADMIN_MODE = ENABLE_DEMO_ADMIN;
+export const DEMO_ADMIN_EMAIL_ADDR = DEMO_ADMIN_EMAIL;
 export const DEMO_ACCOUNT_LIST = DEMO_USERS;
 export const GOOGLE_AUTH_READY = Boolean(GOOGLE_CLIENT_ID && N8N_API_BASE_URL);
 export const GOOGLE_OAUTH_CLIENT_ID = GOOGLE_CLIENT_ID;

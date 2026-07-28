@@ -19,7 +19,7 @@ import { AiOutlineCheck, AiOutlineClose, AiOutlineUser, AiOutlineClockCircle } f
 import { useToast } from '../hooks/useToast';
 
 export default function UserApproval() {
-  const { role, profile, session } = useAuth();
+  const { role, profile, session, isReadOnly } = useAuth();
   const toast = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingUsers, setPendingUsers] = useState([]);
@@ -48,8 +48,13 @@ export default function UserApproval() {
     setLoadError('');
 
     try {
-      const result = await fetchPendingUsers(session?.access_token);
-      setPendingUsers(result.users);
+      if (IS_DEMO) {
+        const { fetchMockPendingUsers } = await import('../services/mockData');
+        setPendingUsers(fetchMockPendingUsers());
+      } else {
+        const result = await fetchPendingUsers(session?.access_token);
+        setPendingUsers(result.users);
+      }
     } catch (error) {
       const message = error.message || 'Gagal memuat pendaftaran baru.';
       setLoadError(message);
@@ -57,7 +62,7 @@ export default function UserApproval() {
     } finally {
       setIsLoading(false);
     }
-  }, [role, session?.access_token]);
+  }, [role, session?.access_token, toast]);
 
   useEffect(() => {
     loadPendingUsers();
@@ -103,6 +108,10 @@ export default function UserApproval() {
   };
 
   const handleApprove = async () => {
+    if (isReadOnly) {
+      toast.warning('⚠️ Persetujuan pendaftaran dinonaktifkan untuk akun Admin Demo (View-Only).');
+      return;
+    }
     if (assignRole === 'warga' && !unitId) {
       toast.error('Silakan pilih nomor rumah terlebih dahulu.');
       return;
@@ -134,6 +143,10 @@ export default function UserApproval() {
   };
 
   const handleReject = async () => {
+    if (isReadOnly) {
+      toast.warning('⚠️ Penolakan pendaftaran dinonaktifkan untuk akun Admin Demo (View-Only).');
+      return;
+    }
     if (!rejectReason.trim()) {
       toast.error('Silakan isi alasan penolakan.');
       return;
