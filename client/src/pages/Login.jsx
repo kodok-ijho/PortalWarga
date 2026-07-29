@@ -7,7 +7,7 @@ import {
   GOOGLE_AUTH_READY,
   GOOGLE_OAUTH_CLIENT_ID,
 } from '../hooks/useAuth';
-import { roleLabel, roleColor } from '../services/mockData';
+import { mockUnits, roleLabel, roleColor } from '../services/mockData';
 import { AiOutlineSafetyCertificate, AiOutlineCloudSync } from 'react-icons/ai';
 import { FcGoogle } from 'react-icons/fc';
 
@@ -33,6 +33,7 @@ export default function Login() {
   const [mode, setMode] = useState('login'); // 'login' | 'register_google'
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [registrationUnitId, setRegistrationUnitId] = useState('');
   const [googleEmail, setGoogleEmail] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -48,7 +49,7 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const result = await signInWithGoogle(credential);
+      const result = await signInWithGoogle(credential, { unitId: registrationUnitId });
       if (result?.pending) {
         setPendingSuccess({ message: result.message });
         return;
@@ -59,7 +60,7 @@ export default function Login() {
     } finally {
       setSubmitting(false);
     }
-  }, [from, navigate, signInWithGoogle]);
+  }, [from, navigate, registrationUnitId, signInWithGoogle]);
 
   useEffect(() => {
     if (IS_DEMO_MODE || !GOOGLE_AUTH_READY) return;
@@ -153,7 +154,11 @@ export default function Login() {
     }
     setSubmitting(true);
     try {
-      const result = await signUp(googleEmail, 'demo123', fullName, phone);
+      if (!registrationUnitId) {
+        setError('Silakan pilih unit rumah yang ditempati.');
+        return;
+      }
+      const result = await signUp(googleEmail, 'demo123', fullName, phone, registrationUnitId);
       if (result?.pending) {
         setPendingSuccess({ message: result.message });
       } else {
@@ -195,7 +200,12 @@ export default function Login() {
             <div className="bg-forest-950 p-3 rounded-xl text-xs text-forest-300 text-left space-y-1 mb-5 border border-forest-800">
               <p><strong>Status:</strong> Menunggu persetujuan Pengurus/Bendahara</p>
               <p><strong>Auth Provider:</strong> Google OAuth 2.0 + App JWT</p>
-              <p><strong>Alokasi Unit:</strong> Ditentukan saat verifikasi</p>
+              <p>
+                <strong>Unit diajukan:</strong>{' '}
+                {mockUnits.find((unit) => String(unit.id) === String(registrationUnitId))
+                  ? `Blok ${mockUnits.find((unit) => String(unit.id) === String(registrationUnitId)).block}/${mockUnits.find((unit) => String(unit.id) === String(registrationUnitId)).unit_number}`
+                  : 'Belum dipilih'}
+              </p>
             </div>
             <button
               type="button"
@@ -238,6 +248,29 @@ export default function Login() {
 
           {!IS_DEMO_MODE || mode === 'login' ? (
             <div className="space-y-5">
+              {!IS_DEMO_MODE && (
+                <div className="rounded-xl border border-forest-800 bg-forest-950/60 p-3.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-forest-300 mb-1">
+                    Unit Rumah (untuk pendaftaran baru)
+                  </label>
+                  <select
+                    value={registrationUnitId}
+                    onChange={(e) => setRegistrationUnitId(e.target.value)}
+                    className="w-full rounded-xl border border-forest-700 bg-forest-950 px-3.5 py-2.5 text-sm text-white focus:border-gold-500 outline-none"
+                  >
+                    <option value="">Pilih unit rumah jika baru mendaftar</option>
+                    {mockUnits.map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        Blok {unit.block}/{unit.unit_number}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-forest-400">
+                    Data ini akan ditampilkan kepada admin untuk diverifikasi. Kosongkan jika hanya masuk ke akun yang sudah terdaftar.
+                  </p>
+                </div>
+              )}
+
               {/* Tombol Utama Google OAuth */}
               {IS_DEMO_MODE ? (
                 <button
@@ -361,6 +394,28 @@ export default function Login() {
                   placeholder="08xx-xxxx-xxxx"
                   className="w-full rounded-xl bg-forest-950 border border-forest-700 px-3.5 py-2.5 text-sm text-white placeholder-forest-500 focus:border-gold-500 outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-forest-300 mb-1 uppercase tracking-wider">
+                  Unit Rumah yang Ditempati
+                </label>
+                <select
+                  value={registrationUnitId}
+                  onChange={(e) => setRegistrationUnitId(e.target.value)}
+                  required
+                  className="w-full rounded-xl bg-forest-950 border border-forest-700 px-3.5 py-2.5 text-sm text-white focus:border-gold-500 outline-none"
+                >
+                  <option value="">Pilih unit rumah</option>
+                  {mockUnits.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      Blok {unit.block}/{unit.unit_number}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-forest-400">
+                  Admin akan memeriksa dan mengonfirmasi unit ini saat verifikasi.
+                </p>
               </div>
 
               <button

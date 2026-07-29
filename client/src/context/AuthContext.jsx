@@ -172,7 +172,7 @@ function useDemoAuth() {
     persist(found);
   }, []);
 
-  const signUp = useCallback(async (email, _password, fullName, phone) => {
+  const signUp = useCallback(async (email, _password, fullName, phone, unitId) => {
     // Cek apakah email sudah terdaftar
     const { mockProfiles } = await import('../services/mockData');
     const exists = mockProfiles.find(
@@ -188,7 +188,7 @@ function useDemoAuth() {
       phone: phone || null,
       email: email.toLowerCase(),
       role: 'warga',
-      unit_id: null,
+      unit_id: unitId ? Number(unitId) : null,
       occupancy_status: null,
       is_active: false,
       approval_status: 'pending',
@@ -392,13 +392,16 @@ function useProductionAuth() {
     };
   }, [persist]);
 
-  const signInWithGoogle = useCallback(async (idToken) => {
+  const signInWithGoogle = useCallback(async (idToken, { unitId } = {}) => {
     let data;
     setAuthError(null);
     setAccountStatus(null);
     try {
       data = await portalApiPost('/auth/google', {
-        body: { id_token: idToken },
+        body: {
+          id_token: idToken,
+          unit_id: unitId ? Number(unitId) : null,
+        },
       });
     } catch (error) {
       const authState = mapAuthError(error);

@@ -91,7 +91,7 @@ export default function UserApproval() {
   const openApproveModal = (user) => {
     setSelectedUser(user);
     setModalMode('approve');
-    setUnitId('');
+    setUnitId(user.unit_id ? String(user.unit_id) : '');
     setOccupancyStatus('owner_occupied');
     setAssignRole('warga');
     setEditFullName(user.full_name || '');
@@ -107,6 +107,12 @@ export default function UserApproval() {
   const closeModal = () => {
     setSelectedUser(null);
     setModalMode(null);
+  };
+
+  const getUnitLabel = (requestedUnitId) => {
+    if (!requestedUnitId) return 'Belum dipilih';
+    const unit = availableUnits.find((item) => Number(item.id) === Number(requestedUnitId));
+    return unit ? `Blok ${unit.block}/${unit.unit_number}` : `Unit ID ${requestedUnitId}`;
   };
 
   const handleApprove = async () => {
@@ -247,6 +253,9 @@ export default function UserApproval() {
                       <span>HP: {user.phone || '-'}</span>
                       <span>Daftar: {formatDate(user.registered_at)}</span>
                     </div>
+                    <p className="mt-1 text-xs font-semibold text-amber-700">
+                      Unit diajukan: {getUnitLabel(user.unit_id)}
+                    </p>
                   </div>
                 </div>
                 <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-shrink-0">
