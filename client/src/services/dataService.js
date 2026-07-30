@@ -28,6 +28,7 @@ async function getMockData() {
 // ── API imports ──────────────────────────────────────────────────
 import { portalApiPost, portalApiUpload } from './apiClient';
 import { supabase } from './supabaseClient';
+import { isPendingVerificationStatus, normalizePaymentStatus } from './dataHelpers';
 
 // =====================================================================
 // USER APPROVAL
@@ -158,7 +159,7 @@ export async function fetchDashboardData(token, { role, period } = {}) {
     if (isBendaharaOrAbove(role)) {
       try {
         const payments = await fetchPayments(token);
-        pendingPaymentCount = payments.filter((p) => p.status === 'pending_verification').length;
+        pendingPaymentCount = payments.filter((p) => isPendingVerificationStatus(p.status)).length;
       } catch (err) {
         console.warn('Failed to load pending payments count for dashboard:', err);
       }
@@ -581,6 +582,15 @@ function normalizePaymentRecord(payment) {
     proofFileUrl = proofFileName;
   }
 
+  const method = payment.method || payment.payment_method || payment.paymentMethod || metadata.method || '';
+  const rawStatus =
+    payment.status ??
+    payment.payment_status ??
+    payment.paymentStatus ??
+    payment.state ??
+    metadata.status ??
+    '';
+
   return {
     ...payment,
     ipl_bill_id:
@@ -597,8 +607,18 @@ function normalizePaymentRecord(payment) {
       payment.resident ||
       payment._profile?.id ||
       '',
-    method: payment.method || payment.payment_method || payment.paymentMethod || metadata.method,
-    status: payment.status === 'completed' ? 'verified' : payment.status,
+    unit_id:
+      payment.unit_id ||
+      payment.unitId ||
+      payment._bill?.unit_id ||
+      payment.ipl_bills?.unit_id ||
+      '',
+    period: payment.period || payment._bill?.period || payment.ipl_bills?.period || '',
+    method,
+    status: normalizePaymentStatus(rawStatus, {
+      method,
+      hasProof: Boolean(proofFileUrl || proofFileName),
+    }),
     paid_at:
       payment.paid_at ||
       payment.paidAt ||
@@ -625,6 +645,21 @@ function normalizePaymentRecord(payment) {
     proof_file_name: proofFileName,
     receipt_file: payment.receipt_file || payment.receiptFile || proofFileName,
   };
+}
+
+function extractPaymentList(result) {
+  const candidates = [
+    result,
+    result?.payments,
+    result?.items,
+    result?.rows,
+    result?.results,
+    result?.data,
+    result?.data?.payments,
+    result?.data?.items,
+    result?.data?.rows,
+  ];
+  return candidates.find((candidate) => Array.isArray(candidate)) || [];
 }
 
 const unitCollator = new Intl.Collator('id-ID', {
@@ -800,9 +835,7 @@ export async function fetchPayments(token, opts = {}) {
       body.unit_id = opts.scopeUnitId;
     }
     const result = await portalApiPost('/payments/list', { token, body });
-    rawPayments = Array.isArray(result)
-      ? result
-      : result?.payments || result?.data || [];
+    rawPayments = extractPaymentList(result);
   } catch (err) {
     rawPayments = [];
   }

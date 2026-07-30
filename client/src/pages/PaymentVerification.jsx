@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import {
   fetchPayments,
+  fetchBillMatrix,
   fetchUnits,
   fetchResidents,
   approveManualPayment,
@@ -16,6 +17,8 @@ import {
   formatPeriod,
   isBendaharaOrAbove,
   canModifyData,
+  normalizePaymentStatus,
+  isPendingVerificationStatus,
 } from '../services/dataHelpers';
 import {
   getUnitById,
@@ -55,6 +58,84 @@ function getReceiptPreviewUrl(payment) {
   return sourceUrl;
 }
 
+function currentBillingYear() {
+  const now = new Date();
+  return now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+}
+
+function pendingPaymentsFromMatrix(matrixRows) {
+  if (!Array.isArray(matrixRows)) return [];
+
+  return matrixRows.flatMap((row) =>
+    (Array.isArray(row?.cells) ? row.cells : []).flatMap((cell) => {
+      const bill = cell?.bill;
+      if (!bill) return [];
+
+      const source = cell.payment || {};
+      const paymentStatus = normalizePaymentStatus(source.status, {
+        method: source.method || source.payment_method,
+        hasProof: Boolean(source.proof_file_url || source.proof_file_name || source.receipt_file),
+      });
+      const cellStatus = cell.status || bill.status;
+      if (!isPendingVerificationStatus(cellStatus) && !isPendingVerificationStatus(paymentStatus)) {
+        return [];
+      }
+
+      const paymentId = source.id || source.payment_id || cell.payment_id || bill.payment_id;
+      if (!paymentId) return [];
+
+      return [{
+        ...source,
+        id: paymentId,
+        ipl_bill_id: source.ipl_bill_id || bill.id,
+        unit_id: source.unit_id || bill.unit_id || row?.unit?.id,
+        resident_id: source.resident_id || row?.resident?.id || '',
+        amount: source.amount ?? bill.amount,
+        period: source.period || bill.period,
+        status: 'pending_verification',
+        _bill: source._bill || bill,
+        _profile: source._profile || row?.resident,
+      }];
+    })
+  );
+}
+
+function mergePaymentSources(payments, matrixRows) {
+  const merged = Array.isArray(payments) ? [...payments] : [];
+  const indexByKey = new Map();
+
+  merged.forEach((payment, index) => {
+    const key = payment?.id
+      ? `payment:${payment.id}`
+      : payment?.ipl_bill_id
+        ? `bill:${payment.ipl_bill_id}`
+        : null;
+    if (key) indexByKey.set(String(key), index);
+  });
+
+  pendingPaymentsFromMatrix(matrixRows).forEach((matrixPayment) => {
+    const paymentKey = `payment:${matrixPayment.id}`;
+    const billKey = `bill:${matrixPayment.ipl_bill_id}`;
+    const existingIndex = indexByKey.get(paymentKey) ?? indexByKey.get(billKey);
+    if (existingIndex === undefined) {
+      indexByKey.set(paymentKey, merged.length);
+      indexByKey.set(billKey, merged.length);
+      merged.push(matrixPayment);
+      return;
+    }
+
+    merged[existingIndex] = {
+      ...matrixPayment,
+      ...merged[existingIndex],
+      status: 'pending_verification',
+      _bill: merged[existingIndex]._bill || matrixPayment._bill,
+      _profile: merged[existingIndex]._profile || matrixPayment._profile,
+    };
+  });
+
+  return merged;
+}
+
 export default function PaymentVerification() {
   const { role, profile, session, isReadOnly } = useAuth();
   const toast = useToast();
@@ -92,13 +173,14 @@ export default function PaymentVerification() {
           setResidents([]);
         } else {
           // Prod mode fetches from API & Supabase
-          const [payData, unitData, resData] = await Promise.all([
+          const [payData, unitData, resData, matrixData] = await Promise.all([
             fetchPayments(session?.access_token),
             fetchUnits(session?.access_token),
             fetchResidents(session?.access_token),
+            fetchBillMatrix(session?.access_token, currentBillingYear()).catch(() => []),
           ]);
           if (active) {
-            setPayments(payData);
+            setPayments(mergePaymentSources(payData, matrixData));
             setUnits(unitData);
             setResidents(resData);
           }
@@ -126,7 +208,7 @@ export default function PaymentVerification() {
   };
 
   const pendingPayments = useMemo(
-    () => payments.filter((p) => p.status === 'pending_verification'),
+    () => payments.filter((p) => isPendingVerificationStatus(p.status)),
     [payments]
   );
 

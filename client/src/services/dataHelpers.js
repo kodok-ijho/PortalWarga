@@ -76,6 +76,37 @@ export function billStatusColor(status) {
 }
 
 // ── ROLE HELPERS ─────────────────────────────────────────────────
+// Keep payment status values consistent across API response shapes.
+export function normalizePaymentStatus(status, { method = '', hasProof = false } = {}) {
+  const value = String(status || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (['completed', 'success', 'successful', 'paid', 'verified'].includes(value)) {
+    return 'verified';
+  }
+  if (
+    [
+      'pending_verification',
+      'waiting_verification',
+      'awaiting_verification',
+      'submitted',
+      'menunggu_verifikasi',
+    ].includes(value)
+  ) {
+    return 'pending_verification';
+  }
+  if (['rejected', 'declined', 'denied'].includes(value)) {
+    return 'rejected';
+  }
+  // Older transfer records can remain `pending` after proof upload.
+  if (value === 'pending' && String(method).toLowerCase() === 'bank_transfer' && hasProof) {
+    return 'pending_verification';
+  }
+  return status || '';
+}
+
+export function isPendingVerificationStatus(status, options) {
+  return normalizePaymentStatus(status, options) === 'pending_verification';
+}
+
 const ROLE_HIERARCHY = ['warga', 'pengurus', 'bendahara', 'admin', 'admin_viewer'];
 const READ_ONLY_ROLES = new Set(['admin_viewer']);
 
