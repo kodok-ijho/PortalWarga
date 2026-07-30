@@ -95,6 +95,7 @@ function pendingPaymentsFromMatrix(matrixRows) {
         status: 'pending_verification',
         _bill: source._bill || bill,
         _profile: source._profile || row?.resident,
+        _unit: source._unit || row?.unit,
       }];
     })
   );
@@ -200,7 +201,7 @@ export default function PaymentVerification() {
   }, [selectedPayment?.id]);
 
   const getUnit = (unitId) => {
-    return units.find(u => u.id === unitId) || getUnitById(unitId);
+    return units.find(u => String(u.id) === String(unitId)) || getUnitById(unitId);
   };
 
   const getResident = (residentId) => {
@@ -362,6 +363,9 @@ export default function PaymentVerification() {
   }
 
   const selectedReceiptPreviewUrl = getReceiptPreviewUrl(selectedPayment);
+  const selectedUnit = selectedPayment
+    ? selectedPayment._unit || getUnit(selectedPayment.unit_id || selectedPayment._bill?.unit_id)
+    : null;
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 sm:space-y-6">
@@ -548,6 +552,12 @@ export default function PaymentVerification() {
                 <span className="text-forest-500">Warga</span>
                 <span className="min-w-0 break-words text-right font-medium text-forest-900">
                   {(selectedPayment._profile || getResident(selectedPayment.resident_id))?.full_name || '-'}
+                </span>
+              </div>
+              <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start gap-3">
+                <span className="text-forest-500">Nomor Unit</span>
+                <span className="min-w-0 break-words text-right font-medium text-forest-900">
+                  {selectedUnit ? `Blok ${selectedUnit.block}/${selectedUnit.unit_number}` : '-'}
                 </span>
               </div>
               <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start gap-3">
