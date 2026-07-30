@@ -7,6 +7,7 @@ import {
   fetchResidents,
   approveManualPayment,
   rejectManualPayment,
+  updatePayment,
   IS_DEMO,
 } from '../services/dataService';
 import {
@@ -27,7 +28,7 @@ import {
   downloadDigitalReceipt,
   sendEmailReceipt,
 } from '../services/mockData';
-import { AiOutlineCheck, AiOutlineClose, AiOutlineEye, AiOutlineClockCircle } from 'react-icons/ai';
+import { AiOutlineCheck, AiOutlineClose, AiOutlineEye, AiOutlineClockCircle, AiOutlineEdit } from 'react-icons/ai';
 import { useToast } from '../hooks/useToast';
 
 const TABS = [
@@ -61,8 +62,15 @@ export default function PaymentVerification() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState('pending');
   const [selectedPayment, setSelectedPayment] = useState(null);
-  const [modalMode, setModalMode] = useState(null); // 'detail' | 'reject'
+  const [modalMode, setModalMode] = useState(null); // 'detail' | 'reject' | 'edit'
   const [rejectReason, setRejectReason] = useState('');
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    method: 'bank_transfer',
+    paid_at: '',
+    note: '',
+    file: null,
+  });
   const [activeActionId, setActiveActionId] = useState(null);
   const [receiptPreviewError, setReceiptPreviewError] = useState(false);
 
@@ -208,6 +216,51 @@ export default function PaymentVerification() {
   const openDetail = (payment) => {
     setSelectedPayment(payment);
     setModalMode('detail');
+  };
+
+  const openEditModal = (payment) => {
+    if (!canWrite) {
+      toast.error('Akun read-only tidak dapat mengubah pembayaran.');
+      return;
+    }
+    setSelectedPayment(payment);
+    setPaymentForm({
+      amount: payment.amount ?? '',
+      method: payment.method || 'bank_transfer',
+      paid_at: payment.paid_at ? String(payment.paid_at).slice(0, 10) : '',
+      note: payment.metadata?.note || '',
+      file: null,
+    });
+    setModalMode('edit');
+  };
+
+  const handleUpdatePayment = async (event) => {
+    event.preventDefault();
+    if (!canWrite || !selectedPayment || activeActionId) return;
+    if (!paymentForm.amount || Number(paymentForm.amount) <= 0) {
+      toast.error('Nominal pembayaran harus lebih besar dari 0.');
+      return;
+    }
+    if (!paymentForm.paid_at) {
+      toast.error('Tanggal pembayaran wajib diisi.');
+      return;
+    }
+
+    setActiveActionId(selectedPayment.id);
+    try {
+      await updatePayment(session?.access_token, {
+        payment_id: selectedPayment.id,
+        ...paymentForm,
+      });
+      toast.success('Detail pembayaran berhasil diperbarui.');
+      setModalMode(null);
+      setSelectedPayment(null);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      toast.error(err.message || 'Gagal memperbarui pembayaran.');
+    } finally {
+      setActiveActionId(null);
+    }
   };
 
   const closeModal = () => {
@@ -536,6 +589,15 @@ export default function PaymentVerification() {
                 </div>
               )}
               <div className="flex flex-col gap-2 sm:flex-row">
+                {canWrite && (
+                  <button
+                    onClick={() => openEditModal(selectedPayment)}
+                    disabled={Boolean(activeActionId)}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-gold-300 bg-gold-50 px-4 py-2.5 text-sm font-medium text-gold-800 hover:bg-gold-100 disabled:opacity-60"
+                  >
+                    <AiOutlineEdit /> Edit Pembayaran
+                  </button>
+                )}
                 {selectedPayment.status === 'pending_verification' && (
                   <>
                     <button
@@ -559,6 +621,95 @@ export default function PaymentVerification() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Payment Modal */}
+      {modalMode === 'edit' && selectedPayment && (
+        <div className="pv-dialog-backdrop">
+          <div className="pv-dialog-panel">
+            <h2 className="text-lg font-bold text-forest-900 mb-1">Edit Detail Pembayaran</h2>
+            <p className="mb-4 text-sm leading-5 text-forest-500">
+              Perbarui transaksi warga. Upload bukti baru bersifat opsional.
+            </p>
+            <form onSubmit={handleUpdatePayment} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Nominal Pembayaran *</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1000"
+                  required
+                  value={paymentForm.amount}
+                  onChange={(e) => setPaymentForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-forest-700 mb-1">Metode Pembayaran *</label>
+                  <select
+                    value={paymentForm.method}
+                    onChange={(e) => setPaymentForm((prev) => ({ ...prev, method: e.target.value }))}
+                    className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 outline-none focus:border-gold-500"
+                  >
+                    <option value="bank_transfer">Transfer Bank</option>
+                    <option value="qris">QRIS</option>
+                    <option value="cash">Tunai</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-forest-700 mb-1">Tanggal Bayar *</label>
+                  <input
+                    type="date"
+                    required
+                    value={paymentForm.paid_at}
+                    onChange={(e) => setPaymentForm((prev) => ({ ...prev, paid_at: e.target.value }))}
+                    className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 outline-none focus:border-gold-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Catatan</label>
+                <textarea
+                  rows={3}
+                  value={paymentForm.note}
+                  onChange={(e) => setPaymentForm((prev) => ({ ...prev, note: e.target.value }))}
+                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 outline-none focus:border-gold-500"
+                  placeholder="Catatan pembayaran..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">Upload Ulang Bukti Pembayaran</label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => setPaymentForm((prev) => ({ ...prev, file: e.target.files?.[0] || null }))}
+                  className="block w-full rounded-lg border border-forest-200 bg-white px-3 py-2 text-sm text-forest-700 file:mr-3 file:rounded file:border-0 file:bg-forest-100 file:px-2 file:py-1 file:text-xs file:font-medium"
+                />
+                {selectedPayment.proof_file_name && !paymentForm.file && (
+                  <p className="mt-1 text-xs text-forest-400">Bukti saat ini: {selectedPayment.proof_file_name}</p>
+                )}
+              </div>
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="submit"
+                  disabled={Boolean(activeActionId)}
+                  className="pv-btn-primary flex-1 rounded-lg py-2.5 text-sm disabled:opacity-60"
+                >
+                  {activeActionId === selectedPayment.id ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalMode('detail')}
+                  disabled={Boolean(activeActionId)}
+                  className="pv-btn-ghost rounded-lg px-4 py-2.5 text-sm"
+                >
+                  Batal
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

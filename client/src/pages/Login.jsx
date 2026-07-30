@@ -126,6 +126,7 @@ export default function Login() {
   const statusTitle = {
     pending_approval: 'Akun menunggu persetujuan',
     rejected: 'Pendaftaran ditolak',
+    blocked: 'Gmail diblokir',
     suspended: 'Akun tidak aktif',
     invalid_session: 'Sesi berakhir',
     session_check_failed: 'Sesi perlu diverifikasi ulang',

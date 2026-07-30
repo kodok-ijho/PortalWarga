@@ -76,7 +76,7 @@ export async function approveUser(token, payload) {
 export async function rejectUser(token, payload) {
   if (IS_DEMO) {
     const mock = await getMockData();
-    mock.rejectRegistration(payload.profile_id, payload.approval_note, payload.rejected_by);
+    mock.rejectRegistration(payload.profile_id, payload.approval_note, payload.rejected_by, payload.decision);
     return { ok: true };
   }
   return portalApiPost('/users/reject', {
@@ -84,7 +84,20 @@ export async function rejectUser(token, payload) {
     body: {
       profile_id: payload.profile_id,
       approval_note: payload.approval_note,
+      decision: payload.decision || 'rejected',
     },
+  });
+}
+
+export async function unblockUser(token, profileId) {
+  if (IS_DEMO) {
+    const mock = await getMockData();
+    mock.unblockRegistration(profileId);
+    return { ok: true };
+  }
+  return portalApiPost('/users/reject', {
+    token,
+    body: { profile_id: profileId, decision: 'unblock' },
   });
 }
 
@@ -751,6 +764,25 @@ export async function rejectManualPayment(token, { payment_id, note }) {
   return portalApiPost('/payments/manual/reject', {
     token,
     body: { payment_id, note }
+  });
+}
+
+export async function updatePayment(token, { payment_id, amount, method, paid_at, note, file }) {
+  if (IS_DEMO) {
+    const mock = await getMockData();
+    return mock.updatePayment(payment_id, { amount, method, paid_at, note, file });
+  }
+
+  if (file) {
+    return portalApiUpload('/payments/update', {
+      token,
+      file,
+      fields: { payment_id, amount, method, paid_at, note },
+    });
+  }
+  return portalApiPost('/payments/update', {
+    token,
+    body: { payment_id, amount, method, paid_at, note },
   });
 }
 

@@ -38,6 +38,7 @@ export default function UserApproval() {
   const [editFullName, setEditFullName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [rejectReason, setRejectReason] = useState('');
+  const [rejectDecision, setRejectDecision] = useState('rejected');
 
   const loadPendingUsers = useCallback(async () => {
     if (!isStaffRole(role)) {
@@ -102,6 +103,7 @@ export default function UserApproval() {
     setSelectedUser(user);
     setModalMode('reject');
     setRejectReason('');
+    setRejectDecision('rejected');
   };
 
   const closeModal = () => {
@@ -150,7 +152,7 @@ export default function UserApproval() {
     }
   };
 
-  const handleReject = async () => {
+  const handleReject = async (decision = rejectDecision) => {
     if (isReadOnly) {
       toast.warning('⚠️ Penolakan pendaftaran dinonaktifkan untuk akun Admin Demo (View-Only).');
       return;
@@ -168,9 +170,14 @@ export default function UserApproval() {
         profile_id: selectedUser.id,
         approval_note: rejectReason,
         rejected_by: profile?.full_name,
+        decision,
       });
 
-      toast.warning(`Pendaftaran ${selectedUser.full_name} ditolak.`);
+      toast.warning(
+        decision === 'blocked'
+          ? `Gmail ${selectedUser.email} diblokir dan tidak dapat mendaftar kembali.`
+          : `Pendaftaran ${selectedUser.full_name} ditolak.`
+      );
       closeModal();
       setRefreshKey((k) => k + 1);
     } catch (error) {
@@ -392,9 +399,13 @@ export default function UserApproval() {
       {modalMode === 'reject' && selectedUser && (
         <div className="pv-dialog-backdrop">
           <div className="pv-dialog-panel">
-            <h2 className="text-lg font-bold text-red-700 mb-1">Tolak Pendaftaran</h2>
+            <h2 className="text-lg font-bold text-red-700 mb-1">
+              {rejectDecision === 'blocked' ? 'Blokir Gmail' : 'Tolak Pendaftaran'}
+            </h2>
             <p className="mb-4 break-words text-sm leading-5 text-forest-500">
-              Tolak pendaftaran <strong>{selectedUser.full_name}</strong> ({selectedUser.email}).
+              {rejectDecision === 'blocked'
+                ? <>Blokir <strong>{selectedUser.email}</strong>. Akun ini tidak dapat mendaftar kembali sampai Admin membuka blokir.</>
+                : <>Tolak pendaftaran <strong>{selectedUser.full_name}</strong> ({selectedUser.email}).</>}
             </p>
 
             <div>
@@ -410,11 +421,21 @@ export default function UserApproval() {
 
             <div className="mt-6 flex flex-col gap-2 sm:flex-row">
               <button
-                onClick={handleReject}
+                onClick={() => handleReject('rejected')}
                 disabled={actionKey === `reject:${selectedUser.id}` || !canWrite}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 text-white py-2.5 text-sm font-medium hover:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {actionKey === `reject:${selectedUser.id}` ? 'Memproses...' : 'Tolak Pendaftaran'}
+                {actionKey === `reject:${selectedUser.id}` && rejectDecision === 'rejected' ? 'Memproses...' : 'Tolak Pendaftaran'}
+              </button>
+              <button
+                onClick={() => {
+                  setRejectDecision('blocked');
+                  handleReject('blocked');
+                }}
+                disabled={actionKey === `reject:${selectedUser.id}` || !canWrite}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-300 bg-red-50 text-red-700 py-2.5 text-sm font-medium hover:bg-red-100 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {actionKey === `reject:${selectedUser.id}` && rejectDecision === 'blocked' ? 'Memproses...' : 'Blokir Gmail'}
               </button>
               <button
                 onClick={closeModal}

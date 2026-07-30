@@ -159,6 +159,9 @@ function useDemoAuth() {
     if (found.approval_status === 'pending') {
       throw new Error('Akun Anda belum disetujui oleh pengurus. Silakan tunggu proses verifikasi.');
     }
+    if (found.approval_status === 'blocked') {
+      throw new Error('Akun Gmail ini diblokir. Hubungi Admin untuk membuka blokir.');
+    }
     if (found.approval_status === 'rejected') {
       throw new Error('Pendaftaran Anda ditolak oleh pengurus. Silakan hubungi pengelola.');
     }
@@ -179,7 +182,24 @@ function useDemoAuth() {
       (p) => p.email?.toLowerCase() === email.toLowerCase()
     );
     if (exists) {
-      throw new Error('Email sudah terdaftar. Silakan gunakan email lain.');
+      if (exists.approval_status === 'blocked') {
+        throw new Error('Akun Gmail ini diblokir. Hubungi Admin untuk membuka blokir.');
+      }
+      if (exists.approval_status !== 'rejected') {
+        throw new Error('Email sudah terdaftar. Silakan gunakan email lain.');
+      }
+      Object.assign(exists, {
+        full_name: fullName || exists.full_name,
+        phone: phone || null,
+        unit_id: unitId ? Number(unitId) : null,
+        is_active: true,
+        approval_status: 'pending',
+        rejection_reason: null,
+        rejected_by: null,
+        rejected_at: null,
+        registered_at: new Date().toISOString(),
+      });
+      return { pending: true, message: 'Pendaftaran berhasil dikirim ulang! Silakan tunggu persetujuan dari pengurus RT.' };
     }
     // Buat profil pending (TIDAK auto-login)
     const newProfile = {
@@ -273,6 +293,11 @@ function mapAuthError(error) {
       return {
         status: 'rejected',
         message: error.message || 'Pendaftaran Anda ditolak. Silakan hubungi pengurus.',
+      };
+    case 'ACCOUNT_BLOCKED':
+      return {
+        status: 'blocked',
+        message: error.message || 'Akun Gmail ini diblokir. Hubungi Admin untuk membuka blokir.',
       };
     case 'SUSPENDED_USER':
       return {

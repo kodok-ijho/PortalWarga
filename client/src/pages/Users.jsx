@@ -8,6 +8,7 @@ import {
   createUser,
   updateUser,
   deactivateUser,
+  unblockUser,
   fetchUnits,
 } from '../services/dataService';
 import {
@@ -16,7 +17,7 @@ import {
   isStaffRole,
   canModifyData,
 } from '../services/dataHelpers';
-import { AiOutlinePlus, AiOutlineEdit, AiOutlineUserDelete } from 'react-icons/ai';
+import { AiOutlinePlus, AiOutlineEdit, AiOutlineUserDelete, AiOutlineUnlock } from 'react-icons/ai';
 
 export default function Users() {
   const { role, session, isReadOnly } = useAuth();
@@ -192,6 +193,21 @@ export default function Users() {
     }
   };
 
+  const handleUnblock = async (user) => {
+    if (role !== 'admin' || !canWrite) return;
+    if (!window.confirm(`Buka blokir Gmail ${user.email}? Akun akan kembali ke antrean verifikasi.`)) return;
+    setIsSaving(true);
+    try {
+      await unblockUser(token, user.id);
+      toast.success(`Blokir ${user.email} berhasil dibuka.`);
+      await loadData();
+    } catch (err) {
+      toast.error(err.message || 'Gagal membuka blokir Gmail.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -285,11 +301,13 @@ export default function Users() {
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        u.is_active !== false 
+                        u.approval_status === 'blocked'
+                          ? 'bg-red-100 text-red-800 border border-red-300'
+                          : u.is_active !== false
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                           : 'bg-red-50 text-red-700 border border-red-200'
                       }`}>
-                        {u.is_active !== false ? 'Aktif' : 'Nonaktif'}
+                        {u.approval_status === 'blocked' ? 'Gmail Diblokir' : u.is_active !== false ? 'Aktif' : 'Nonaktif'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
@@ -310,6 +328,16 @@ export default function Users() {
                             title="Nonaktifkan User"
                           >
                             <AiOutlineUserDelete className="text-base" />
+                          </button>
+                        )}
+                        {role === 'admin' && canWrite && u.approval_status === 'blocked' && (
+                          <button
+                            onClick={() => handleUnblock(u)}
+                            disabled={isSaving}
+                            className="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="Buka blokir Gmail"
+                          >
+                            <AiOutlineUnlock className="text-base" />
                           </button>
                         )}
                       </div>

@@ -1366,16 +1366,31 @@ export function approveRegistration(userId, data = {}) {
  * @param {string} reason
  * @param {string} [rejectedBy]
  */
-export function rejectRegistration(userId, reason, rejectedBy) {
+export function rejectRegistration(userId, reason, rejectedBy, decision = 'rejected') {
   const idx = mockProfiles.findIndex((p) => p.id === userId);
   if (idx === -1) return null;
+  const isBlocked = decision === 'blocked';
   mockProfiles[idx] = {
     ...mockProfiles[idx],
-    approval_status: 'rejected',
+    approval_status: isBlocked ? 'blocked' : 'rejected',
     is_active: false,
     rejection_reason: reason,
     rejected_by: rejectedBy || 'System',
     rejected_at: new Date().toISOString(),
+  };
+  return mockProfiles[idx];
+}
+
+export function unblockRegistration(userId) {
+  const idx = mockProfiles.findIndex((p) => p.id === userId);
+  if (idx === -1) return null;
+  mockProfiles[idx] = {
+    ...mockProfiles[idx],
+    approval_status: 'pending',
+    is_active: true,
+    rejection_reason: null,
+    rejected_by: null,
+    rejected_at: null,
   };
   return mockProfiles[idx];
 }
@@ -1450,6 +1465,21 @@ export function revisePayment(paymentId, opts = {}) {
     bill.payment_id = payment.id;
   }
   return payment;
+}
+
+export function updatePayment(paymentId, opts = {}) {
+  const payment = mockPayments.find((p) => p.id === paymentId);
+  if (!payment) return null;
+  if (opts.amount !== undefined && opts.amount !== '') payment.amount = Number(opts.amount);
+  if (opts.method) payment.method = opts.method;
+  if (opts.paid_at) payment.paid_at = opts.paid_at;
+  if (opts.note !== undefined) payment.metadata = { ...(payment.metadata || {}), note: opts.note };
+  if (opts.file) {
+    payment.receipt_file = opts.file.name || opts.file;
+    payment.proof_file_name = payment.receipt_file;
+  }
+  payment.updated_at = new Date().toISOString();
+  return { ok: true, data: { payment } };
 }
 
 /**

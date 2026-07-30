@@ -95,6 +95,7 @@ export default function Settings() {
   const canWrite = canModifyData(role) && !isReadOnly;
   const canEdit = role === 'admin' && canWrite;
   const canEditSchema = isBendaharaOrAbove(role) && canWrite;
+  const canEditBilling = isBendaharaOrAbove(role) && canWrite;
 
   const handleAddSchema = () => {
     const newId = `schema-${Date.now()}`;
@@ -167,17 +168,23 @@ export default function Settings() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!canEdit && !canEditSchema) {
+    if (!canEditBilling && !canEditSchema) {
       toast.error('Anda tidak memiliki hak untuk mengubah pengaturan ini.');
       return;
     }
 
-    // Validasi Admin
-    if (canEdit) {
+    // Validasi pengaturan denda oleh Admin & Bendahara.
+    if (canEditBilling) {
       if (lateFeeEnabled && lateFeeValue < 0) {
         toast.error('Nilai denda tidak boleh negatif.');
         return;
       }
+      if (lateFeeEnabled && lateFeeType === 'percent' && Number(lateFeeValue) > 100) {
+        toast.error('Persentase denda tidak boleh lebih dari 100%.');
+        return;
+      }
+    }
+    if (canEdit) {
       if (dueDay < 1 || dueDay > 28) {
         toast.error('Tanggal jatuh tempo harus antara 1-28.');
         return;
@@ -205,10 +212,12 @@ export default function Settings() {
       const payload = {};
       if (canEdit) {
         payload.due_day = Number(dueDay);
+        payload.bill_recipient = billRecipient;
+      }
+      if (canEditBilling) {
         payload.late_fee_enabled = lateFeeEnabled;
         payload.late_fee_type = lateFeeType;
         payload.late_fee_value = Number(lateFeeValue);
-        payload.bill_recipient = billRecipient;
       }
       if (canEditSchema) {
         payload.ipl_schemas = schemas.map((s) => ({
@@ -261,13 +270,13 @@ export default function Settings() {
         </p>
       </div>
 
-      {!canEdit && !canEditSchema && (
+      {!canEditBilling && !canEditSchema && (
         <div className="pv-card p-3 bg-blue-50 border border-blue-200 text-blue-700 text-sm flex items-center gap-2">
           <span>ℹ️</span>
           <span>Anda melihat pengaturan dalam mode read-only.</span>
         </div>
       )}
-      {!canEdit && canEditSchema && (
+      {!canEdit && canEditSchema && !canEditBilling && (
         <div className="pv-card p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm flex items-center gap-2">
           <span>ℹ️</span>
           <span>Sebagai <b>Bendahara</b>, Anda memiliki hak akses untuk menambah, mengedit, dan menghapus Profil Skema Biaya IPL.</span>
@@ -506,7 +515,7 @@ export default function Settings() {
                   type="checkbox"
                   checked={lateFeeEnabled}
                   onChange={(e) => setLateFeeEnabled(e.target.checked)}
-                  disabled={!canEdit}
+                  disabled={!canEditBilling}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-forest-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold-500"></div>
@@ -520,7 +529,7 @@ export default function Settings() {
                   <select
                     value={lateFeeType}
                     onChange={(e) => setLateFeeType(e.target.value)}
-                    disabled={!canEdit}
+                    disabled={!canEditBilling}
                     className="w-full rounded-lg border border-forest-200 bg-white disabled:bg-forest-50 px-3 py-2 text-sm text-forest-700 focus:border-gold-500 outline-none"
                   >
                     <option value="percent">Persentase (%)</option>
@@ -537,7 +546,7 @@ export default function Settings() {
                     onChange={(e) => setLateFeeValue(e.target.value)}
                     min="0"
                     step={lateFeeType === 'percent' ? '0.5' : '1000'}
-                    disabled={!canEdit}
+                    disabled={!canEditBilling}
                     className="w-full rounded-lg border border-forest-200 bg-white disabled:bg-forest-50 px-3 py-2 text-sm text-forest-900 focus:border-gold-500 outline-none transition-all"
                   />
                   {lateFeeType === 'percent' && (
