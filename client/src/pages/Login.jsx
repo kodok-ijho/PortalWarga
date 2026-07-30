@@ -8,7 +8,7 @@ import {
   GOOGLE_OAUTH_CLIENT_ID,
 } from '../hooks/useAuth';
 import { mockUnits, roleLabel, roleColor } from '../services/mockData';
-import { AiOutlineSafetyCertificate, AiOutlineCloudSync } from 'react-icons/ai';
+import { AiOutlineSafetyCertificate, AiOutlineCloudSync, AiOutlineClose, AiOutlineHome } from 'react-icons/ai';
 import { FcGoogle } from 'react-icons/fc';
 
 const GOOGLE_SCRIPT_ID = 'google-identity-services';
@@ -39,6 +39,8 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [pendingSuccess, setPendingSuccess] = useState(null);
   const [googleButtonReady, setGoogleButtonReady] = useState(false);
+  const [googleRegistration, setGoogleRegistration] = useState(null);
+  const [registrationError, setRegistrationError] = useState('');
 
   const handleGoogleCredential = useCallback(async (credential) => {
     if (!credential) {
@@ -49,7 +51,17 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const result = await signInWithGoogle(credential, { unitId: registrationUnitId });
+      const result = await signInWithGoogle(credential);
+      if (result?.registrationRequired) {
+        setRegistrationUnitId('');
+        setRegistrationError('');
+        setGoogleRegistration({
+          credential,
+          currentUser: result.currentUser,
+          units: result.units,
+        });
+        return;
+      }
       if (result?.pending) {
         setPendingSuccess({ message: result.message });
         return;
@@ -60,7 +72,7 @@ export default function Login() {
     } finally {
       setSubmitting(false);
     }
-  }, [from, navigate, registrationUnitId, signInWithGoogle]);
+  }, [from, navigate, signInWithGoogle]);
 
   useEffect(() => {
     if (IS_DEMO_MODE || !GOOGLE_AUTH_READY) return;
@@ -172,6 +184,57 @@ export default function Login() {
     }
   };
 
+  const closeGoogleRegistration = () => {
+    if (submitting) return;
+    setGoogleRegistration(null);
+    setRegistrationUnitId('');
+    setRegistrationError('');
+  };
+
+  const handleGoogleUnitSubmit = async (event) => {
+    event.preventDefault();
+    if (!googleRegistration?.credential || submitting) return;
+    if (!registrationUnitId) {
+      setRegistrationError('Silakan pilih unit rumah yang ditempati.');
+      return;
+    }
+
+    setRegistrationError('');
+    setSubmitting(true);
+    try {
+      const result = await signInWithGoogle(googleRegistration.credential, {
+        unitId: registrationUnitId,
+      });
+      if (result?.registrationRequired) {
+        setGoogleRegistration((current) => ({
+          ...current,
+          currentUser: result.currentUser || current?.currentUser,
+          units: result.units,
+        }));
+        setRegistrationError('Unit belum dapat diproses. Silakan pilih kembali.');
+        return;
+      }
+      if (result?.pending) {
+        const selectedUnit = googleRegistration.units.find(
+          (unit) => String(unit.id) === String(registrationUnitId)
+        );
+        setPendingSuccess({
+          message: result.message,
+          unitLabel: selectedUnit
+            ? `Blok ${selectedUnit.block}/${selectedUnit.unit_number}`
+            : 'Unit terpilih',
+        });
+        setGoogleRegistration(null);
+        return;
+      }
+      navigate(from, { replace: true });
+    } catch (err) {
+      setRegistrationError(err.message || 'Pendaftaran belum berhasil. Silakan coba lagi.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-forest-900 via-forest-800 to-[#082315] px-4 py-8">
       <div className="w-full max-w-md">
@@ -203,9 +266,9 @@ export default function Login() {
               <p><strong>Auth Provider:</strong> Google OAuth 2.0 + App JWT</p>
               <p>
                 <strong>Unit diajukan:</strong>{' '}
-                {mockUnits.find((unit) => String(unit.id) === String(registrationUnitId))
+                {pendingSuccess.unitLabel || (mockUnits.find((unit) => String(unit.id) === String(registrationUnitId))
                   ? `Blok ${mockUnits.find((unit) => String(unit.id) === String(registrationUnitId)).block}/${mockUnits.find((unit) => String(unit.id) === String(registrationUnitId)).unit_number}`
-                  : 'Belum dipilih'}
+                  : 'Belum dipilih')}
               </p>
             </div>
             <button
@@ -249,29 +312,6 @@ export default function Login() {
 
           {!IS_DEMO_MODE || mode === 'login' ? (
             <div className="space-y-5">
-              {!IS_DEMO_MODE && (
-                <div className="rounded-xl border border-forest-800 bg-forest-950/60 p-3.5">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-forest-300 mb-1">
-                    Unit Rumah (untuk pendaftaran baru)
-                  </label>
-                  <select
-                    value={registrationUnitId}
-                    onChange={(e) => setRegistrationUnitId(e.target.value)}
-                    className="w-full rounded-xl border border-forest-700 bg-forest-950 px-3.5 py-2.5 text-sm text-white focus:border-gold-500 outline-none"
-                  >
-                    <option value="">Pilih unit rumah jika baru mendaftar</option>
-                    {mockUnits.map((unit) => (
-                      <option key={unit.id} value={unit.id}>
-                        Blok {unit.block}/{unit.unit_number}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-forest-400">
-                    Data ini akan ditampilkan kepada admin untuk diverifikasi. Kosongkan jika hanya masuk ke akun yang sudah terdaftar.
-                  </p>
-                </div>
-              )}
-
               {/* Tombol Utama Google OAuth */}
               {IS_DEMO_MODE ? (
                 <button
@@ -484,6 +524,116 @@ export default function Login() {
           </p>
         </div>
       </div>
+
+      {googleRegistration && (
+        <div className="pv-dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="registration-unit-title">
+          <div className="pv-dialog-panel relative max-w-md">
+            <button
+              type="button"
+              onClick={closeGoogleRegistration}
+              disabled={submitting}
+              className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-lg text-forest-500 transition-colors hover:bg-forest-100 hover:text-forest-900 disabled:opacity-50"
+              aria-label="Tutup pemilihan unit"
+              title="Tutup"
+            >
+              <AiOutlineClose aria-hidden="true" />
+            </button>
+
+            <div className="pr-10">
+              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-gold-100 text-gold-700">
+                <AiOutlineHome className="text-xl" aria-hidden="true" />
+              </div>
+              <h2 id="registration-unit-title" className="text-lg font-bold text-forest-900">
+                Pilih Unit Rumah
+              </h2>
+              <p className="mt-1 text-sm leading-5 text-forest-500">
+                Akun Google ini belum terdaftar. Pilih unit yang akan diajukan untuk diverifikasi admin.
+              </p>
+            </div>
+
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-forest-100 bg-forest-50 p-3">
+              {googleRegistration.currentUser?.avatar_url ? (
+                <img
+                  src={googleRegistration.currentUser.avatar_url}
+                  alt=""
+                  className="h-10 w-10 shrink-0 rounded-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-forest-800 text-sm font-bold text-white">
+                  {(googleRegistration.currentUser?.full_name || 'W').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-forest-900">
+                  {googleRegistration.currentUser?.full_name || 'Warga baru'}
+                </p>
+                <p className="truncate text-xs text-forest-500">
+                  {googleRegistration.currentUser?.email || '-'}
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleGoogleUnitSubmit} className="mt-4 space-y-4">
+              <div>
+                <label htmlFor="google-registration-unit" className="mb-1 block text-sm font-medium text-forest-700">
+                  Unit Rumah yang Ditempati
+                </label>
+                <select
+                  id="google-registration-unit"
+                  value={registrationUnitId}
+                  onChange={(event) => {
+                    setRegistrationUnitId(event.target.value);
+                    setRegistrationError('');
+                  }}
+                  className="pv-input"
+                  required
+                  autoFocus
+                >
+                  <option value="">Pilih unit rumah</option>
+                  {googleRegistration.units.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      Blok {unit.block}/{unit.unit_number}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs leading-5 text-forest-500">
+                  Admin akan memeriksa kecocokan identitas dan unit sebelum akun diaktifkan.
+                </p>
+              </div>
+
+              {googleRegistration.units.length === 0 && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                  Daftar unit belum tersedia. Tutup dialog lalu coba kembali beberapa saat lagi.
+                </p>
+              )}
+              {registrationError && (
+                <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                  {registrationError}
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={closeGoogleRegistration}
+                  disabled={submitting}
+                  className="pv-btn-ghost min-h-10 text-sm disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || googleRegistration.units.length === 0}
+                  className="pv-btn-primary min-h-10 text-sm disabled:opacity-50"
+                >
+                  {submitting ? 'Mengirim...' : 'Ajukan Unit'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

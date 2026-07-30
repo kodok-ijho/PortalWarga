@@ -439,6 +439,18 @@ function useProductionAuth() {
     const currentUser = extractCurrentUser(data);
     const approvalStatus = data?.approval_status || currentUser?.approval_status || data?.status || null;
 
+    if (approvalStatus === 'registration_required' || data?.registration_required === true) {
+      persist(null, null);
+      setAccountStatus('registration_required');
+      setAuthError(null);
+      return {
+        registrationRequired: true,
+        message: data?.message || 'Pilih unit rumah untuk melanjutkan pendaftaran.',
+        currentUser,
+        units: Array.isArray(data?.units) ? data.units : [],
+      };
+    }
+
     if (approvalStatus === 'pending_approval' || approvalStatus === 'pending') {
       persist(null, null);
       setAccountStatus('pending_approval');
