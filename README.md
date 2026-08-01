@@ -10,10 +10,13 @@ Kelola data warga, tagihan IPL (Iuran Pemeliharaan Lingkungan), pembayaran QRIS,
 
 ---
 
-## Changelog v1.2.2
+## Changelog v1.3.12 — Midtrans QRIS Sandbox
 
-- Approval pendaftaran sekarang menyimpan `full_name`, `phone`, `unit_id`, dan `occupancy_status` secara konsisten.
-- Payload auth `currentUser` ikut membawa `occupancy_status` untuk login dan sesi aktif.
+- Pembayaran QRIS melalui Midtrans Sandbox sudah terhubung end-to-end melalui n8n, termasuk pembuatan checkout dan pembaruan status melalui webhook.
+- Selama proses review Midtrans, QRIS hanya tersedia untuk **Admin** dan **Admin Demo** (`admin_viewer`).
+- Admin Demo tetap read-only untuk fitur lain; pengecualian hak tulis hanya berlaku saat membuat pembayaran QRIS.
+- Warga, Pengurus, dan Bendahara tetap menggunakan metode transfer/tunai sesuai otorisasi sebelumnya.
+- Refresh status QRIS berjalan di background tanpa memicu fullscreen loading atau blinking pada matriks pembayaran.
 
 ---
 
@@ -54,7 +57,7 @@ Ringkasan status IPL real-time: total tagihan, jumlah terkumpul, tunggakan, dan 
 Database warga lengkap dengan **import/export CSV massal**, pencarian cerdas, filter multi-kriteria, dan pelacakan status hunian (pemilik/penyewa).
 
 ### 💳 Matriks Pembayaran Multi-Tahun
-Grid pembayaran **lintas tahun** yang memvisualkan status setiap unit per bulan. Pilih & bayar beberapa bulan **sekaligus** via QRIS.
+Grid pembayaran **lintas tahun** yang memvisualkan status setiap unit per bulan. Pembayaran multi-bulan mendukung transfer/tunai sesuai role, serta QRIS Midtrans Sandbox khusus Admin dan Admin Demo selama masa review.
 
 </td>
 <td width="50%" valign="top">
@@ -127,13 +130,13 @@ Portal Warga Palm Village telah dilengkapi dengan inovasi arsitektur mutakhir un
 | 💰 Pengeluaran | ✅ | CRUD dengan kwitansi, kategori, filter bulan |
 | ⚙️ Pengaturan IPL | ✅ | Komponen IPL, denda, jatuh tempo, penerima |
 | 📱 PWA (Installable) | ✅ | Service worker, manifest, icon, update prompt |
-| 💵 Integrasi Mayar QRIS | 🚧 | Schema siap, integrasi Edge Function Phase 2 |
+| 💵 Integrasi Midtrans QRIS Sandbox | 🧪 | Checkout + webhook aktif; sementara hanya untuk Admin dan Admin Demo selama review Midtrans |
 | 📅 Kalender Acara | 🚧 | Schema DB siap, UI placeholder Phase 2 |
 | 💬 Forum Diskusi | 🚧 | Schema DB siap (nested comments), UI Phase 2 |
-| 🤖 Otomasi n8n | 🚧 | 4 workflow: webhook, billing, denda, notifikasi |
+| 🤖 Otomasi n8n | 🧪 | API QRIS create + webhook aktif; workflow billing, denda, dan notifikasi dikembangkan bertahap |
 | 📲 Notifikasi WA/Email | 🚧 | Via n8n (Fonnte/Wablas + SMTP) |
 
-> **Legenda:** ✅ Implemented &nbsp;|&nbsp; 🚧 Phase 2 / Planned &nbsp;|&nbsp; ⏳ Future
+> **Legenda:** ✅ Implemented &nbsp;|&nbsp; 🧪 Sandbox / Review &nbsp;|&nbsp; 🚧 Phase 2 / Planned &nbsp;|&nbsp; ⏳ Future
 
 ---
 
@@ -146,6 +149,7 @@ Aplikasi bisa langsung dijalankan **tanpa Supabase** menggunakan mode demo. Semu
 | Role | Email | Password | Akses |
 |:-----|:------|:---------|:------|
 | 👑 **Admin** | `admin@palmvillage.id` | `demo123` | Akses penuh sistem (Kelola User & Log) |
+| 👁️ **Admin Demo** | `admin.viewer@palmvillage.id` | `demo123` | Read-only untuk fitur lain; pembayaran QRIS diizinkan sebagai pengecualian |
 | 💰 **Bendahara** | `bendahara@palmvillage.id` | `demo123` | CRUD Pengeluaran, catat tunai & transfer |
 | 📋 **Pengurus** | `pengurus@palmvillage.id` | `demo123` | Read-only pengeluaran, catat transfer only |
 | 🧑 **Warga** | `warga@palmvillage.id` | `demo123` | Lihat unit & bayar IPL rumah sendiri |
@@ -203,16 +207,16 @@ Aplikasi bisa langsung dijalankan **tanpa Supabase** menggunakan mode demo. Semu
 ┌──────────────────────────────┐   ┌──────────────────────────────┐
 │    🟢 SUPABASE CLOUD         │   │      🔄 n8n AUTOMATION       │
 │  ┌────────────────────────┐  │   │  ┌────────────────────────┐  │
-│  │ Auth (Email/OTP)       │  │   │  │ Webhook Mayar          │  │
+│  │ Auth + App JWT         │  │   │  │ API Pembayaran QRIS    │  │
 │  │ PostgreSQL + RLS       │◄─┼───┼─▶│ Cron Billing Bulanan   │  │
-│  │ Edge Functions (QRIS)  │  │   │  │ Cek Denda Otomatis     │  │
-│  │ Storage (Kwitansi)     │  │   │  │ Notifikasi WA + Email  │  │
+│  │ Storage (Kwitansi)     │  │   │  │ Webhook Midtrans       │  │
+│  │ Audit Log              │  │   │  │ Notifikasi WA + Email  │  │
 │  └────────────────────────┘  │   │  └────────────────────────┘  │
 └──────────────┬───────────────┘   └──────────────┬───────────────┘
                │ API Call                         │ API Call
                ▼                                  ▼
           ┌─────────┐                    ┌─────────────────┐
-          │ Mayar   │                    │ WhatsApp / SMTP │
+          │Midtrans │                    │ WhatsApp / SMTP │
           │ (QRIS)  │                    │ (Fonnte/Wablas) │
           └─────────┘                    └─────────────────┘
 ```
@@ -220,38 +224,39 @@ Aplikasi bisa langsung dijalankan **tanpa Supabase** menggunakan mode demo. Semu
 ### Alur Pembayaran IPL
 
 ```
-Warga pilih bulan ──▶ Generate QRIS (Mayar) ──▶ Scan & Bayar
-                                                       │
-                                                       ▼
-                                              Webhook Mayar → n8n
-                                                       │
-                                       ┌───────────────┼───────────────┐
-                                       ▼               ▼               ▼
-                                  Update DB      Notifikasi WA    Kirim Email
-                                  (paid)         "Terima kasih"    (Receipt)
+Admin/Admin Demo pilih tagihan ──▶ n8n membuat transaksi QRIS
+                                              │
+                                              ▼
+                                  Midtrans Snap Sandbox ──▶ Scan & Bayar
+                                              │
+                                              ▼
+                                      Webhook Midtrans → n8n
+                                              │
+                                              ▼
+                              Validasi notifikasi + update pembayaran/tagihan
 ```
 
 ---
 
 ## 👥 Role-Based Access Control (RBAC)
 
-Sistem memiliki 4 role dengan pembagian hak akses terperinci. Keamanan diterapkan dua lapis: frontend route guard + database RLS.
+Sistem memiliki 4 role utama dan 1 profil Admin Demo read-only. Keamanan diterapkan pada UI serta divalidasi kembali oleh endpoint n8n/database.
 
-| Halaman / Fitur | 👑 Admin | 💰 Bendahara | 📋 Pengurus | 🧑 Warga |
-|:----------------|:--------:|:------------:|:-----------:|:-------:|
-| 🏠 Dashboard | ✅ | ✅ | ✅ | ✅ |
-| 👥 Daftar Warga | ✅ CRUD + CSV | ✅ CRUD + CSV | ✅ CRUD + CSV | 👁️ Lihat saja |
-| 💳 Matriks Pembayaran | ✅ Semua unit | ✅ Semua unit | ✅ Semua unit | ✅ Unit sendiri |
-| 📝 Catat Bayar Tunai | ✅ | ✅ | ❌ | ❌ |
-| 📝 Catat Bayar Transfer | ✅ | ✅ | ✅ | ❌ |
-| 💵 Bayar IPL (QRIS) | ❌ | ❌ | ❌ | ✅ |
-| 📊 Laporan Keuangan | ✅ | ✅ | ✅ | 🔒 Blocked |
-| 💰 Pengeluaran (CRUD) | ✅ | ✅ | 👁️ Lihat saja | 🔒 Blocked |
-| ⚙️ Pengaturan IPL (Edit)| ✅ | 👁️ Lihat saja | 👁️ Lihat saja | 🔒 Blocked |
-| 👤 Kelola User (CRUD) | ✅ | ❌ | ❌ | ❌ |
-| 📋 Log Sistem (Audit) | ✅ | ❌ | ❌ | ❌ |
-| 📅 Kalender Acara | 🚧 | 🚧 | 🚧 | 🚧 |
-| 💬 Forum Diskusi | 🚧 | 🚧 | 🚧 | 🚧 |
+| Halaman / Fitur | 👑 Admin | 👁️ Admin Demo | 💰 Bendahara | 📋 Pengurus | 🧑 Warga |
+|:----------------|:--------:|:-------------:|:------------:|:-----------:|:-------:|
+| 🏠 Dashboard | ✅ | 👁️ Lihat saja | ✅ | ✅ | ✅ |
+| 👥 Daftar Warga | ✅ CRUD + CSV | 👁️ Lihat saja | ✅ CRUD + CSV | ✅ CRUD + CSV | 👁️ Lihat saja |
+| 💳 Matriks Pembayaran | ✅ Semua unit | ✅ Semua unit | ✅ Semua unit | ✅ Semua unit | ✅ Unit sendiri |
+| 📝 Catat Bayar Tunai | ✅ | ❌ | ✅ | ❌ | ❌ |
+| 📝 Catat Bayar Transfer | ✅ | ❌ | ✅ | ✅ | ✅ Unit sendiri |
+| 💵 Bayar IPL (QRIS Sandbox) | ✅ | ✅ | ❌ | ❌ | ❌ |
+| 📊 Laporan Keuangan | ✅ | 👁️ Lihat saja | ✅ | ✅ | 🔒 Blocked |
+| 💰 Pengeluaran (CRUD) | ✅ | 👁️ Lihat saja | ✅ | 👁️ Lihat saja | 🔒 Blocked |
+| ⚙️ Pengaturan IPL (Edit)| ✅ | 👁️ Lihat saja | 👁️ Lihat saja | 👁️ Lihat saja | 🔒 Blocked |
+| 👤 Kelola User (CRUD) | ✅ | 👁️ Lihat saja | ❌ | ❌ | ❌ |
+| 📋 Log Sistem (Audit) | ✅ | 👁️ Lihat saja | ❌ | ❌ | ❌ |
+| 📅 Kalender Acara | 🚧 | 👁️ Lihat saja | 🚧 | 🚧 | 🚧 |
+| 💬 Forum Diskusi | 🚧 | 👁️ Lihat saja | 🚧 | 🚧 | 🚧 |
 
 ---
 
@@ -270,7 +275,7 @@ Sistem memiliki 4 role dengan pembagian hak akses terperinci. Keamanan diterapka
 | 🟢 **Backend & Auth** | Supabase (PostgreSQL + Auth + RLS) | 2.39 |
 | ⚡ **Edge Functions** | Supabase (Deno/TypeScript) | — |
 | 🔄 **Automation** | n8n (self-hosted) | — |
-| 💵 **Payment Gateway** | Mayar (QRIS) | — |
+| 💵 **Payment Gateway** | Midtrans Snap (QRIS Sandbox) | Sandbox |
 | 📲 **Notifikasi** | WhatsApp (Fonnte/Wablas) + Email (SMTP) | — |
 | 🚀 **Deployment** | Vercel (frontend) + Supabase Cloud (backend) | — |
 
@@ -334,10 +339,11 @@ VITE_SUPABASE_ANON_KEY=your-anon-public-key
 npm run dev
 ```
 
-#### 5. (Opsional) Setup n8n Automation
-- Impor 4 workflow: webhook Mayar, cron billing bulanan, cek denda, notifikasi
-- Set credentials: Mayar API, WhatsApp gateway, SMTP
-- Detail: lihat [`PLAN.md`](./PLAN.md)
+#### 5. Setup n8n API & Midtrans Sandbox
+- Konfigurasikan `VITE_N8N_API_BASE_URL` ke URL webhook n8n.
+- Aktifkan workflow pembuatan transaksi QRIS dan webhook notifikasi Midtrans.
+- Simpan Midtrans Server Key sebagai credential **server-side di n8n**, bukan sebagai variable `VITE_*` atau source frontend.
+- Detail implementasi: lihat [`docs/production/TASK_MIDTRANS_QRIS_SANDBOX.md`](./docs/production/TASK_MIDTRANS_QRIS_SANDBOX.md).
 
 </details>
 
@@ -350,26 +356,21 @@ npm run dev
 | `VITE_DEMO_MODE` | Aktifkan mode demo (tanpa Supabase) | ✅ | `true` |
 | `VITE_SUPABASE_URL` | URL project Supabase | ❌* | — |
 | `VITE_SUPABASE_ANON_KEY` | Anon public key Supabase | ❌* | — |
+| `VITE_N8N_API_BASE_URL` | Base URL API webhook n8n | ❌* | — |
+| `VITE_GOOGLE_CLIENT_ID` | Client ID Google OAuth untuk login production | ❌* | — |
 
 > *\*Wajib jika `VITE_DEMO_MODE=false`*
 
 <details>
 <summary><strong>🔐 Backend Secrets (Supabase & n8n)</strong></summary>
 
-Set via Supabase Dashboard → Edge Function Secrets:
-```
-MAYAR_API_KEY=your_mayar_sandbox_key
-MAYAR_API_SECRET=your_mayar_sandbox_secret
-```
+Credential backend dikelola langsung melalui **n8n Credentials**:
 
-n8n Credentials:
-```
-N8N_MAYAR_WEBHOOK_SECRET=your_webhook_secret
-WA_GATEWAY_TOKEN=your_fonnte_or_wablas_token
-SMTP_HOST=smtp.your-provider.com
-SMTP_USER=your@email.com
-SMTP_PASS=your_smtp_password
-```
+- Midtrans Sandbox Server Key menggunakan credential HTTP Basic Auth.
+- Supabase service credential untuk membaca dan memperbarui pembayaran/tagihan.
+- Credential notifikasi tambahan (WA/SMTP) bila workflow terkait diaktifkan.
+
+Jangan menuliskan Midtrans Server Key, JWT, atau token transaksi di README, source code, variable `VITE_*`, maupun repository GitHub.
 
 </details>
 
@@ -615,7 +616,9 @@ Didesain mengikuti logo Palm Village — nuansa **hijau hutan** yang menenangkan
 | 🔑 **Authentication** | Google Account OAuth 2.0 via Supabase Auth + JWT Bearer Token (n8n backend ready) |
 | 🛡️ **Route Protection** | `ProtectedLayout` guard + per-page role check |
 | 🔁 **Session** | Auto-refresh token, persist via HttpOnly cookie |
-| 🚫 **Sequential Payment** | `canPayBill()` — cegit bayar bulan yang belum wajib |
+| 🚫 **Sequential Payment** | `canPayBill()` — cegah pembayaran jika masih ada tagihan periode sebelumnya |
+| 💵 **QRIS Authorization** | UI dan endpoint n8n hanya menerima Admin serta akun Admin Demo resmi selama masa review |
+| 🔐 **Midtrans Credential** | Server Key disimpan sebagai credential server-side n8n, tidak boleh dimasukkan ke source code atau di-push ke GitHub |
 
 ---
 
@@ -636,12 +639,14 @@ Didesain mengikuti logo Palm Village — nuansa **hijau hutan** yang menenangkan
 
 ### Backend → Supabase Cloud
 - Database: managed PostgreSQL
-- Auth: built-in Email/OTP
+- Auth: Google OAuth + App JWT
 - Storage: untuk kwitansi & receipt
-- Edge Functions: deploy QRIS integration
+- Tabel pembayaran/tagihan diperbarui oleh workflow n8n setelah notifikasi Midtrans tervalidasi
 
 ### Automation → n8n (self-hosted)
-- 4 workflow: webhook Mayar, cron billing, cek denda, notifikasi
+- Endpoint pembuatan checkout QRIS Midtrans Sandbox
+- Webhook Midtrans untuk sinkronisasi status pembayaran
+- Credential Midtrans dikelola di n8n dan tidak diekspos ke frontend
 
 ---
 
@@ -669,9 +674,12 @@ Didesain mengikuti logo Palm Village — nuansa **hijau hutan** yang menenangkan
 - [x] Pengeluaran + kwitansi & Audit Log Sistem (Login, Akses, Transaksi)
 - [x] Pengaturan IPL (komponen-based) & Dasbor Proaktif dengan Banner/Badge
 - [x] PWA (installable, offline-ready)
+- [x] Integrasi Midtrans QRIS Sandbox melalui n8n untuk Admin dan Admin Demo
+- [x] Webhook Midtrans untuk sinkronisasi status pembayaran QRIS
 
 ### 🚧 Phase 2 — Integrasi & Komunitas
-- [ ] Integrasi Mayar QRIS via Edge Function
+- [ ] Aktivasi QRIS untuk role lain setelah review dan persetujuan Midtrans selesai
+- [ ] Migrasi credential dan endpoint dari Midtrans Sandbox ke Production setelah persetujuan eksplisit
 - [ ] Otomasi n8n (billing, denda, notifikasi)
 - [ ] Kalender acara + RSVP
 - [ ] Forum diskusi (nested comments)

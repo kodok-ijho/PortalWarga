@@ -647,6 +647,66 @@ function normalizePaymentRecord(payment) {
   };
 }
 
+const PAYMENT_STATUS_PRIORITY = {
+  completed: 60,
+  pending_verification: 50,
+  pending: 40,
+  draft: 30,
+  rejected: 20,
+  failed: 10,
+  expired: 10,
+  cancelled: 10,
+  refunded: 10,
+};
+
+function paymentCreatedTimestamp(payment) {
+  const value =
+    payment?.created_at ||
+    payment?.createdAt ||
+    payment?.updated_at ||
+    payment?.updatedAt ||
+    '';
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function linkedPaymentId(payment) {
+  return (
+    payment?._bill?.payment_id ||
+    payment?.ipl_bills?.payment_id ||
+    payment?.bill?.payment_id ||
+    null
+  );
+}
+
+function comparePaymentPreference(left, right, preferredPaymentId = null) {
+  const preferredId = preferredPaymentId ? String(preferredPaymentId) : '';
+  const leftId = String(left?.id || '');
+  const rightId = String(right?.id || '');
+
+  const leftExplicit = preferredId && leftId === preferredId ? 1 : 0;
+  const rightExplicit = preferredId && rightId === preferredId ? 1 : 0;
+  if (leftExplicit !== rightExplicit) return rightExplicit - leftExplicit;
+
+  const leftLinked = linkedPaymentId(left) && String(linkedPaymentId(left)) === leftId ? 1 : 0;
+  const rightLinked = linkedPaymentId(right) && String(linkedPaymentId(right)) === rightId ? 1 : 0;
+  if (leftLinked !== rightLinked) return rightLinked - leftLinked;
+
+  const leftPriority = PAYMENT_STATUS_PRIORITY[left?.status] || 0;
+  const rightPriority = PAYMENT_STATUS_PRIORITY[right?.status] || 0;
+  if (leftPriority !== rightPriority) return rightPriority - leftPriority;
+
+  return paymentCreatedTimestamp(right) - paymentCreatedTimestamp(left);
+}
+
+export function selectPreferredPayment(records, preferredPaymentId = null) {
+  if (!Array.isArray(records) || records.length === 0) return null;
+  return records
+    .filter(Boolean)
+    .map((payment) => normalizePaymentRecord(payment))
+    .sort((left, right) => comparePaymentPreference(left, right, preferredPaymentId))[0] || null;
+}
+
 function extractPaymentList(result) {
   const candidates = [
     result,
@@ -860,7 +920,7 @@ export async function fetchPayments(token, opts = {}) {
     ...normalizePaymentRecord(p),
     _bill: p.ipl_bills || p.bill || p._bill,
     _profile: p.profiles || p.profile || p._profile,
-  }));
+  })).sort((left, right) => comparePaymentPreference(left, right));
 }
 
 export async function fetchPaymentByBillId(token, billId, billContext = {}) {
@@ -881,11 +941,12 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
         token,
         body: { bill_id: billId, ipl_bill_id: billId },
       });
-      const list = Array.isArray(result) ? result : result?.payments || result?.data || [];
-      const found = list.find(p =>
+      const list = extractPaymentList(result);
+      const matches = list.filter(p =>
         String(p.ipl_bill_id) === String(billId) ||
         String(p.bill_id) === String(billId)
       );
+      const found = selectPreferredPayment(matches, billContext.payment_id);
       if (found) return normalizePaymentRecord(found);
     } catch { /* try next */ }
   }
@@ -897,11 +958,12 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
         token,
         body: { scopeUnitId: billContext.unit_id, unit_id: billContext.unit_id },
       });
-      const list = Array.isArray(result) ? result : result?.payments || result?.data || [];
-      const found = list.find(p =>
+      const list = extractPaymentList(result);
+      const matches = list.filter(p =>
         (billId && (String(p.ipl_bill_id) === String(billId) || String(p.bill_id) === String(billId))) ||
         (billContext.period && p._bill?.period === billContext.period)
       );
+      const found = selectPreferredPayment(matches, billContext.payment_id);
       if (found) return normalizePaymentRecord(found);
     } catch { /* try next */ }
   }
@@ -913,10 +975,9 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
         token,
         body: { period: billContext.period, unit_id: billContext.unit_id },
       });
-      const list = Array.isArray(result) ? result : result?.payments || result?.data || [];
-      if (Array.isArray(list) && list.length > 0) {
-        return normalizePaymentRecord(list[0]);
-      }
+      const list = extractPaymentList(result);
+      const found = selectPreferredPayment(list, billContext.payment_id);
+      if (found) return found;
     } catch { /* try next */ }
   }
 
@@ -930,12 +991,13 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
 
   if (billId) {
     try {
-      const { data: supaPayment } = await authedClient
+      const { data: supaPayments } = await authedClient
         .from('payments')
         .select('*, ipl_bills(*), profiles(*)')
         .eq('ipl_bill_id', billId)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
+      const supaPayment = selectPreferredPayment(supaPayments, billContext.payment_id);
       if (supaPayment) {
         return normalizePaymentRecord({
           ...supaPayment,
@@ -955,10 +1017,11 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
         .eq('ipl_bills.period', billContext.period);
 
       if (Array.isArray(supaPayments) && supaPayments.length > 0) {
+        const supaPayment = selectPreferredPayment(supaPayments, billContext.payment_id);
         return normalizePaymentRecord({
-          ...supaPayments[0],
-          _bill: supaPayments[0].ipl_bills,
-          _profile: supaPayments[0].profiles,
+          ...supaPayment,
+          _bill: supaPayment.ipl_bills,
+          _profile: supaPayment.profiles,
         });
       }
     } catch {}
@@ -968,19 +1031,33 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
 }
 
 
-export async function createQrisPayment(token, { bill_ids }) {
+// Create one Midtrans QRIS checkout. Ownership and amount are resolved by the API.
+export async function createQrisPayment(token, { bill_ids } = {}) {
+  if (!Array.isArray(bill_ids) || bill_ids.length === 0) {
+    throw new Error('Pilih minimal satu tagihan untuk dibayar via QRIS.');
+  }
+
   if (IS_DEMO) {
     return {
-      token: "demo-token-" + Math.random().toString(36).substring(2, 10),
-      redirect_url: "https://app.sandbox.midtrans.com/snap/v2/vtweb/demo-token",
-      parent_order_id: "PV-QRIS-demo-" + Date.now(),
-      total_amount: 150000
+      token: null,
+      redirect_url: null,
+      parent_order_id: `DEMO-QRIS-${Date.now()}`,
+      total_amount: 0,
+      bills: bill_ids.map((id) => ({ id })),
+      demo: true,
     };
   }
-  return portalApiPost('/payments/qris/create', {
+
+  const data = await portalApiPost('/payments/qris/create', {
     token,
-    body: { bill_ids }
+    body: { bill_ids },
   });
+
+  return {
+    ...data,
+    total_amount: Number(data?.total_amount ?? data?.total ?? 0),
+    bills: Array.isArray(data?.bills) ? data.bills : [],
+  };
 }
 
 export async function fetchRunningBalance(token, { year, month }) {

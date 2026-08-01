@@ -26,6 +26,8 @@ import {
   rejectManualPayment,
   fetchPayments,
   fetchPaymentByBillId,
+  selectPreferredPayment,
+  createQrisPayment,
   IS_DEMO,
 } from '../services/dataService';
 import { portalApiPost } from '../services/apiClient';
@@ -70,6 +72,7 @@ export default function PaymentMatrix() {
   // Seleksi sel pembayaran warga. Key pakai bill.id (unik lintas tahun).
   const [selected, setSelected] = useState({}); // { [billId]: true }
   const [payModal, setPayModal] = useState(null);
+  const [qrisCheckoutData, setQrisCheckoutData] = useState(null);
   // Manual payment (staff)
   const [manualModal, setManualModal] = useState(null); // { bill, unitId, monthIdx }
   // Detail bukti bayar (lunas)
@@ -78,6 +81,10 @@ export default function PaymentMatrix() {
   // Semua role bisa LIHAT semua unit. Interaksi (bayar) di-gate per baris.
   const isStaff = isStaffRole(role);
   const canWrite = canModifyData(role) && !isReadOnly;
+  // Admin Demo memakai role internal admin_viewer dan tetap read-only untuk
+  // seluruh fitur lain. QRIS adalah satu-satunya pengecualian sementara.
+  const isDemoAdmin = isReadOnly && (role === 'admin' || role === 'admin_viewer');
+  const canUseQris = role === 'admin' || isDemoAdmin;
   const myUnitId = profile?.unit_id;
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -86,9 +93,11 @@ export default function PaymentMatrix() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
-  const loadMatrix = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError('');
+  const loadMatrix = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setIsLoading(true);
+      setLoadError('');
+    }
     try {
       const scopedMatrixPromise =
         !IS_DEMO && !isStaff && myUnitId
@@ -117,17 +126,18 @@ export default function PaymentMatrix() {
       setProductionPayments(paymentData);
     } catch (err) {
       const msg = err.message || 'Gagal memuat matriks pembayaran.';
-      setLoadError(msg);
-      toast.error(msg);
+      if (!silent) {
+        setLoadError(msg);
+        toast.error(msg);
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [session?.access_token, year, role, toast, isStaff, myUnitId]);
 
-  const getPaymentForBillView = useCallback((billId) => {
+  const getPaymentForBillView = useCallback((billId, preferredPaymentId = null) => {
     if (IS_DEMO) return getPaymentForBill(billId);
-    return (
-      productionPayments.find((payment) => {
+    const candidates = productionPayments.filter((payment) => {
         const paymentBillId =
           payment.ipl_bill_id ||
           payment.iplBillId ||
@@ -136,12 +146,12 @@ export default function PaymentMatrix() {
           payment._bill?.id ||
           payment.ipl_bill?.id;
         return String(paymentBillId) === String(billId);
-      }) || null
-    );
+      });
+    return selectPreferredPayment(candidates, preferredPaymentId);
   }, [productionPayments]);
 
-  const mergePaymentDetails = useCallback((cellPayment, billId) => {
-    const listPayment = getPaymentForBillView(billId);
+  const mergePaymentDetails = useCallback((cellPayment, billId, preferredPaymentId = null) => {
+    const listPayment = getPaymentForBillView(billId, preferredPaymentId);
     if (!cellPayment) return listPayment;
     if (!listPayment) return cellPayment;
 
@@ -164,6 +174,41 @@ export default function PaymentMatrix() {
   useEffect(() => {
     loadMatrix();
   }, [loadMatrix, refreshKey]);
+
+  useEffect(() => {
+    if (!qrisCheckoutData || IS_DEMO) return undefined;
+
+    let isRefreshing = false;
+    const refreshPaymentStatus = async () => {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      try {
+        await loadMatrix({ silent: true });
+      } finally {
+        isRefreshing = false;
+      }
+    };
+    const intervalId = window.setInterval(refreshPaymentStatus, 10000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void refreshPaymentStatus();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [qrisCheckoutData, loadMatrix]);
+
+  // Resolve unit from the production matrix first. Production unit IDs can
+  // overlap with mock IDs, so getUnitById() must only be a demo fallback.
+  const findUnitInMatrix = useCallback((unitId) => {
+    const row = matrix.find(
+      (item) => String(item?.unit?.id) === String(unitId)
+    );
+    if (row?.unit) return row.unit;
+    return IS_DEMO ? getUnitById(unitId) : null;
+  }, [matrix]);
 
   // Helper to find a bill in local matrix state
   const findBillInMatrix = useCallback((billId) => {
@@ -275,9 +320,11 @@ export default function PaymentMatrix() {
       // Select baru: cegah lintas unit (proaktif, bukan hanya di akhir).
       // Pesan kontekstual: beri tahu unit mana yang sedang aktif.
       if (activeUnitId !== null && bill.unit_id !== activeUnitId) {
-        const u = getUnitById(activeUnitId);
+        const u = findUnitInMatrix(activeUnitId);
         toast.warning(
-          `Selesaikan dulu transaksi untuk Blok ${u.block}/${u.unit_number}, atau kosongkan seleksi sebelum memilih unit lain.`
+          u
+            ? `Selesaikan dulu transaksi untuk ${u.block} no ${u.unit_number}, atau kosongkan seleksi sebelum memilih unit lain.`
+            : 'Selesaikan dulu transaksi unit yang sedang dipilih, atau kosongkan seleksi sebelum memilih unit lain.'
         );
         return prev;
       }
@@ -359,7 +406,22 @@ export default function PaymentMatrix() {
     let completedCount = 0;
     try {
       if (method === 'qris') {
-        toast.error('Pembayaran QRIS sedang tidak tersedia. Gunakan Transfer Bank.');
+        if (!canUseQris) {
+          toast.error('Pembayaran QRIS sementara hanya tersedia untuk Admin dan Admin Demo.');
+          return;
+        }
+        const data = await createQrisPayment(session?.access_token, {
+          bill_ids: payModal.map((bill) => bill.id),
+        });
+        setQrisCheckoutData({
+          ...data,
+          bills: data.bills?.length ? data.bills : payModal,
+          total: data.total_amount || totalToPay,
+        });
+        setSelected({});
+        setPayModal(null);
+        void loadMatrix({ silent: true });
+        toast.success(IS_DEMO ? 'Simulasi QRIS berhasil dibuat.' : 'Checkout QRIS berhasil dibuat.');
         return;
       } else {
         if (IS_DEMO) {
@@ -406,7 +468,7 @@ export default function PaymentMatrix() {
   // Staff memakai mekanisme seleksi yang sama dengan warga: klik untuk
   // memilih beberapa bulan (runut, lintas tahun), lalu klik tombol di footer.
   const handleStaffPay = () => {
-    if (!canWrite) {
+    if (!canWrite && !canUseQris) {
       toast.error('Akun read-only tidak dapat mencatat pembayaran.');
       return;
     }
@@ -421,13 +483,18 @@ export default function PaymentMatrix() {
     // sebagai lapisan terakhir sebelum membuka modal pencatatan.
     const unitIds = new Set(validBills.map((b) => b.unit_id));
     if (unitIds.size > 1) {
-      const u = getUnitById([...unitIds][0]);
+      const u = findUnitInMatrix([...unitIds][0]);
       toast.warning(
-        `Pilih tagihan dari satu rumah/unit saja dalam satu transaksi (aktif: Blok ${u.block}/${u.unit_number}).`
+        u
+          ? `Pilih tagihan dari satu rumah/unit saja dalam satu transaksi (aktif: ${u.block} no ${u.unit_number}).`
+          : 'Pilih tagihan dari satu rumah/unit saja dalam satu transaksi.'
       );
       return;
     }
-    setManualModal({ bills: validBills });
+    setManualModal({
+      bills: validBills,
+      unit: findUnitInMatrix(validBills[0].unit_id),
+    });
   };
 
   const confirmManual = async ({ method, paidAt, note, receiptFile }) => {
@@ -436,6 +503,14 @@ export default function PaymentMatrix() {
     const noteWithDate = [note?.trim(), `Tanggal diterima: ${paidAt}`].filter(Boolean).join(' | ');
     let completedCount = 0;
     try {
+      if (method === 'qris' && !canUseQris) {
+        toast.error('Pembayaran QRIS sementara hanya tersedia untuk Admin dan Admin Demo.');
+        return;
+      }
+      if (method !== 'qris' && !canWrite) {
+        toast.error('Akun read-only hanya diizinkan melakukan pembayaran melalui QRIS.');
+        return;
+      }
       if (IS_DEMO) {
         let count = 0;
         for (const bill of manualModal.bills) {
@@ -450,7 +525,24 @@ export default function PaymentMatrix() {
         }
         toast.success(`${count} pembayaran ${methodLabel} berhasil dicatat.`);
       } else {
-        if (method === 'cash') {
+        if (method === 'qris') {
+          const data = await createQrisPayment(session?.access_token, {
+            bill_ids: manualModal.bills.map((bill) => bill.id),
+          });
+          setQrisCheckoutData({
+            ...data,
+            bills: data.bills?.length ? data.bills : manualModal.bills,
+            total: data.total_amount || manualModal.bills.reduce(
+              (sum, bill) => sum + Number(bill.amount || 0) + Number(bill.late_fee || 0),
+              0
+            ),
+          });
+          setSelected({});
+          setManualModal(null);
+          void loadMatrix({ silent: true });
+          toast.success(IS_DEMO ? 'Simulasi QRIS berhasil dibuat.' : 'Checkout QRIS berhasil dibuat.');
+          return;
+        } else if (method === 'cash') {
           let firstPayment = null;
           for (let i = 0; i < manualModal.bills.length; i++) {
             const bill = manualModal.bills[i];
@@ -487,9 +579,6 @@ export default function PaymentMatrix() {
             completedCount += 1;
           }
           toast.success(`Bukti transfer untuk ${manualModal.bills.length} tagihan berhasil dicatat dan menunggu verifikasi bendahara.`);
-        } else {
-          toast.error('Pembayaran QRIS sedang tidak tersedia. Gunakan Transfer atau Tunai.');
-          return;
         }
       }
       setSelected({});
@@ -726,7 +815,11 @@ export default function PaymentMatrix() {
                                   matchedCell?.status === 'rejected' ||
                                   matchedCell?.payment?.status === 'rejected'
                                 ) {
-                                  const payment = mergePaymentDetails(matchedCell.payment, matchedCell.bill.id);
+                                  const payment = mergePaymentDetails(
+                                    matchedCell.payment,
+                                    matchedCell.bill.id,
+                                    matchedCell.bill.payment_id
+                                  );
                                   setDetailModal({ bill: matchedCell.bill, payment, unit: row.unit });
                                   return;
                                 }
@@ -755,8 +848,8 @@ export default function PaymentMatrix() {
               {isStaff && activeUnitId !== null && (
                 <span className="ml-2 text-[11px] text-forest-500">
                   · {(() => {
-                    const u = getUnitById(activeUnitId);
-                    return u ? `Blok ${u.block}/${u.unit_number}` : '';
+                    const u = findUnitInMatrix(activeUnitId);
+                    return u ? `${u.block} no ${u.unit_number}` : '';
                   })()}
                 </span>
               )}
@@ -778,12 +871,12 @@ export default function PaymentMatrix() {
               ✕ Kosongkan
             </button>
             {isStaff ? (
-              <button onClick={handleStaffPay} disabled={!canWrite} className="pv-btn-primary text-sm disabled:opacity-50">
-                Catat Pembayaran →
+              <button onClick={handleStaffPay} disabled={!canWrite && !canUseQris} className="pv-btn-primary text-sm disabled:opacity-50">
+                {isDemoAdmin ? 'Bayar via QRIS →' : 'Catat Pembayaran →'}
               </button>
             ) : (
               <button onClick={handlePay} className="pv-btn-primary text-sm">
-                Bayar via Transfer →
+                Lanjutkan Pembayaran →
               </button>
             )}
           </div>
@@ -795,6 +888,7 @@ export default function PaymentMatrix() {
         <ResidentPayModal
           bills={payModal}
           total={totalToPay}
+          canUseQris={canUseQris}
           onConfirm={confirmPay}
           onClose={() => setPayModal(null)}
         />
@@ -804,9 +898,22 @@ export default function PaymentMatrix() {
       {manualModal && (
         <ManualPaymentModal
           bills={manualModal.bills}
+          unit={manualModal.unit}
           role={role}
+          canWrite={canWrite}
+          canUseQris={canUseQris}
           onConfirm={confirmManual}
           onClose={() => setManualModal(null)}
+        />
+      )}
+
+      {qrisCheckoutData && (
+        <QrisCheckoutModal
+          data={qrisCheckoutData}
+          onClose={() => {
+            setQrisCheckoutData(null);
+            void loadMatrix({ silent: true });
+          }}
         />
       )}
 
@@ -946,7 +1053,7 @@ function Cell({ cell, unitId, isSelected, isStaff, canInteract, isLockedOtherUni
 }
 
 // ── Modal pembayaran warga: Transfer Bank (dengan bukti) ────
-function ResidentPayModal({ bills, total, onConfirm, onClose }) {
+function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
   const [method, setMethod] = useState('bank_transfer');
   const [receiptFile, setReceiptFile] = useState(null);
   const [uploadError, setUploadError] = useState('');
@@ -1027,7 +1134,20 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
         {/* Pilihan metode */}
         <div>
           <label className="block text-sm font-medium text-forest-700 mb-1">Metode Pembayaran</label>
-          <div className="grid grid-cols-1 gap-2">
+          <div className={`grid ${canUseQris ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+            {canUseQris && (
+              <button
+                type="button"
+                onClick={() => { setMethod('qris'); setUploadError(''); setReceiptFile(null); }}
+                className={`py-2.5 rounded-lg text-sm font-medium border transition-colors ${
+                  method === 'qris'
+                    ? 'bg-forest-800 text-gold-400 border-forest-800'
+                    : 'bg-white text-forest-600 border-forest-200 hover:bg-forest-50'
+                }`}
+              >
+                QRIS Midtrans
+              </button>
+            )}
             <button
               type="button"
               onClick={() => { setMethod('bank_transfer'); setUploadError(''); }}
@@ -1074,6 +1194,12 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
           </div>
         )}
 
+        {method === 'qris' && (
+          <div className="rounded-lg border border-gold-200 bg-gold-50 p-3 text-xs text-gold-800">
+            QRIS akan dibuka melalui checkout Midtrans Sandbox. Setelah pembayaran terkonfirmasi oleh webhook, status tagihan diperbarui otomatis.
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-forest-700 mb-1">
             Catatan <span className="text-forest-400 font-normal">(opsional)</span>
@@ -1092,7 +1218,7 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
             Batal
           </button>
           <button type="submit" disabled={isSubmitting} className="pv-btn-primary flex-1 text-sm disabled:opacity-50">
-            {isSubmitting ? 'Memproses...' : 'Kirim Bukti Transfer'}
+            {isSubmitting ? 'Memproses...' : method === 'qris' ? 'Lanjut ke QRIS' : 'Kirim Bukti Transfer'}
           </button>
         </div>
       </form>
@@ -1103,9 +1229,13 @@ function ResidentPayModal({ bills, total, onConfirm, onClose }) {
 // ── Modal input manual (bendahara, multi-bulan lintas tahun) ───────
 // Staff can record transfer proof for residents who cannot use the app yet.
 // Cash remains limited to bendahara/admin.
-function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
-  const canRecordCash = isBendaharaOrAbove(role) && canModifyData(role);
-  const [method, setMethod] = useState(canRecordCash ? 'cash' : 'bank_transfer');
+function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm, onClose }) {
+  const canRecordCash = isBendaharaOrAbove(role) && canWrite;
+  const canRecordTransfer = canWrite;
+  const methodCount = Number(canRecordCash) + Number(canRecordTransfer) + Number(canUseQris);
+  const [method, setMethod] = useState(
+    canRecordCash ? 'cash' : canRecordTransfer ? 'bank_transfer' : 'qris'
+  );
   const [paidAt, setPaidAt] = useState(new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState('');
   const [receiptFile, setReceiptFile] = useState(null);
@@ -1120,10 +1250,9 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
     (sum, bill) => sum + Number(bill.amount || 0) + Number(bill.late_fee || 0),
     0
   );
-  const unit = getUnitById(bills[0].unit_id);
-  const unitLabel = unit ? `Blok ${unit.block}/${unit.unit_number}` : '';
+  const unitLabel = unit ? `${unit.block} no ${unit.unit_number}` : '';
   const isMulti = bills.length > 1;
-  const needsReceipt = true;
+  const needsReceipt = method !== 'qris';
 
   const handleFile = async (e) => {
     setUploadError('');
@@ -1224,22 +1353,25 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
         {/* Metode: Tunai / Transfer */}
         <div>
           <label className="block text-sm font-medium text-forest-700 mb-1">Metode Pembayaran</label>
-          <div className={`grid ${canRecordCash ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+          <div className={`grid ${methodCount >= 3 ? 'grid-cols-3' : methodCount === 2 ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
             {canRecordCash && methodBtn('cash', '💵 Tunai')}
-            {methodBtn('bank_transfer', '🏦 Transfer')}
+            {canRecordTransfer && methodBtn('bank_transfer', '🏦 Transfer')}
+            {canUseQris && methodBtn('qris', 'QRIS')}
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-forest-700 mb-1">Tanggal Diterima</label>
-          <input
-            type="date"
-            value={paidAt}
-            onChange={(e) => setPaidAt(e.target.value)}
-            required
-            className="pv-input"
-          />
-        </div>
+        {method !== 'qris' && (
+          <div>
+            <label className="block text-sm font-medium text-forest-700 mb-1">Tanggal Diterima</label>
+            <input
+              type="date"
+              value={paidAt}
+              onChange={(e) => setPaidAt(e.target.value)}
+              required
+              className="pv-input"
+            />
+          </div>
+        )}
 
         {/* Upload bukti wajib untuk Tunai & Transfer */}
         {needsReceipt && (
@@ -1270,6 +1402,12 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
           </div>
         )}
 
+        {method === 'qris' && (
+          <div className="rounded-lg border border-gold-200 bg-gold-50 p-3 text-xs text-gold-800">
+            QRIS akan dibuka melalui checkout Midtrans Sandbox. Pembayaran dicatat untuk unit yang dipilih dan dikonfirmasi melalui webhook.
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-forest-700 mb-1">
             Catatan <span className="text-forest-400 font-normal">(opsional)</span>
@@ -1288,7 +1426,7 @@ function ManualPaymentModal({ bills, role, onConfirm, onClose }) {
             Batal
           </button>
           <button type="submit" disabled={isSubmitting} className="pv-btn-primary flex-1 text-sm disabled:opacity-50">
-            {isSubmitting ? 'Memproses...' : 'Catat Pembayaran'}
+            {isSubmitting ? 'Memproses...' : method === 'qris' ? 'Lanjut ke QRIS' : 'Catat Pembayaran'}
           </button>
         </div>
       </form>
@@ -1348,7 +1486,9 @@ function getPaymentProofPreviewUrl(payment) {
   // 1. Google Drive link
   const driveMatch = sourceUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/i);
   if (driveMatch?.[1] && driveMatch[1] !== 'undefined') {
-    return `https://drive.google.com/thumbnail?id=${encodeURIComponent(driveMatch[1])}&sz=w1200`;
+    // Use the image CDN directly. The Drive thumbnail endpoint redirects to
+    // this host, and the direct URL is more reliable inside an <img> preview.
+    return `https://lh3.googleusercontent.com/d/${encodeURIComponent(driveMatch[1])}=w1200`;
   }
 
   // 2. Full HTTP/HTTPS URL
@@ -1394,7 +1534,11 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
     let isMounted = true;
 
     if ((bill?.id || bill?.period) && !IS_DEMO) {
-      const context = { unit_id: unit?.id || bill?.unit_id, period: bill?.period };
+      const context = {
+        unit_id: unit?.id || bill?.unit_id,
+        period: bill?.period,
+        payment_id: bill?.payment_id,
+      };
       fetchPaymentByBillId(session?.access_token, bill?.id, context)
         .then((fetched) => {
           if (isMounted) setAsyncPayment(fetched || null);
@@ -1402,7 +1546,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
         .catch(() => {});
     }
     return () => { isMounted = false; };
-  }, [bill?.id, bill?.period, bill?.unit_id, unit?.id, session?.access_token]);
+  }, [bill?.id, bill?.period, bill?.unit_id, bill?.payment_id, unit?.id, session?.access_token]);
 
   // Merge: asyncPayment fields take priority over cellPayment for proof/date fields
   const activePayment = useMemo(() => {
@@ -1436,7 +1580,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
 
 
   const resolvedBill = bill;
-  const targetUnit = unit || (bill?.unit_id ? getUnitById(bill.unit_id) : null);
+  const targetUnit = unit || (IS_DEMO && bill?.unit_id ? getUnitById(bill.unit_id) : null);
   const resolvedUnitId = targetUnit?.id ?? bill?.unit_id ?? activePayment?.unit_id;
 
   const isMyUnit =
@@ -1653,12 +1797,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
               <div>
                 <p className="text-xs text-forest-500 font-medium">Rumah / Unit</p>
                 <p className="font-semibold text-forest-800">
-                  {targetUnit
-                    ? `Blok ${targetUnit.block}/${targetUnit.unit_number}`
-                    : (() => {
-                        const u = getUnitById(resolvedUnitId);
-                        return u ? `Blok ${u.block}/${u.unit_number}` : '-';
-                      })()}
+                  {targetUnit ? `${targetUnit.block} no ${targetUnit.unit_number}` : '-'}
                 </p>
               </div>
               <div>
@@ -1713,6 +1852,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
                           <img
                             src={proofPreviewUrl}
                             alt={proofFileName || 'Bukti transfer'}
+                            referrerPolicy="no-referrer"
                             className="max-h-52 w-full rounded-md object-contain transition-transform group-hover:scale-[1.01]"
                             onError={() => setProofPreviewError(true)}
                           />
@@ -1781,8 +1921,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
               <button
                 type="button"
                 onClick={() => {
-                  const u = getUnitById(resolvedUnitId);
-                  downloadDigitalReceipt({ bill: resolvedBill, unit: u });
+                  downloadDigitalReceipt({ bill: resolvedBill, unit: targetUnit });
                 }}
                 className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-forest-300 bg-white px-3 py-2 text-xs font-semibold text-forest-800 shadow-sm hover:bg-forest-50 transition-colors"
               >
@@ -1795,9 +1934,8 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
                     toast.error('Akun read-only tidak dapat mengirim kuitansi email.');
                     return;
                   }
-                  const u = getUnitById(bill.unit_id);
                   toast.info('Mengirim kuitansi digital ke email...');
-                  const res = await sendEmailReceipt({ bill, unit: u });
+                  const res = await sendEmailReceipt({ bill, unit: targetUnit });
                   toast.success(res.message);
                 }}
                 disabled={!canModifyData(role)}
@@ -1855,6 +1993,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
           <img
             src={proofPreviewUrl}
             alt={proofFileName || 'Bukti transfer'}
+            referrerPolicy="no-referrer"
             className="max-h-[92vh] max-w-[96vw] rounded-lg bg-white object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             onError={() => {
@@ -1870,6 +2009,8 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
 
 // ── Modal Instuksi QRIS Midtrans ─────────────────────────
 function QrisCheckoutModal({ data, onClose }) {
+  const total = data.total_amount || data.total || 0;
+  const redirectUrl = data.redirect_url;
   return (
     <Modal open onClose={onClose} title="Menunggu Pembayaran QRIS" size="md">
       <div className="space-y-4 text-center py-2">
@@ -1890,7 +2031,7 @@ function QrisCheckoutModal({ data, onClose }) {
           </div>
           <div className="flex justify-between">
             <span className="text-forest-500">Total Nominal:</span>
-            <span className="font-bold text-forest-900">{formatRupiah(data.total)}</span>
+            <span className="font-bold text-forest-900">{formatRupiah(total)}</span>
           </div>
           <div className="pt-1.5 border-t border-forest-200">
             <p className="text-forest-500 font-medium mb-1">Tagihan Periode:</p>
@@ -1914,19 +2055,24 @@ function QrisCheckoutModal({ data, onClose }) {
         </div>
 
         <div className="flex flex-col gap-2 pt-2">
-          <a
-            href={data.redirect_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="pv-btn-primary text-center py-2.5 font-bold shadow-md"
-          >
-            Buka Halaman Pembayaran 🔗
-          </a>
+          {redirectUrl ? (
+            <a
+              href={redirectUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pv-btn-primary text-center py-2.5 font-bold shadow-md"
+            >
+              Buka Halaman Pembayaran 🔗
+            </a>
+          ) : (
+            <p className="rounded-lg bg-white border border-gold-200 p-3 text-xs text-gold-800">
+              Mode demo: checkout Midtrans tidak dibuka.
+            </p>
+          )}
           <button
             type="button"
             onClick={() => {
               onClose();
-              window.location.reload();
             }}
             className="pv-btn-ghost text-sm py-2"
           >

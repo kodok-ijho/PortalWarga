@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { AiOutlineCheckCircle, AiOutlineCloseCircle, AiOutlineInfoCircle, AiOutlineWarning } from 'react-icons/ai';
 
 const ToastContext = createContext(null);
@@ -38,14 +38,13 @@ export function ToastProvider({ children }) {
     [remove]
   );
 
-  // API singkat
-  const api = {
+  const api = useMemo(() => ({
     toast,
-    success: (msg, d) => toast(msg, 'success', d),
-    error: (msg, d) => toast(msg, 'error', d ?? 5000),
-    info: (msg, d) => toast(msg, 'info', d),
-    warning: (msg, d) => toast(msg, 'warning', d),
-  };
+    success: (msg, duration) => toast(msg, 'success', duration),
+    error: (msg, duration) => toast(msg, 'error', duration ?? 5000),
+    info: (msg, duration) => toast(msg, 'info', duration),
+    warning: (msg, duration) => toast(msg, 'warning', duration),
+  }), [toast]);
 
   return (
     <ToastContext.Provider value={api}>
