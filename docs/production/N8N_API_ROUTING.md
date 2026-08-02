@@ -137,6 +137,7 @@ Naming rules:
 | Workflow | Method | Route | Minimum Role | Purpose |
 | --- | --- | --- | --- | --- |
 | `PV API - Payments QRIS Create` | `POST` | `/portal-v1/payments/qris/create` | `warga` | Create Midtrans QRIS transaction |
+| `PV API - Payments QRIS Status` | `POST` | `/portal-v1/payments/qris/status` | `warga` | Verify Midtrans status server-side and synchronize the existing webhook |
 
 QRIS is optional if the project keeps a strict zero-monthly-cost / low-cost manual transfer mode. Midtrans QRIS can still incur transaction fees.
 

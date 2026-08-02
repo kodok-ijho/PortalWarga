@@ -25,6 +25,10 @@ async function getMockData() {
   return import('./mockData.js');
 }
 
+async function getEventMockData() {
+  return import('./eventMockData.js');
+}
+
 // ── API imports ──────────────────────────────────────────────────
 import { portalApiPost, portalApiUpload } from './apiClient';
 import { supabase } from './supabaseClient';
@@ -133,7 +137,7 @@ export async function fetchDashboardData(token, { role, period } = {}) {
     return {
       report: mock.computeReport(period),
       pendingRegistrationCount: mock.isStaffRole(role) ? mock.getPendingRegistrations().length : 0,
-      pendingPaymentCount: mock.isBendaharaOrAbove(role) ? mock.getPendingPayments().length : 0,
+      pendingPaymentCount: mock.isStaffRole(role) ? mock.getPendingPayments().length : 0,
     };
   }
 
@@ -155,19 +159,11 @@ export async function fetchDashboardData(token, { role, period } = {}) {
       }
     }
 
-    // Fetch pending payments count (for bendahara/admin)
-    if (isBendaharaOrAbove(role)) {
+    // Fetch pending payments count (for all staff roles: pengurus, bendahara, admin)
+    if (isStaffRole(role)) {
       try {
         const payments = await fetchPayments(token);
         pendingPaymentCount = payments.filter((p) => isPendingVerificationStatus(p.status)).length;
-      } catch (err) {
-        console.warn('Failed to load pending payments count for dashboard:', err);
-      }
-    }
-
-    // Fetch monthly report (for staff/pengurus and above)
-    if (isStaffRole(role) && period) {
-      try {
         const [yearStr, monthStr] = period.split('-');
         const year = Number(yearStr);
         const month = Number(monthStr);
@@ -753,6 +749,17 @@ function normalizeBillMatrixRows(rows) {
           }
         : null;
 
+      const residents = (Array.isArray(row?.residents) ? row.residents : resident ? [resident] : [])
+        .filter((profile) => profile?.id || profile?.full_name)
+        .map((profile) => ({
+          ...profile,
+          unit_id:
+            profile.unit_id !== undefined
+              ? toNumberOrOriginal(profile.unit_id)
+              : unit.id,
+          occupancy_status: profile.occupancy_status || unit.occupancy_status,
+        }));
+
       const rawCells = Array.isArray(row?.cells) ? row.cells : [];
       const cells = rawCells.map((cell) => {
         if (!cell || !cell.bill) return cell;
@@ -772,7 +779,7 @@ function normalizeBillMatrixRows(rows) {
         };
       });
 
-      return { ...row, unit, resident, cells };
+      return { ...row, unit, resident: resident || residents[0] || null, residents, cells };
     })
     .sort((a, b) => {
       const blockCompare = unitCollator.compare(
@@ -1060,6 +1067,29 @@ export async function createQrisPayment(token, { bill_ids } = {}) {
   };
 }
 
+// Reconcile the checkout against Midtrans on the server. The frontend never
+// decides that a QRIS payment is completed by itself.
+export async function verifyQrisPayment(token, { parent_order_id } = {}) {
+  const parentOrderId = String(parent_order_id || '').trim();
+  if (!parentOrderId) {
+    throw new Error('Order ID pembayaran QRIS tidak tersedia.');
+  }
+
+  if (IS_DEMO) {
+    return {
+      parent_order_id: parentOrderId,
+      transaction_status: 'settlement',
+      fraud_status: 'accept',
+      payment_type: 'qris',
+    };
+  }
+
+  return portalApiPost('/payments/qris/status', {
+    token,
+    body: { parent_order_id: parentOrderId },
+  });
+}
+
 export async function fetchRunningBalance(token, { year, month }) {
   if (IS_DEMO) {
     const mock = await getMockData();
@@ -1088,6 +1118,160 @@ export async function fetchMonthlyFinance(token, { year, month }) {
 }
 
 // =====================================================================
+// EVENTS & EVENT FINANCE
+// =====================================================================
+
+export async function fetchEvents(token, { role, profileId, includeDeleted = false } = {}) {
+  if (IS_DEMO) {
+    const mock = await getEventMockData();
+    return mock.listDemoEvents({ role, profileId, includeDeleted });
+  }
+  const result = await portalApiPost('/events/list', {
+    token,
+    body: { include_deleted: includeDeleted },
+  });
+  return result?.events || [];
+}
+
+export async function fetchEventDetail(token, eventId) {
+  if (IS_DEMO) {
+    const mock = await getEventMockData();
+    return mock.getDemoEvent(eventId);
+  }
+  const result = await portalApiPost('/events/detail', {
+    token,
+    body: { event_id: eventId },
+  });
+  return result?.event || result;
+}
+
+export async function createEvent(token, payload) {
+  if (IS_DEMO) {
+    // Demo mode remains read-only for the event fixture; production is the
+    // source of truth for event creation and assignment changes.
+    return { ...payload, id: `demo-event-${Date.now()}` };
+  }
+  const result = await portalApiPost('/events/create', { token, body: payload });
+  return result?.event || result;
+}
+
+export async function updateEvent(token, eventId, payload) {
+  if (IS_DEMO) return { id: eventId, ...payload };
+  const result = await portalApiPost('/events/update', {
+    token,
+    body: { event_id: eventId, ...payload },
+  });
+  return result?.event || result;
+}
+
+export async function deleteEvent(token, eventId) {
+  if (IS_DEMO) return { id: eventId, deleted_at: new Date().toISOString() };
+  return portalApiPost('/events/delete', {
+    token,
+    body: { event_id: eventId },
+  });
+}
+
+export async function fetchEventMembers(token, eventId) {
+  if (IS_DEMO) {
+    const mock = await getEventMockData();
+    return mock.getDemoMembers(eventId);
+  }
+  const result = await portalApiPost('/events/members/list', {
+    token,
+    body: { event_id: eventId },
+  });
+  return result?.members || [];
+}
+
+export async function assignEventMember(token, payload) {
+  if (IS_DEMO) return { ...payload, id: `demo-member-${Date.now()}` };
+  const result = await portalApiPost('/events/members/assign', { token, body: payload });
+  return result?.member || result;
+}
+
+export async function revokeEventMember(token, assignmentId, note = '') {
+  if (IS_DEMO) return { id: assignmentId, revoked_at: new Date().toISOString() };
+  return portalApiPost('/events/members/revoke', {
+    token,
+    body: { assignment_id: assignmentId, note },
+  });
+}
+
+export async function fetchMyEventAccess(token, { profileId, role } = {}) {
+  if (IS_DEMO) {
+    const mock = await getEventMockData();
+    return mock.getDemoAccess({ profileId, role });
+  }
+  return portalApiPost('/events/my-access', { token, body: {} });
+}
+
+export async function fetchNonIplIncomes(token, filters = {}) {
+  if (IS_DEMO) {
+    const mock = await getEventMockData();
+    return mock.listDemoIncomes(filters);
+  }
+  const result = await portalApiPost('/incomes/list', { token, body: filters });
+  return result?.incomes || [];
+}
+
+export async function createNonIplIncome(token, { file, ...payload }) {
+  if (IS_DEMO) {
+    const mock = await getEventMockData();
+    return mock.createDemoIncome({ ...payload, receipt_file_name: file?.name || null });
+  }
+  if (file) {
+    return portalApiUpload('/incomes/create', {
+      token,
+      file,
+      fields: payload,
+    });
+  }
+  return portalApiPost('/incomes/create', { token, body: payload });
+}
+
+export async function updateNonIplIncome(token, incomeId, { file, ...payload }) {
+  if (IS_DEMO) {
+    const mock = await getEventMockData();
+    return mock.updateDemoIncome(incomeId, { ...payload, receipt_file_name: file?.name || undefined });
+  }
+  if (file) {
+    return portalApiUpload('/incomes/update', {
+      token,
+      file,
+      fields: { income_id: incomeId, ...payload },
+    });
+  }
+  return portalApiPost('/incomes/update', {
+    token,
+    body: { income_id: incomeId, ...payload },
+  });
+}
+
+export async function deleteNonIplIncome(token, incomeId) {
+  if (IS_DEMO) {
+    const mock = await getEventMockData();
+    return mock.deleteDemoIncome(incomeId);
+  }
+  return portalApiPost('/incomes/delete', {
+    token,
+    body: { income_id: incomeId },
+  });
+}
+
+export async function fetchEventFinanceReport(token, { eventId, from, to, category } = {}) {
+  if (IS_DEMO) {
+    const mock = await getEventMockData();
+    return mock.getDemoEventReport(eventId);
+  }
+  const result = await portalApiPost('/reports/event-finance', {
+    token,
+    body: { event_id: eventId, from, to, category },
+  });
+  return result?.report || result;
+}
+
+// =====================================================================
 // PROFILE
 // =====================================================================
 
@@ -1107,57 +1291,125 @@ export async function updateProfileApi(token, { full_name, phone, avatar_url }) 
 // EXPENSES
 // =====================================================================
 
-export async function fetchExpenses(token) {
+export async function fetchExpenses(token, filters = {}) {
   if (IS_DEMO) {
+    if (filters.scope === 'event' || filters.event_id) {
+      const eventMock = await getEventMockData();
+      return eventMock.listDemoExpenses({ eventId: filters.event_id });
+    }
     const mock = await getMockData();
-    return mock.mockExpenses;
+    const expenses = mock.mockExpenses || [];
+    if (!filters.scope && !filters.event_id) {
+      const eventMock = await getEventMockData();
+      return [...expenses, ...eventMock.listDemoExpenses()];
+    }
+    return expenses.filter((expense) => (
+      (!filters.scope || (expense.scope || 'general') === filters.scope)
+      && (!filters.event_id || expense.event_id === filters.event_id)
+    ));
   }
-  const result = await portalApiPost('/expenses/list', { token });
+  const result = await portalApiPost('/expenses/list', { token, body: filters });
   return result?.expenses || [];
 }
 
-export async function createExpense(token, { date, category, amount, description, file }) {
+export async function createExpense(token, {
+  date,
+  category,
+  amount,
+  description,
+  file,
+  scope = 'general',
+  event_id = null,
+}) {
   if (IS_DEMO) {
+    if (scope === 'event') {
+      const eventMock = await getEventMockData();
+      return eventMock.createDemoExpense({ date, category, amount, description, scope, event_id, receipt_file: file ? file.name : null });
+    }
     const mock = await getMockData();
-    return mock.addExpense({ date, category, amount, description, receipt_file: file ? file.name : null });
+    return mock.addExpense({
+      date,
+      category,
+      amount,
+      description,
+      scope,
+      event_id,
+      receipt_file: file ? file.name : null,
+    });
+  }
+
+  const financeFields = { expense_date: date, category, amount, description };
+  if (scope !== 'general' || event_id) {
+    financeFields.scope = scope;
+    financeFields.event_id = event_id;
   }
 
   if (file) {
     return portalApiUpload('/expenses/create', {
       token,
       file,
-      fields: { expense_date: date, category, amount, description }
+      fields: financeFields
     });
   } else {
     return portalApiPost('/expenses/create', {
       token,
-      body: { expense_date: date, category, amount, description }
+      body: financeFields
     });
   }
 }
 
-export async function updateExpense(token, id, { date, category, amount, description, file }) {
+export async function updateExpense(token, id, {
+  date,
+  category,
+  amount,
+  description,
+  file,
+  scope = 'general',
+  event_id = null,
+}) {
   if (IS_DEMO) {
+    if (scope === 'event') {
+      const eventMock = await getEventMockData();
+      return eventMock.updateDemoExpense(id, { date, category, amount, description, scope, event_id, receipt_file: file ? file.name : null });
+    }
     const mock = await getMockData();
-    return mock.updateExpense(id, { date, category, amount, description, receipt_file: file ? file.name : null });
+    return mock.updateExpense(id, {
+      date,
+      category,
+      amount,
+      description,
+      scope,
+      event_id,
+      receipt_file: file ? file.name : null,
+    });
+  }
+
+  const financeFields = { expense_id: id, expense_date: date, category, amount, description };
+  if (scope !== 'general' || event_id) {
+    financeFields.scope = scope;
+    financeFields.event_id = event_id;
   }
 
   if (file) {
     return portalApiUpload('/expenses/update', {
       token,
       file,
-      fields: { expense_id: id, expense_date: date, category, amount, description }
+      fields: financeFields
     });
   } else {
     return portalApiPost('/expenses/update', {
       token,
-      body: { expense_id: id, expense_date: date, category, amount, description }
+      body: financeFields
     });
   }
 }
 
 export async function deleteExpense(token, id) {
   if (IS_DEMO) {
+    if (String(id).startsWith('demo-event-expense-')) {
+      const eventMock = await getEventMockData();
+      return eventMock.deleteDemoExpense(id);
+    }
     const mock = await getMockData();
     return mock.deleteExpense(id);
   }

@@ -745,7 +745,7 @@ function UploadCSVModal({ onImport, onClose, isSaving }) {
               />
               <div>
                 <p className="text-sm font-medium text-forest-800">Delete & Insert</p>
-                <p className="text-[11px] text-forest-500">Hapus SEMUA warga, ganti dengan data CSV. Admin & Pengurus RT/RW dipertahankan.</p>
+                <p className="text-[11px] text-forest-500">Hapus SEMUA warga, ganti dengan data CSV. Admin & Koordinator Palm Village dipertahankan.</p>
               </div>
             </label>
           </div>

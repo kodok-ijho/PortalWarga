@@ -11,6 +11,8 @@ import { useToast } from '../hooks/useToast';
 import Modal from '../components/Modal';
 import {
   fetchExpenses,
+  fetchEvents,
+  fetchMyEventAccess,
   createExpense,
   updateExpense,
   deleteExpense,
@@ -48,12 +50,18 @@ function getGoogleDriveThumbnail(url) {
 }
 
 export default function Expenses() {
-  const { role, profile, session, isReadOnly } = useAuth();
+  const { role, profile, session, isReadOnly, isAuthenticated } = useAuth();
   const token = session?.access_token;
   const toast = useToast();
+  const [eventAccess, setEventAccess] = useState({ events: [] });
+  const [eventOptions, setEventOptions] = useState([]);
   const isStaff = hasMinRole(role, 'pengurus');
-  const canEdit = isBendaharaOrAbove(role);
-  const canWrite = canModifyData(role) && !isReadOnly;
+  const canEditGeneral = isBendaharaOrAbove(role);
+  const manageableEventIds = useMemo(() => new Set(
+    (eventAccess.events || []).filter((item) => item.can_manage_finance).map((item) => item.event_id)
+  ), [eventAccess.events]);
+  const canEdit = canEditGeneral || manageableEventIds.size > 0;
+  const canWrite = (canModifyData(role) || manageableEventIds.size > 0) && !isReadOnly;
 
   const [expenses, setExpenses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,17 +72,31 @@ export default function Expenses() {
   const [receiptImageError, setReceiptImageError] = useState(false);
 
   const loadExpenses = useCallback(async () => {
-    if (!token) return;
+    if (!isAuthenticated) return;
     try {
       setIsLoading(true);
+      // Keep the existing expense flow independent from the additive event
+      // endpoints. This prevents a staged backend rollout from breaking the
+      // production Expenses page.
       const data = await fetchExpenses(token);
       setExpenses(data);
+      try {
+        const [events, access] = await Promise.all([
+          fetchEvents(token, { role, profileId: profile?.id }),
+          fetchMyEventAccess(token, { role, profileId: profile?.id }),
+        ]);
+        setEventOptions(events || []);
+        setEventAccess(access || { events: [] });
+      } catch {
+        setEventOptions([]);
+        setEventAccess({ events: [] });
+      }
     } catch (err) {
       toast.error('Gagal mengambil data pengeluaran.');
     } finally {
       setIsLoading(false);
     }
-  }, [token, toast]);
+  }, [isAuthenticated, profile?.id, role, token, toast]);
 
   useEffect(() => {
     loadExpenses();
@@ -82,7 +104,7 @@ export default function Expenses() {
 
   // Bulan tersedia dari data
   const availableMonths = useMemo(() => {
-    const set = new Set(expenses.map((e) => e.date ? e.date.substring(0, 7) : ''));
+    const set = new Set(expenses.map((e) => (e.date || e.expense_date) ? (e.date || e.expense_date).substring(0, 7) : ''));
     return [...set].filter(Boolean).sort().reverse();
   }, [expenses]);
 
@@ -90,16 +112,17 @@ export default function Expenses() {
     return expenses
       .filter((e) => {
         if (filterCategory && e.category !== filterCategory) return false;
-        if (filterMonth && (!e.date || !e.date.startsWith(filterMonth))) return false;
+        const date = e.date || e.expense_date;
+        if (filterMonth && (!date || !date.startsWith(filterMonth))) return false;
         return true;
       })
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      .sort((a, b) => (b.date || b.expense_date || '').localeCompare(a.date || a.expense_date || ''));
   }, [expenses, filterCategory, filterMonth]);
 
   const totalAmount = filtered.reduce((s, e) => s + e.amount, 0);
 
   // Staff-only (pengurus, bendahara, admin)
-  if (!isStaff) {
+  if (!isStaff && manageableEventIds.size === 0) {
     return <Navigate to="/" replace />;
   }
 
@@ -127,7 +150,7 @@ export default function Expenses() {
       toast.warning('⚠️ Penghapusan pengeluaran dinonaktifkan untuk akun Admin Demo (View-Only).');
       return;
     }
-    if (!confirm(`Hapus pengeluaran "${exp.description.substring(0, 40)}..."?`)) return;
+    if (!confirm(`Hapus pengeluaran "${String(exp.description || '').substring(0, 40)}..."?`)) return;
     try {
       setIsLoading(true);
       await deleteExpense(token, exp.id);
@@ -212,7 +235,8 @@ export default function Expenses() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium text-forest-900 text-sm">{exp.category}</p>
-                    <span className="pv-badge bg-forest-50 text-forest-600">{formatDate(exp.date)}</span>
+                    <span className="pv-badge bg-gold-50 text-gold-700">{exp.scope === 'event' ? 'Event' : 'Umum'}</span>
+                    <span className="pv-badge bg-forest-50 text-forest-600">{formatDate(exp.date || exp.expense_date)}</span>
                   </div>
                   <p className="text-xs text-forest-500 mt-0.5 line-clamp-1">{exp.description}</p>
                   <p className="text-[10px] text-forest-400 mt-0.5">Oleh: {exp.recorded_by}</p>
@@ -231,7 +255,7 @@ export default function Expenses() {
                   </button>
                 )}
                 <p className="font-bold text-forest-900 text-sm">{formatRupiah(exp.amount)}</p>
-                {canEdit && canWrite && (
+                {canEdit && canWrite && ((exp.scope || 'general') === 'event' ? manageableEventIds.has(exp.event_id) : canEditGeneral) && (
                   <div className="flex gap-1">
                     <button
                       onClick={() => setModalForm(exp)}
@@ -259,6 +283,10 @@ export default function Expenses() {
       {modalForm && canWrite && (
         <ExpenseFormModal
           expense={modalForm === 'add' ? null : modalForm}
+          initialScope={canEditGeneral ? 'general' : 'event'}
+          eventOptions={eventOptions}
+          manageableEventIds={manageableEventIds}
+          canEditGeneral={canEditGeneral}
           isSaving={isLoading}
           onSave={handleSave}
           onClose={() => setModalForm(null)}
@@ -334,7 +362,7 @@ export default function Expenses() {
 }
 
 // ── Form modal ────────────────────────────────────────────────────
-function ExpenseFormModal({ expense, isSaving, onSave, onClose }) {
+function ExpenseFormModal({ expense, initialScope = 'general', eventOptions = [], manageableEventIds = new Set(), canEditGeneral = false, isSaving, onSave, onClose }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const isEdit = !!expense;
   const [form, setForm] = useState({
@@ -342,6 +370,8 @@ function ExpenseFormModal({ expense, isSaving, onSave, onClose }) {
     category: expense?.category || EXPENSE_CATEGORIES[0],
     amount: expense?.amount || '',
     description: expense?.description || '',
+    scope: expense?.scope || initialScope,
+    event_id: expense?.event_id || '',
     receipt_file: expense?.receipt_file || '',
   });
   const [fileName, setFileName] = useState(expense?.receipt_file || '');
@@ -391,6 +421,9 @@ function ExpenseFormModal({ expense, isSaving, onSave, onClose }) {
     if (!form.description.trim()) {
       return;
     }
+    if (form.scope === 'event' && !form.event_id) {
+      return;
+    }
     onSave({ ...form, description: form.description.trim() }, selectedFile);
   };
 
@@ -420,6 +453,33 @@ function ExpenseFormModal({ expense, isSaving, onSave, onClose }) {
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-forest-700 mb-1">Scope</label>
+            <select
+              value={form.scope}
+              onChange={(e) => setForm({ ...form, scope: e.target.value, event_id: '' })}
+              className="pv-input"
+            >
+              {canEditGeneral && <option value="general">Umum</option>}
+              {(canEditGeneral || manageableEventIds.size > 0) && <option value="event">Event</option>}
+            </select>
+          </div>
+          {form.scope === 'event' && (
+            <div>
+              <label className="block text-sm font-medium text-forest-700 mb-1">Event</label>
+              <select
+                value={form.event_id}
+                onChange={(e) => setForm({ ...form, event_id: e.target.value })}
+                className="pv-input"
+                required
+              >
+                <option value="">Pilih event</option>
+                {eventOptions
+                  .filter((event) => canEditGeneral || manageableEventIds.has(event.id))
+                  .map((event) => <option key={event.id} value={event.id}>{event.event_code} · {event.title}</option>)}
+              </select>
+            </div>
+          )}
         </div>
 
         <div>

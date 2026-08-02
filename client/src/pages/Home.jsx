@@ -91,6 +91,7 @@ export default function Home() {
     if (isStaff) {
       return [
         { to: '/user-approval', icon: AiOutlineUserAdd, title: 'Approval User', desc: 'Verifikasi pendaftaran warga baru.', badge: pendingRegCount },
+        { to: '/payment-verification', icon: AiOutlineCheckCircle, title: 'Verifikasi Bayar', desc: 'Verifikasi bukti transfer IPL.', badge: pendingPayCount },
         { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
         { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
         { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Pantau status pembayaran IPL semua unit.' },

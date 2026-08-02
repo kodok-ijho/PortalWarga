@@ -32,6 +32,10 @@ Selesai jika request backend dapat terautentikasi ke Midtrans Sandbox tanpa memb
 
 Workflow: `Gt84N4815U8eXyIP`, endpoint `/portal-v1/payments/qris/create`.
 
+> Catatan perbaikan 2026-08-02: Midtrans Sandbox menamai kanal QRIS pada Snap sebagai
+> **Other QRIS**. Payload sekarang memakai identifier API `other_qris`; identifier lama
+> `qris` dapat menghasilkan checkout tanpa kanal pembayaran meskipun token berhasil dibuat.
+
 - [x] Izinkan hanya role `admin` dan akun Admin Demo resmi (`admin_viewer`); tolak `warga`, `pengurus`, `bendahara`, dan akun lain.
 - [x] Ambil role, user ID, status akun, dan unit dari JWT/profil database, bukan dari body frontend.
 - [x] Admin/Admin Demo hanya boleh mengirim tagihan dari satu unit yang sama dalam satu transaksi.
@@ -39,7 +43,7 @@ Workflow: `Gt84N4815U8eXyIP`, endpoint `/portal-v1/payments/qris/create`.
 - [x] Tolak bill yang lunas, dibatalkan, atau sudah memiliki `payment_id` aktif; unique index database juga menangani race condition.
 - [x] Pastikan `resident_id` untuk pembayaran staff tetap menunjuk warga/pemilik tagihan; simpan staff sebagai actor pada metadata/audit.
 - [x] Buat parent dan child `order_id` yang unik dengan timestamp dan suffix acak.
-- [x] Kirim `enabled_payments: ['qris']` agar Snap hanya menawarkan QRIS.
+- [x] Kirim `enabled_payments: ['other_qris']` agar Snap menampilkan kanal **Other QRIS** yang aktif di Midtrans Sandbox.
 - [x] Sertakan item detail, customer detail seperlunya, dan response konsisten: `token`, `redirect_url`, `parent_order_id`, `total_amount`, dan bills.
 - [x] Jika create Midtrans gagal, child payment dibersihkan berdasarkan parent order ID dan endpoint mengembalikan error aman.
 

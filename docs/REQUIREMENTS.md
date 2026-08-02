@@ -37,7 +37,7 @@ Tidak berubah (tetap: `owner_occupied`, `owner_vacant`, `owner_rented`, `tenant`
 // SESUDAH (4 akun demo):
 { id: 'demo-admin',     role: 'admin',     full_name: 'Pak Hendra (Admin)', ... }
 { id: 'demo-bendahara', role: 'bendahara', full_name: 'Budi Santoso (Bendahara)', ... }
-{ id: 'demo-pengurus',  role: 'pengurus',  full_name: 'Ibu Ratna (Pengurus RT)', ... }
+{ id: 'demo-pengurus',  role: 'pengurus',  full_name: 'Ibu Ratna (Koordinator Palm Village)', ... }
 { id: 'demo-warga',     role: 'warga',     full_name: 'Siti Rahayu', ... }
 ```
 
@@ -126,7 +126,7 @@ const DEMO_ACCOUNTS = {
     password: 'demo123',
     profile: {
       id: 'demo-pengurus',
-      full_name: 'Ibu Ratna (Pengurus RT)',
+  full_name: 'Ibu Ratna (Koordinator Palm Village)',
       phone: '0814-3000-0003',
       role: 'pengurus',
       unit_id: 3, // assign ke unit yang ada

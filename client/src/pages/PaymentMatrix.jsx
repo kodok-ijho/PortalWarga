@@ -28,6 +28,7 @@ import {
   fetchPaymentByBillId,
   selectPreferredPayment,
   createQrisPayment,
+  verifyQrisPayment,
   IS_DEMO,
 } from '../services/dataService';
 import { portalApiPost } from '../services/apiClient';
@@ -269,7 +270,7 @@ export default function PaymentMatrix() {
   // Helper: cek apakah sebuah tagihan boleh di-select (runut, lintas tahun).
   // Sel yang sudah paid atau sudah di-select tidak perlu dicek lagi.
   const canSelectBill = (bill) => {
-    if (!bill || bill.status === 'paid' || bill.status === 'cancelled') return false;
+    if (!bill || bill.status === 'paid') return false;
     // Cegah seleksi lintas unit: jika sudah ada unit aktif, hanya boleh unit itu.
     // Satu transaksi = satu unit (satu tanda terima).
     if (activeUnitId !== null && bill.unit_id !== activeUnitId) return false;
@@ -416,6 +417,7 @@ export default function PaymentMatrix() {
         setQrisCheckoutData({
           ...data,
           bills: data.bills?.length ? data.bills : payModal,
+          payments: data.payments || [],
           total: data.total_amount || totalToPay,
         });
         setSelected({});
@@ -532,6 +534,7 @@ export default function PaymentMatrix() {
           setQrisCheckoutData({
             ...data,
             bills: data.bills?.length ? data.bills : manualModal.bills,
+            payments: data.payments || [],
             total: data.total_amount || manualModal.bills.reduce(
               (sum, bill) => sum + Number(bill.amount || 0) + Number(bill.late_fee || 0),
               0
@@ -706,6 +709,9 @@ export default function PaymentMatrix() {
           <span className="h-3 w-3 rounded bg-red-50 border border-red-300"></span> Terlambat / Ditolak
         </span>
         <span className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded bg-gray-100 border border-gray-300"></span> Dibatalkan
+        </span>
+        <span className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded bg-forest-800 border border-forest-800"></span> Dipilih
         </span>
       </div>
@@ -740,6 +746,13 @@ export default function PaymentMatrix() {
                 </tr>
               ) : (
                 matrix.map((row) => {
+                  const residentNames = (Array.isArray(row.residents) && row.residents.length > 0
+                    ? row.residents
+                    : row.resident
+                      ? [row.resident]
+                      : [])
+                    .map((resident) => resident?.full_name?.trim())
+                    .filter(Boolean);
                   // Warga hanya bisa interaksi (bayar) untuk unitnya sendiri.
                   const isMyUnit = role === 'warga' && row.unit.id === myUnitId;
                   const canInteract = isStaff || isMyUnit;
@@ -775,8 +788,11 @@ export default function PaymentMatrix() {
                             </span>
                           )}
                         </p>
-                        <p className="text-[10px] text-forest-400 truncate max-w-[160px]">
-                          {row.resident?.full_name ? row.resident.full_name : '— Belum Ada Pemilik —'}
+                        <p
+                          className="text-[10px] leading-tight text-forest-500 max-w-[180px] break-words"
+                          title={residentNames.join(' / ')}
+                        >
+                          {residentNames.length > 0 ? residentNames.join(' / ') : '— Belum Ada Pemilik —'}
                         </p>
                         {row.unit.is_occupied ? (
                           row.resident?.occupancy_status && (
@@ -823,6 +839,7 @@ export default function PaymentMatrix() {
                                   setDetailModal({ bill: matchedCell.bill, payment, unit: row.unit });
                                   return;
                                 }
+                                // Cancelled/failed/expired: allow selecting for re-payment
                                 if (!canInteract || isLockedOtherUnit) return;
                                 toggleCell(matchedCell?.bill);
                               }}
@@ -910,9 +927,69 @@ export default function PaymentMatrix() {
       {qrisCheckoutData && (
         <QrisCheckoutModal
           data={qrisCheckoutData}
-          onClose={() => {
+          onClose={async () => {
+            const billIds = (qrisCheckoutData.bills || []).map((b) => b.id);
+            if (IS_DEMO || qrisCheckoutData.demo) {
+              if (isStaffRole(role)) {
+                for (const billId of billIds) {
+                  recordManualPayment(billId, {
+                    method: 'qris',
+                    paidAt: new Date().toISOString().split('T')[0],
+                    recordedBy: profile?.full_name || 'Staff',
+                    note: 'Pembayaran QRIS (Simulasi)',
+                    recorderRole: role,
+                  });
+                }
+              } else {
+                recordResidentPayment(billIds, {
+                  method: 'qris',
+                  payerName: profile?.full_name || 'Warga',
+                  note: 'Pembayaran QRIS (Simulasi)',
+                });
+              }
+              toast.success('Pembayaran QRIS berhasil dikonfirmasi (Simulasi).');
+            } else {
+              try {
+                let verification = null;
+                let transactionStatus = '';
+                let fraudStatus = '';
+
+                for (let attempt = 0; attempt < 6; attempt += 1) {
+                  verification = await verifyQrisPayment(session?.access_token, {
+                    parent_order_id: qrisCheckoutData.parent_order_id,
+                  });
+                  transactionStatus = String(verification?.transaction_status || '').toLowerCase();
+                  fraudStatus = String(verification?.fraud_status || '').toLowerCase();
+
+                  if (transactionStatus !== 'pending' || attempt === 5) break;
+                  await new Promise(resolve => window.setTimeout(resolve, 3000));
+                }
+
+                if (transactionStatus === 'settlement' || (transactionStatus === 'capture' && fraudStatus === 'accept')) {
+                  toast.success('Pembayaran QRIS terverifikasi dan tagihan sudah diperbarui.');
+                } else if (transactionStatus === 'pending') {
+                  toast.info('Midtrans belum mengirim status lunas dalam 15 detik. Tagihan belum dianggap lunas dan akan diperbarui otomatis saat konfirmasi diterima.');
+                } else if (['expire', 'cancel', 'deny', 'failure'].includes(transactionStatus)) {
+                  toast.warning('Pembayaran tidak berhasil. Tagihan dapat dibayar ulang.');
+                } else {
+                  toast.info('Status pembayaran sedang diverifikasi oleh sistem.');
+                }
+              } catch (err) {
+                console.error('Error verifying QRIS payment status:', err);
+                const networkError = err?.name === 'TypeError'
+                  || /failed to fetch|network error/i.test(String(err?.message || ''));
+                toast.info(
+                  networkError
+                    ? 'Koneksi ke layanan pembayaran gagal. Silakan coba lagi.'
+                    : err?.code === 'MIDTRANS_STATUS_UNAVAILABLE'
+                    ? 'Midtrans Sandbox belum menerima simulasi pembayaran. Selesaikan transaksi melalui simulator Midtrans; QRIS sandbox tidak dapat dibayar dengan aplikasi bank nyata.'
+                    : (err?.message || 'Status pembayaran belum dapat diperiksa.')
+                );
+              }
+            }
+
             setQrisCheckoutData(null);
-            void loadMatrix({ silent: true });
+            void loadMatrix({ silent: false });
           }}
         />
       )}
@@ -951,6 +1028,9 @@ function Cell({ cell, unitId, isSelected, isStaff, canInteract, isLockedOtherUni
   const isPending = status === 'pending';
   const isPendingVerif = status === 'pending_verification';
   const isRejected = status === 'rejected' || cell.payment?.status === 'rejected';
+  const isCancelled = status === 'cancelled';
+  const isFailed = status === 'failed';
+  const isExpired = status === 'expired';
   // Sel non-interaktif (warga lihat unit lain): view-only, tidak bisa diklik
   const isViewOnly = !canInteract;
 
@@ -973,6 +1053,25 @@ function Cell({ cell, unitId, isSelected, isStaff, canInteract, isLockedOtherUni
         onClick={onClick}
         className={`block h-12 rounded ${bgClass} flex flex-col items-center justify-center px-0.5 cursor-pointer transition-colors`}
         title={`${billStatusLabel(status)} ${formatRupiah(bill.amount)}${payment ? ' · ' + formatDate(payment.paid_at) : ''}`}
+      >
+        <span className="text-[9px] font-bold leading-none">{formatShort(bill.amount)}</span>
+        <span className="text-[8px] leading-none mt-0.5 font-medium">
+          {label}
+        </span>
+      </span>
+    );
+  }
+
+  // Sel CANCELLED / FAILED / EXPIRED → tampilkan status dan bisa diklik untuk bayar ulang
+  if (isCancelled || isFailed || isExpired) {
+    const bgClass = 'bg-gray-100 border border-gray-300 hover:bg-gray-200 text-gray-500';
+    const label = isCancelled ? '↩ Batal' : isFailed ? '✕ Gagal' : '⏰ Expired';
+
+    return (
+      <span
+        onClick={onClick}
+        className={`block h-12 rounded ${bgClass} flex flex-col items-center justify-center px-0.5 cursor-pointer transition-colors`}
+        title={`${billStatusLabel(status)} — klik untuk bayar ulang`}
       >
         <span className="text-[9px] font-bold leading-none">{formatShort(bill.amount)}</span>
         <span className="text-[8px] leading-none mt-0.5 font-medium">
@@ -1691,16 +1790,26 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!payment) return;
     if (!confirm('Yakin ingin membatalkan transaksi ini? Tagihan akan kembali belum dibayar.')) return;
-    if (IS_DEMO) {
-      cancelPayment(payment.id);
-      toast.info('Transaksi pembayaran berhasil dibatalkan.');
+    setIsActing(true);
+    try {
+      if (IS_DEMO) {
+        cancelPayment(payment.id);
+      } else {
+        await portalApiPost('/payments/cancel', {
+          token: session?.access_token,
+          body: { payment_id: payment.id },
+        });
+      }
+      toast.info('Transaksi pembayaran berhasil dibatalkan. Tagihan kembali belum dibayar.');
       if (onRefresh) onRefresh();
       onClose();
-    } else {
-      toast.error('Pembatalan transaksi riil hanya dapat dilakukan melalui penolakan bukti oleh bendahara.');
+    } catch (err) {
+      toast.error(err.message || 'Gagal membatalkan pembayaran.');
+    } finally {
+      setIsActing(false);
     }
   };
 
@@ -1962,10 +2071,16 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
               <button type="button" onClick={() => setIsRevising(true)} className="pv-btn-primary flex-1 text-xs">
                 🔄 Revisi & Upload Ulang
               </button>
-              <button type="button" onClick={handleCancel} className="pv-btn-ghost flex-1 text-xs border-red-300 text-red-600 hover:bg-red-50">
+              <button type="button" onClick={handleCancel} disabled={isActing} className="pv-btn-ghost flex-1 text-xs border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50">
                 🗑 Batalkan
               </button>
             </div>
+          )}
+
+          {payment?.status === 'pending_verification' && (isMyUnit || isStaffRole(role)) && canModifyData(role) && (
+            <button type="button" onClick={handleCancel} disabled={isActing} className="pv-btn-ghost w-full text-xs border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50">
+              🗑 Batalkan Pembayaran
+            </button>
           )}
 
           <button type="button" onClick={onClose} className="pv-btn-ghost w-full text-sm">
@@ -2011,8 +2126,19 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
 function QrisCheckoutModal({ data, onClose }) {
   const total = data.total_amount || data.total || 0;
   const redirectUrl = data.redirect_url;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleDone = async () => {
+    setIsSubmitting(true);
+    try {
+      await onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <Modal open onClose={onClose} title="Menunggu Pembayaran QRIS" size="md">
+    <Modal open onClose={handleDone} title="Menunggu Pembayaran QRIS" size="md">
       <div className="space-y-4 text-center py-2">
         <div className="mx-auto h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-xl font-bold">
           !
@@ -2071,12 +2197,11 @@ function QrisCheckoutModal({ data, onClose }) {
           )}
           <button
             type="button"
-            onClick={() => {
-              onClose();
-            }}
-            className="pv-btn-ghost text-sm py-2"
+            disabled={isSubmitting}
+            onClick={handleDone}
+            className="pv-btn-primary w-full text-sm py-2.5 font-bold shadow-md disabled:opacity-50 mt-1"
           >
-            Saya Sudah Selesai Membayar
+            {isSubmitting ? '🔄 Memeriksa Status Pembayaran...' : '✓ Saya Sudah Selesai Membayar'}
           </button>
         </div>
       </div>

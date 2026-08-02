@@ -46,7 +46,7 @@
 5. Update `mockProfiles`:
    - `demo-admin`: role tetap `'admin'`, full_name → `'Pak Hendra (Admin)'`
    - `demo-rt` → rename ke `demo-bendahara`: role → `'bendahara'`, full_name → `'Budi Santoso (Bendahara)'`
-   - Tambah profil baru `demo-pengurus`: role `'pengurus'`, full_name `'Ibu Ratna (Pengurus RT)'`, unit_id: salah satu unit yang tersedia, email `'pengurus@palmvillage.id'`
+- Tambah profil baru `demo-pengurus`: role `'pengurus'`, full_name `'Ibu Ratna (Koordinator Palm Village)'`, unit_id: salah satu unit yang tersedia, email `'pengurus@palmvillage.id'`
    - `demo-warga`: role → `'warga'` (dari `'resident'`)
    - Semua profil warga lain (p-4 sampai p-14): role → `'warga'` (dari `'resident'`)
 

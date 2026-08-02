@@ -17,6 +17,7 @@ import {
   AiOutlineMenu,
   AiOutlineClose,
   AiOutlineEdit,
+  AiOutlineCalendar,
 } from 'react-icons/ai';
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -27,7 +28,7 @@ import {
   canModifyData,
   roleLabel,
 } from '../services/dataHelpers';
-import { fetchDashboardData } from '../services/dataService';
+import { fetchDashboardData, fetchMyEventAccess } from '../services/dataService';
 
 export default function Header() {
   const { isAuthenticated, profile, role, isReadOnly, signOut, updateProfile, session } = useAuth();
@@ -75,9 +76,10 @@ export default function Header() {
 
   const [pendingRegCount, setPendingRegCount] = useState(0);
   const [pendingPayCount, setPendingPayCount] = useState(0);
+  const [eventAccess, setEventAccess] = useState(null);
 
   useEffect(() => {
-    if (!isAuthenticated || !session?.access_token) return;
+    if (!isAuthenticated) return;
     let cancelled = false;
     (async () => {
       try {
@@ -86,12 +88,20 @@ export default function Header() {
           setPendingRegCount(data?.pendingRegistrationCount || 0);
           setPendingPayCount(data?.pendingPaymentCount || 0);
         }
+        // Event capability is additive. A backend without the new endpoint
+        // must not disable existing dashboard badges/navigation.
+        try {
+          const access = await fetchMyEventAccess(session?.access_token, { role, profileId: profile?.id });
+          if (!cancelled) setEventAccess(access || null);
+        } catch {
+          if (!cancelled) setEventAccess(null);
+        }
       } catch {
         // Non-critical — don't break header
       }
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated, session?.access_token, role]);
+  }, [isAuthenticated, profile?.id, session?.access_token, role]);
 
   // Tutup dropdown saat pindah halaman
   useEffect(() => {
@@ -123,11 +133,11 @@ export default function Header() {
       key: 'keuangan',
       label: 'Keuangan & IPL',
       icon: AiOutlineWallet,
-      badgeCount: isBendaharaOrAbove(role) ? pendingPayCount : 0,
-      activePaths: ['/payment-matrix', '/payment-verification', '/expenses', '/reports'],
+      badgeCount: isStaffRole(role) ? pendingPayCount : 0,
+      activePaths: ['/payment-matrix', '/payment-verification', '/expenses', '/reports', '/events', '/incomes'],
       items: [
         { to: '/payment-matrix', label: 'Matriks Bayar', icon: AiOutlineTable, desc: 'Matriks pembayaran IPL unit' },
-        ...(isBendaharaOrAbove(role)
+        ...(isStaffRole(role)
           ? [
               {
                 to: '/payment-verification',
@@ -142,6 +152,18 @@ export default function Header() {
           ? [
               { to: '/expenses', label: 'Pengeluaran', icon: AiOutlineWallet, desc: 'Catat & kelola pengeluaran' },
               { to: '/reports', label: 'Laporan Keuangan', icon: AiOutlineBarChart, desc: 'Laporan arus kas bulanan' },
+            ]
+          : []),
+        ...((role === 'admin' || role === 'bendahara' || role === 'admin_viewer' || (eventAccess?.events || []).length > 0)
+          ? [
+              { to: '/events', label: 'Event / Kegiatan', icon: AiOutlineCalendar, desc: 'Master dan akses event' },
+              { to: '/incomes', label: 'Pemasukan Non-IPL', icon: AiOutlineWallet, desc: 'Pemasukan umum dan event' },
+              ...(!isStaffRole(role)
+                ? [{ to: '/expenses', label: 'Pengeluaran Event', icon: AiOutlineWallet, desc: 'Pengeluaran event assignment' }]
+                : []),
+              ...((eventAccess?.events?.length > 0)
+                ? [{ to: `/events/${eventAccess.events[0].event_id}`, label: 'Event Saya', icon: AiOutlineCalendar, desc: 'Laporan keuangan event' }]
+                : []),
             ]
           : []),
       ],

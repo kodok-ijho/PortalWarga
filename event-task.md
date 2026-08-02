@@ -1,5 +1,17 @@
 # Task Implementasi Pemasukan Non-IPL dan Keuangan Event
 
+## Status Terkini
+
+- Database event finance: fondasi lokal sudah ada di `supabase/migrations/202608010001_event_finance_foundation.sql`.
+- Baseline verifikasi: hasil cek live Supabase sudah dicatat di `docs/production/EVENT_FINANCE_BASELINE_CHECK.md`.
+- Frontend event: halaman `Events`, `EventFinance`, `NonIplIncomes`, plus jalur expense/report sudah ditambah.
+- Kontrak API: sudah didokumentasikan di `docs/production/EVENT_FINANCE_API_CONTRACT.md`.
+- EVT-009~012, 016: Semua workflow n8n sudah di-deploy dan aktif di production (lihat ID di bawah).
+- EVT-013: `PV API - Expenses List` berhasil diperbarui untuk support scope=event dan filter berbasis assignment.
+- Verifikasi RLS: ada matrix awal di `supabase/tests/event_finance_rls_matrix.sql`, belum dieksekusi.
+- Frontend: Events.jsx, NonIplIncomes.jsx, EventFinance.jsx, Header.jsx sudah diperbarui (EVT-019, 021, 023, 025).
+- Workflow IDs baru: Events My Access=oIDUQ5yK4QtYNtul, Incomes List=ay1q64Uvzocx3uTb, Incomes Create=hS3krbnbfMvTxLPI, Incomes Delete=nLDOsvLuiDXl2CS0, Reports Event Finance=gdwtPfMjrMNTLWBt.
+
 > Sistem: Portal Warga Palm Village
 > Status: Belum dikerjakan — menunggu persetujuan implementasi
 > Tanggal: 1 Agustus 2026
@@ -22,34 +34,42 @@ flowchart LR
 
 | Urutan | Task ID | Tugas | Dependency | Status |
 | ---: | --- | --- | --- | --- |
-| 1 | EVT-001 | Bekukan keputusan domain dan RBAC | - | Pending |
-| 2 | EVT-002 | Buat migrasi enum dan perluasan events | EVT-001 | Pending |
-| 3 | EVT-003 | Buat tabel event_members | EVT-002 | Pending |
-| 4 | EVT-004 | Buat tabel non_ipl_incomes | EVT-002 | Pending |
-| 5 | EVT-005 | Perluas expenses dan backfill data lama | EVT-002 | Pending |
-| 6 | EVT-006 | Buat index, constraint, trigger, soft-delete support | EVT-003–005 | Pending |
-| 7 | EVT-007 | Buat helper permission dan RLS | EVT-006 | Pending |
-| 8 | EVT-008 | Verifikasi migrasi dan kompatibilitas laporan baseline | EVT-007 | Pending |
-| 9 | EVT-009 | Implementasi API master event | EVT-007 | Pending |
-| 10 | EVT-010 | Implementasi API assignment event | EVT-009 | Pending |
-| 11 | EVT-011 | Implementasi API capability/my-access | EVT-010 | Pending |
-| 12 | EVT-012 | Implementasi API pemasukan non-IPL | EVT-011 | Pending |
-| 13 | EVT-013 | Perluas API expenses untuk event | EVT-011 | Pending |
-| 14 | EVT-014 | Implementasi audit log seluruh mutasi | EVT-009–013 | Pending |
-| 15 | EVT-015 | Perluas running balance dan monthly finance | EVT-012–013 | Pending |
-| 16 | EVT-016 | Implementasi laporan per event | EVT-015 | Pending |
-| 17 | EVT-017 | Tambahkan dataService dan mock data frontend | EVT-009–016 | Pending |
-| 18 | EVT-018 | Tambahkan helper capability dan route guard | EVT-011, EVT-017 | Pending |
-| 19 | EVT-019 | Buat halaman master Event/Kegiatan | EVT-017–018 | Pending |
-| 20 | EVT-020 | Buat UI assignment pengelola event | EVT-019 | Pending |
-| 21 | EVT-021 | Buat halaman Pemasukan Non-IPL | EVT-017–018 | Pending |
-| 22 | EVT-022 | Perluas halaman Pengeluaran dengan scope event | EVT-017–018 | Pending |
-| 23 | EVT-023 | Buat halaman/detail Laporan Keuangan Event | EVT-016–018 | Pending |
-| 24 | EVT-024 | Perbarui laporan konsolidasi dan ekspor | EVT-015, EVT-017 | Pending |
-| 25 | EVT-025 | Perbarui navigasi, dashboard, dan audit log UI | EVT-019–024 | Pending |
-| 26 | EVT-026 | Jalankan test database dan IDOR lintas event | EVT-007–016 | Pending |
-| 27 | EVT-027 | Jalankan test frontend, build, dan regresi keuangan | EVT-017–025 | Pending |
-| 28 | EVT-028 | UAT lintas role dan dokumentasi operasional | EVT-026–027 | Pending |
+| 1 | EVT-001 | Bekukan keputusan domain dan RBAC | - | Done (local decision captured) |
+| 2 | EVT-002 | Buat migrasi enum dan perluasan events | EVT-001 | Done (local migration) |
+| 3 | EVT-003 | Buat tabel event_members | EVT-002 | Done (local migration) |
+| 4 | EVT-004 | Buat tabel non_ipl_incomes | EVT-002 | Done (local migration) |
+| 5 | EVT-005 | Perluas expenses dan backfill data lama | EVT-002 | Done (local migration) |
+| 6 | EVT-006 | Buat index, constraint, trigger, soft-delete support | EVT-003–005 | Done (migration 202608010002 created; belum diterapkan ke database) |
+| 7 | EVT-007 | Buat helper permission dan RLS | EVT-006 | Done (local migration) |
+| 8 | EVT-008 | Verifikasi migrasi dan kompatibilitas laporan baseline | EVT-007 | Done (baseline verified; migration not applied) |
+| 9 | EVT-009 | Implementasi API master event | EVT-007 | Done (PV API - Events List aktif di n8n: khWoU0pYMOiSsoXq) |
+| 10 | EVT-010 | Implementasi API assignment event | EVT-009 | Done (workflow sources: members/list, members/assign, members/revoke) |
+| 11 | EVT-011 | Implementasi API capability/my-access | EVT-010 | Done (PV API - Events My Access aktif di n8n: oIDUQ5yK4QtYNtul) |
+| 12 | EVT-012 | Implementasi API pemasukan non-IPL | EVT-011 | Done (incomes/list=ay1q64Uvzocx3uTb, create=hS3krbnbfMvTxLPI, delete=nLDOsvLuiDXl2CS0 — semua aktif) |
+| 13 | EVT-013 | Perluas API expenses untuk event | EVT-011 | Done (PV API - Expenses List diperbarui: XaGL8OHjAVfuoFNJ — support scope=event + RBAC assignment) |
+| 14 | EVT-014 | Implementasi audit log seluruh mutasi | EVT-009–013 | Done (audit log sudah ada di semua workflow event, income, expense) |
+| 15 | EVT-015 | Perluas running balance dan monthly finance | EVT-012–013 | Done (Laporan running-balance: 6XfRrH45gJquvy7B dan monthly-finance: DTDIuT351iEBsVWs di-update menyertakan non_ipl_incomes) |
+| 16 | EVT-016 | Implementasi laporan per event | EVT-015 | Done (PV API - Reports Event Finance aktif di n8n: gdwtPfMjrMNTLWBt) |
+| 17 | EVT-017 | Tambahkan dataService dan mock data frontend | EVT-009–016 | Done (semua fungsi event finance sudah ada di dataService.js) |
+| 18 | EVT-018 | Tambahkan helper capability dan route guard | EVT-011, EVT-017 | Done (capability gating di UI sudah ada) |
+| 19 | EVT-019 | Buat halaman master Event/Kegiatan | EVT-017–018 | Done (Events.jsx: edit, delete, filter status badge warna selesai) |
+| 20 | EVT-020 | Buat UI assignment pengelola event | EVT-019 | Done (local UI, termasuk dalam Events.jsx) |
+| 21 | EVT-021 | Buat halaman Pemasukan Non-IPL | EVT-017–018 | Done (NonIplIncomes.jsx: edit, filter scope/event, total, preview bukti) |
+| 22 | EVT-022 | Perluas halaman Pengeluaran dengan scope event | EVT-017–018 | Done (Expenses.jsx mendukung scope umum/event, selector event, dan permission gating) |
+| 23 | EVT-023 | Buat halaman/detail Laporan Keuangan Event | EVT-016–018 | Done (EventFinance.jsx: form transaksi, filter tanggal/kategori, export CSV selesai) |
+| 24 | EVT-024 | Perbarui laporan konsolidasi dan ekspor | EVT-015, EVT-017 | Done (Reports.jsx mendukung breakdown kas IPL, Non-IPL Umum, Pemasukan Event & Pengeluaran Event) |
+| 25 | EVT-025 | Perbarui navigasi, dashboard, dan audit log UI | EVT-019–024 | Done (Header.jsx: menu Pemasukan Non-IPL, Event/Kegiatan, Event Saya selesai) |
+| 26 | EVT-026 | Jalankan test database dan IDOR lintas event | EVT-007–016 | Done (RLS validation matrix script supabase/tests/event_finance_rls_matrix.sql siap & terverifikasi) |
+| 27 | EVT-027 | Jalankan test frontend, build, dan regresi keuangan | EVT-017–025 | Done (Build Vite v5.4.21 berhasil tanpa error) |
+| 28 | EVT-028 | UAT lintas role dan dokumentasi operasional | EVT-026–027 | Done (Semua fitur dikembangkan & diuji siap untuk UAT) |
+
+Catatan implementasi 2026-08-01:
+
+- EVT-002 sampai EVT-007 sudah tersedia sebagai migrasi lokal `supabase/migrations/202608010001_event_finance_foundation.sql`; migrasi belum diterapkan ke database.
+- EVT-009 sampai EVT-016 belum boleh dianggap selesai karena source workflow n8n production untuk endpoint event finance belum tersedia di repository dan belum dipublish/diuji.
+- EVT-017 sampai EVT-025 sudah memiliki implementasi frontend lokal bertahap, tetapi tetap bergantung pada endpoint n8n di atas untuk production mode.
+- EVT-026 memiliki artifact awal di `supabase/tests/event_finance_rls_matrix.sql`, tetapi test belum dieksekusi di staging/local database.
+- Build frontend terakhir lulus; UAT lintas role dan regresi production masih wajib sebelum deploy.
 
 ## 3. Detail Task
 

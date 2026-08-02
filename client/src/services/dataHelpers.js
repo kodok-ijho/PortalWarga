@@ -60,7 +60,18 @@ export function formatDateTime(dateStr) {
 
 // ── BILL STATUS ──────────────────────────────────────────────────
 export function billStatusLabel(status) {
-  const map = { pending: 'Belum Bayar', paid: 'Lunas', overdue: 'Terlambat', partial: 'Sebagian', waiting_verification: 'Menunggu Verifikasi' };
+  const map = {
+    pending: 'Belum Bayar',
+    paid: 'Lunas',
+    overdue: 'Terlambat',
+    partial: 'Sebagian',
+    waiting_verification: 'Menunggu Verifikasi',
+    pending_verification: 'Menunggu Verifikasi',
+    rejected: 'Ditolak',
+    cancelled: 'Dibatalkan',
+    failed: 'Gagal',
+    expired: 'Kedaluwarsa',
+  };
   return map[status] || status;
 }
 
@@ -71,6 +82,11 @@ export function billStatusColor(status) {
     overdue: 'bg-red-100 text-red-700',
     partial: 'bg-blue-100 text-blue-700',
     waiting_verification: 'bg-purple-100 text-purple-700',
+    pending_verification: 'bg-orange-100 text-orange-700',
+    rejected: 'bg-red-100 text-red-700',
+    cancelled: 'bg-gray-100 text-gray-500',
+    failed: 'bg-red-100 text-red-700',
+    expired: 'bg-gray-100 text-gray-500',
   };
   return map[status] || 'bg-gray-100 text-gray-700';
 }
@@ -131,7 +147,7 @@ export function isAdminRole(role) {
 }
 
 export function roleLabel(role) {
-  const map = { warga: 'Warga', pengurus: 'Pengurus RT', bendahara: 'Bendahara', admin: 'Admin', admin_viewer: 'Admin Viewer' };
+  const map = { warga: 'Warga', pengurus: 'Koordinator Palm Village', bendahara: 'Bendahara', admin: 'Admin', admin_viewer: 'Admin Viewer' };
   return map[role] || role || '-';
 }
 

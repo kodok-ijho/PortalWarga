@@ -913,6 +913,10 @@ Rules:
 - Call Midtrans.
 - Return QRIS/payment instructions.
 
+#### `POST /payments/qris/status`
+
+Protected by the App JWT. The endpoint accepts only the QRIS `parent_order_id`, queries Midtrans Sandbox using the server-side credential, and forwards the verified provider payload to the hardened Midtrans webhook. The browser must never update a payment to `completed` directly.
+
 #### `POST /payments/midtrans/webhook`
 
 Public endpoint but must verify Midtrans signature.

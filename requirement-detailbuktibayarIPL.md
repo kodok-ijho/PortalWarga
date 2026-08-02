@@ -21,7 +21,7 @@ Dokumen ini mendefinisikan kebutuhan fungsional dan non-fungsional untuk perbaik
 **Agar** saya dapat memastikan bukti transfer yang saya unggah telah tersimpan dengan benar dan dapat saya periksa kembali sewaktu-waktu.
 
 ### US-02: Staff/Admin Mengakses Bukti Bayar Seluruh Unit
-**Sebagai** Bendahara / Admin / Pengurus RT  
+**Sebagai** Bendahara / Admin / Koordinator Palm Village
 **Saya ingin** membuka detail bukti pembayaran IPL pada unit rumah mana pun  
 **Agar** saya dapat memverifikasi keabsahan bukti bayar dan mencocokkan nominal serta tanggal pembayaran warga.
 

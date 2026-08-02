@@ -50,7 +50,7 @@ Mengubah role dari `admin | rt_rw | resident` menjadi **4 level** yang lebih gra
 | Level | Role (enum)  | Nama Tampilan | Deskripsi                            |
 | ----- | ------------ | ------------- | ------------------------------------ |
 | 1     | `warga`      | Warga         | Penghuni biasa                       |
-| 2     | `pengurus`   | Pengurus      | Pengurus RT/RW non-bendahara         |
+| 2     | `pengurus`   | Pengurus      | Koordinator Palm Village non-bendahara |
 | 3     | `bendahara`  | Bendahara     | Pengurus yang mengelola keuangan     |
 | 4     | `admin`      | Admin         | Super admin dengan akses penuh       |
 

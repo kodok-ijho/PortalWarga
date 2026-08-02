@@ -151,8 +151,8 @@ Tabel utama (semua dengan RLS policy per role):
 
 ### Phase 2 — Fitur Esensial Warga (Pengumuman, Lapor RT, Kalender)
 
-- **T18**: **Papan Pengumuman RT (Broadcast Info Lingkungan)** — Skema + RLS `announcements`; halaman Berita & Pengumuman; kemampuan Admin & Pengurus RT membuat pengumuman penting (tag: Darurat, Kegiatan, Keuangan) dengan pin di dashboard utama & broadcast notifikasi via n8n (WA/Email).
-- **T19**: **Helpdesk / Lapor RT (Pengaduan & Aspirasi Warga)** — Skema + RLS `helpdesk_tickets`; halaman Lapor RT untuk warga mengajukan keluhan (kebersihan, keamanan, lampu jalan mati, fasilitas umum); tracking status tiket (Open, In Progress, Resolved) & balasan diskusi antar warga dengan Pengurus RT/Admin.
+- **T18**: **Papan Pengumuman RT (Broadcast Info Lingkungan)** — Skema + RLS `announcements`; halaman Berita & Pengumuman; kemampuan Admin & Koordinator Palm Village membuat pengumuman penting (tag: Darurat, Kegiatan, Keuangan) dengan pin di dashboard utama & broadcast notifikasi via n8n (WA/Email).
+- **T19**: **Helpdesk / Lapor RT (Pengaduan & Aspirasi Warga)** — Skema + RLS `helpdesk_tickets`; halaman Lapor RT untuk warga mengajukan keluhan (kebersihan, keamanan, lampu jalan mati, fasilitas umum); tracking status tiket (Open, In Progress, Resolved) & balasan diskusi antar warga dengan Koordinator Palm Village/Admin.
 - **T20**: **Kalender Acara & RSVP Kegiatan** — Skema + RLS `events` + `rsvp`; halaman Kalender Kegiatan (FullCalendar) untuk agenda kerja bakti, rapat RT, posyandu, dan perayaan; fitur RSVP partisipasi warga & export agenda ke `.ics` / Google Calendar.
 - **T21 (opsional)**: **Forum Komunitas Warga** — Skema + RLS forum (`categories`/`threads`/`posts` nested); wadah diskusi silaturahmi antar warga dengan moderasi (pin/lock/hapus) untuk Admin/RT.
 

@@ -6,8 +6,8 @@ const AuthContext = createContext(null);
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 const ENABLE_DEMO_ADMIN = import.meta.env.VITE_ENABLE_DEMO_ADMIN === 'true';
-const DEMO_ADMIN_EMAIL = (import.meta.env.VITE_DEMO_ADMIN_EMAIL || 'admin.demo@palmvillage.id').toLowerCase();
-const DEMO_ADMIN_PASS = import.meta.env.VITE_DEMO_ADMIN_PASS || 'demoview123';
+const DEMO_ADMIN_EMAIL = (import.meta.env.VITE_DEMO_ADMIN_EMAIL || 'admin.viewer@palmvillage.id').toLowerCase();
+const DEMO_ADMIN_PASS = import.meta.env.VITE_DEMO_ADMIN_PASS || 'demo123';
 const DEMO_STORAGE_KEY = 'pv_demo_session';
 const APP_TOKEN_STORAGE_KEY = 'pv_app_jwt';
 const APP_USER_STORAGE_KEY = 'pv_current_user';

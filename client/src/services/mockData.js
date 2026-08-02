@@ -81,7 +81,7 @@ export const mockProfiles = [
   },
   {
     id: 'demo-pengurus',
-    full_name: 'Ibu Ratna (Pengurus RT)',
+    full_name: 'Ibu Ratna (Koordinator Palm Village)',
     phone: '0814-3000-0003',
     role: 'pengurus',
     unit_id: 6,
@@ -1524,7 +1524,7 @@ export const mockLoginLogs = [
 export const mockAccessLogs = [
   { id: 'acc-1', userName: 'Pak Hendra (Admin)', page: '/users', timestamp: '2026-07-04T08:01:00Z' },
   { id: 'acc-2', userName: 'Budi Santoso (Bendahara)', page: '/expenses', timestamp: '2026-07-04T08:06:00Z' },
-  { id: 'acc-3', userName: 'Ibu Ratna (Pengurus RT)', page: '/reports', timestamp: '2026-07-04T08:11:00Z' },
+  { id: 'acc-3', userName: 'Ibu Ratna (Koordinator Palm Village)', page: '/reports', timestamp: '2026-07-04T08:11:00Z' },
   { id: 'acc-4', userName: 'Siti Rahayu', page: '/payment-matrix', timestamp: '2026-07-04T08:16:00Z' },
   { id: 'acc-5', userName: 'Pak Hendra (Admin)', page: '/logs', timestamp: '2026-07-04T08:30:00Z' },
 ];

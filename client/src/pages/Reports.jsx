@@ -338,6 +338,14 @@ export default function Reports() {
 
   const totalCashIn = activeBalance.totalIncome;
   const totalExpenses = activeBalance.totalExpense;
+  // New finance fields are optional so the existing IPL report contract and
+  // baseline remain unchanged until the backend starts returning them.
+  const iplIncome = Number(activeBalance.iplIncome ?? activeBalance.ipl_income ?? report?.iplIncome ?? report?.ipl_income ?? totalCashIn);
+  const nonIplGeneralIncome = Number(activeBalance.nonIplGeneralIncome ?? activeBalance.non_ipl_general_income ?? report?.nonIplGeneralIncome ?? report?.non_ipl_general_income ?? 0);
+  const eventIncome = Number(activeBalance.eventIncome ?? activeBalance.event_income ?? report?.eventIncome ?? report?.event_income ?? 0);
+  const eventExpense = Number(activeBalance.eventExpense ?? activeBalance.event_expense ?? report?.eventExpense ?? report?.event_expense ?? 0);
+  const hasFinanceBreakdown = [nonIplGeneralIncome, eventIncome, eventExpense].some((value) => value !== 0)
+    || activeBalance.iplIncome != null || activeBalance.ipl_income != null;
   const netBalance = totalCashIn - totalExpenses;
   const openingBalance = activeBalance.openingBalance;
   const closingBalance = activeBalance.closingBalance;
@@ -564,6 +572,15 @@ export default function Reports() {
               <SummaryCard label="Saldo Akhir Kas" value={formatRupiah(closingBalance)} icon="📈" color="bg-forest-800 text-gold-400" />
             </div>
           </div>
+
+          {hasFinanceBreakdown && (
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <SummaryCard label="Pemasukan IPL" value={formatRupiah(iplIncome)} icon="IPL" color="bg-emerald-50 text-emerald-700 border border-emerald-200" />
+              <SummaryCard label="Non-IPL Umum" value={formatRupiah(nonIplGeneralIncome)} icon="UM" color="bg-blue-50 text-blue-700 border border-blue-200" />
+              <SummaryCard label="Pemasukan Event" value={formatRupiah(eventIncome)} icon="EV" color="bg-purple-50 text-purple-700 border border-purple-200" />
+              <SummaryCard label="Pengeluaran Event" value={formatRupiah(eventExpense)} icon="EX" color="bg-red-50 text-red-700 border border-red-200" />
+            </div>
+          )}
 
           {/* Section B: Kinerja Tagihan IPL (Koleksi) */}
           <div>

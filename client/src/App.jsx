@@ -17,6 +17,9 @@ const PaymentMatrix = lazy(() => import('./pages/PaymentMatrix'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Expenses = lazy(() => import('./pages/Expenses'));
+const Events = lazy(() => import('./pages/Events'));
+const EventFinance = lazy(() => import('./pages/EventFinance'));
+const NonIplIncomes = lazy(() => import('./pages/NonIplIncomes'));
 const Users = lazy(() => import('./pages/Users'));
 const Logs = lazy(() => import('./pages/Logs'));
 const UserApproval = lazy(() => import('./pages/UserApproval'));
@@ -113,9 +116,31 @@ export default function App() {
                   path="/expenses"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['bendahara', 'admin', 'admin_viewer']}>
-                        <Expenses />
-                      </RoleGuard>
+                      <Expenses />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/events"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <Events />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/events/:eventId"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <EventFinance />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/incomes"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <NonIplIncomes />
                     </Suspense>
                   }
                 />
