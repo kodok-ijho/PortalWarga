@@ -1,0 +1,104 @@
+{
+  "contract_version": "1.0.0",
+  "status": "draft",
+  "timezone": "Asia/Jakarta",
+  "sender": {
+    "credential": "Gmail account PalmVillage.Paguyuban",
+    "address": "VERIFY_BEFORE_GO_LIVE"
+  },
+  "operational_alert": {
+    "recipient": "denmas.dyudhiantoro@gmail.com",
+    "credential": "PV Alert Provider Secondary",
+    "independent_from_sender": true
+  },
+  "dedupe": {
+    "key_fields": [
+      "event_type",
+      "entity_id",
+      "business_transition",
+      "recipient_email_normalized",
+      "template_version"
+    ],
+    "message_id": "deterministic-rfc-message-id-from-dedupe-key"
+  },
+  "events": [
+    {
+      "event_type": "profile.registered.user",
+      "entity_type": "profile",
+      "business_transition": "insert",
+      "recipients": ["profile_owner"],
+      "required_fields": ["profile_id", "email", "full_name", "role", "approval_status", "created_at"]
+    },
+    {
+      "event_type": "profile.registered.admin",
+      "entity_type": "profile",
+      "business_transition": "insert",
+      "recipients": ["active_approved_admins"],
+      "required_fields": ["profile_id", "email", "full_name", "role", "approval_status", "created_at"]
+    },
+    {
+      "event_type": "payment.recorded.resident",
+      "entity_type": "payment",
+      "business_transition": "insert",
+      "recipients": ["bill_owner"],
+      "required_fields": ["payment_id", "ipl_bill_id", "period", "unit_label", "amount", "method", "status", "created_at"]
+    },
+    {
+      "event_type": "payment.recorded.actor",
+      "entity_type": "payment",
+      "business_transition": "insert",
+      "recipients": ["recorded_by"],
+      "required_fields": ["payment_id", "recorded_by", "period", "amount", "method", "status", "created_at"]
+    },
+    {
+      "event_type": "payment.recorded.staff",
+      "entity_type": "payment",
+      "business_transition": "insert_pending_verification",
+      "recipients": ["active_approved_admins", "active_approved_bendahara"],
+      "required_fields": ["payment_id", "period", "unit_label", "amount", "method", "status", "created_at"]
+    },
+    {
+      "event_type": "profile.verification.user",
+      "entity_type": "profile",
+      "business_transition": "approval_status_terminal",
+      "recipients": ["profile_owner"],
+      "required_fields": ["profile_id", "email", "full_name", "approval_status", "approval_note", "approved_at", "rejected_at"]
+    },
+    {
+      "event_type": "profile.verification.actor",
+      "entity_type": "profile",
+      "business_transition": "approval_status_terminal",
+      "recipients": ["approved_by_or_rejected_by"],
+      "required_fields": ["profile_id", "actor_id", "approval_status", "approval_note"]
+    },
+    {
+      "event_type": "payment.verification.resident",
+      "entity_type": "payment",
+      "business_transition": "status_completed_or_rejected",
+      "recipients": ["bill_owner"],
+      "required_fields": ["payment_id", "ipl_bill_id", "period", "unit_label", "amount", "status", "verification_note", "verified_at"]
+    },
+    {
+      "event_type": "payment.verification.actor",
+      "entity_type": "payment",
+      "business_transition": "status_completed_or_rejected",
+      "recipients": ["verified_by"],
+      "required_fields": ["payment_id", "actor_id", "period", "amount", "status", "verification_note"]
+    },
+    {
+      "event_type": "email.pipeline.failure",
+      "entity_type": "email_notification_outbox",
+      "business_transition": "terminal_failure_or_watchdog_incident",
+      "recipients": ["denmas.dyudhiantoro@gmail.com"],
+      "required_fields": ["environment", "incident_type", "affected_count", "reference_ids", "error_class", "first_seen_at", "last_seen_at"]
+    }
+  ],
+  "privacy": {
+    "payload_minimum": true,
+    "never_store": ["jwt", "api_key", "password", "payment_proof_binary"],
+    "retention_days": {
+      "sent": 30,
+      "dead_letter": 90
+    }
+  }
+}
