@@ -124,22 +124,44 @@ const shouldAlert = ifElse({
   },
 });
 
-const sendSecondaryAlert = node({
-  type: 'n8n-nodes-base.emailSend',
-  version: 2.1,
+const prepareWatchdogMime = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
   config: {
-    name: 'Send Independent SMTP Alert',
-    position: [1780, 200],
+    name: 'Prepare Watchdog Alert MIME',
+    position: [1680, 200],
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: `const item = $input.first()?.json || {};
+const from = String($env.PV_EMAIL_FROM || 'palmvillage.paguyuban@gmail.com').trim();
+const to = String($env.PV_ALERT_TO || 'denmas.dyudhiantoro@gmail.com').trim();
+const mime = ['From: Portal Warga Alert <' + from + '>', 'To: ' + to, 'Subject: ' + item.subject, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', '', item.text].join('\\r\\n');
+const raw = Buffer.from(mime, 'utf8').toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '');
+return [{ json: { ...item, raw_mime: raw } }];`,
+    },
+  },
+});
+
+const sendGmailAlert = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.4,
+  config: {
+    name: 'Send Gmail Watchdog Alert',
+    position: [1800, 200],
     onError: 'continueRegularOutput',
     parameters: {
-      fromEmail: expr("{{ $env.PV_ALERT_FROM || 'Portal Warga Alert <alerts@localhost>' }}"),
-      toEmail: expr("{{ $env.PV_ALERT_TO || 'denmas.dyudhiantoro@gmail.com' }}"),
-      subject: expr('{{ $json.subject }}'),
-      emailFormat: 'text',
-      text: expr('{{ $json.text }}'),
-      options: { appendAttribution: false },
+      url: 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+      method: 'POST',
+      authentication: 'predefinedCredentialType',
+      nodeCredentialType: 'gmailOAuth2',
+      sendBody: true,
+      contentType: 'json',
+      specifyBody: 'json',
+      jsonBody: expr("{{ JSON.stringify({ raw: $json.raw_mime }) }}"),
+      options: { response: { response: { responseFormat: 'json', neverError: true } } },
     },
-    credentials: { smtp: newCredential('PV Alert SMTP Secondary') },
+    credentials: { gmailOAuth2: newCredential('Gmail account PalmVillage.Paguyuban') },
   },
 });
 
@@ -230,7 +252,7 @@ export default workflow('pv-notifications-watchdog', 'PV Notifications - Watchdo
   .to(syncIncident)
   .to(prepareAlertDecision)
   .to(shouldAlert
-    .onTrue(sendSecondaryAlert.to(classifyAlertDelivery).to(alertSent
+    .onTrue(prepareWatchdogMime.to(sendGmailAlert).to(classifyAlertDelivery).to(alertSent
       .onTrue(acknowledgeIncidentDelivery.to(markDeadLettersAlerted).to(markWatchdogHeartbeat))
       .onFalse(markWatchdogFailure)))
     .onFalse(markWatchdogHeartbeat));
