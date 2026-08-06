@@ -164,6 +164,19 @@ QRIS is optional if the project keeps a strict zero-monthly-cost / low-cost manu
 
 Use public health only if it returns no secrets and no DB-private details. Otherwise require admin JWT.
 
+### 4.10 Transactional Email Notifications
+
+| Workflow | Trigger | Data Source | Purpose |
+| --- | --- | --- | --- |
+| `PV Notifications - Transactional Email v2` | Schedule setiap 1 menit | `email_notification_outbox` | Atomic claim, kirim Gmail raw MIME, cek Sent pada hasil ambigu, dan persist outcome |
+| `PV Notifications - Stale Claim Recovery` | Schedule setiap 2 menit | expired outbox leases dan Gmail Sent | Memulihkan worker crash tanpa blind resend |
+| `PV Notifications - Reconciler` | Schedule setiap 5 menit | `profiles`, `payments`, `email_notification_outbox` | Memulihkan event email yang gagal dicapture tanpa mengubah transaksi bisnis |
+| `PV Notifications - Payment Reconciler` | Schedule setiap 5 menit | `payments`, `email_notification_outbox` | Memastikan branch payment tetap direkonsiliasi saat daftar profile kosong |
+| `PV Notifications - Watchdog` | Schedule setiap 5 menit | outbox, heartbeat, incident | Mengirim alert/recovery melalui SMTP sekunder |
+| `PV Notifications - Retention Cleanup` | Schedule harian | outbox dan attempt history | Menghapus PII melewati masa retensi secara bertahap |
+
+Outbox diisi oleh trigger Supabase fail-open dan dipulihkan reconciler; API bisnis tidak menunggu pengiriman email. Semua workflow masih berupa artifact lokal sampai gate pada `EMAIL_NOTIFICATIONS.md` lulus. Outbox tidak diekspos sebagai endpoint frontend.
+
 Current Google login implementation decision:
 
 - `PV API - Auth Google` is public but validates Google `id_token`.

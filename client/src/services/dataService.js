@@ -30,7 +30,7 @@ async function getEventMockData() {
 }
 
 // ── API imports ──────────────────────────────────────────────────
-import { portalApiPost, portalApiUpload } from './apiClient';
+import { PortalApiError, portalApiPost, portalApiUpload } from './apiClient';
 import { supabase } from './supabaseClient';
 import { isPendingVerificationStatus, normalizePaymentStatus } from './dataHelpers';
 
@@ -1126,11 +1126,22 @@ export async function fetchEvents(token, { role, profileId, includeDeleted = fal
     const mock = await getEventMockData();
     return mock.listDemoEvents({ role, profileId, includeDeleted });
   }
-  const result = await portalApiPost('/events/list', {
-    token,
-    body: { include_deleted: includeDeleted },
-  });
-  return result?.events || [];
+  try {
+    const result = await portalApiPost('/events/list', {
+      token,
+      body: { include_deleted: includeDeleted },
+    });
+    return result?.events || [];
+  } catch (error) {
+    // Some deployed n8n list workflows return an empty webhook body with
+    // HTTP 200 when there are no rows. Treat that as an empty event list;
+    // authentication, network, and non-200 API errors must still surface.
+    if (error instanceof PortalApiError && error.code === 'INVALID_API_RESPONSE' && error.status === 200) {
+      console.warn('Events API returned an empty 200 response; treating it as an empty list.');
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function fetchEventDetail(token, eventId) {
@@ -1203,7 +1214,17 @@ export async function fetchMyEventAccess(token, { profileId, role } = {}) {
     const mock = await getEventMockData();
     return mock.getDemoAccess({ profileId, role });
   }
-  return portalApiPost('/events/my-access', { token, body: {} });
+  try {
+    return await portalApiPost('/events/my-access', { token, body: {} });
+  } catch (error) {
+    // Keep the events page usable when the legacy access workflow responds
+    // with an empty HTTP 200 body for a user with no assignments.
+    if (error instanceof PortalApiError && error.code === 'INVALID_API_RESPONSE' && error.status === 200) {
+      console.warn('Event access API returned an empty 200 response; treating it as no access.');
+      return { global: {}, events: [] };
+    }
+    throw error;
+  }
 }
 
 export async function fetchNonIplIncomes(token, filters = {}) {
@@ -1308,8 +1329,19 @@ export async function fetchExpenses(token, filters = {}) {
       && (!filters.event_id || expense.event_id === filters.event_id)
     ));
   }
-  const result = await portalApiPost('/expenses/list', { token, body: filters });
-  return result?.expenses || [];
+  try {
+    const result = await portalApiPost('/expenses/list', { token, body: filters });
+    return result?.expenses || [];
+  } catch (error) {
+    // Older n8n list workflows can return an empty webhook response when the
+    // database query has no rows. Preserve that valid empty state without
+    // hiding authentication, network, or server errors.
+    if (error instanceof PortalApiError && error.code === 'INVALID_API_RESPONSE' && error.status === 200) {
+      console.warn('Expenses API returned an empty 200 response; treating it as an empty list.');
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function createExpense(token, {
