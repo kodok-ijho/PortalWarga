@@ -31,6 +31,7 @@ async function getEventMockData() {
 
 // ── API imports ──────────────────────────────────────────────────
 import { PortalApiError, portalApiPost, portalApiUpload } from './apiClient';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import { isPendingVerificationStatus, normalizePaymentStatus } from './dataHelpers';
 
@@ -1096,23 +1097,211 @@ function isEmptyOkResponse(error) {
     && error.status === 200;
 }
 
-function buildEmptyMonthlyFinance(year, month) {
-  const period = `${year}-${String(month).padStart(2, '0')}`;
+function getAuthedSupabaseClient(token) {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mzjgliclzihrdjaqzmqg.supabase.co';
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!token || !supabaseUrl || !supabaseAnonKey) return supabase;
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+function monthRange(year, month) {
+  const start = `${year}-${String(month).padStart(2, '0')}-01`;
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const end = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+  return { start, end };
+}
+
+function monthKeyFromDate(value) {
+  if (!value) return '';
+  return String(value).slice(0, 7);
+}
+
+function billTotal(bill) {
+  return Number(bill?.amount || 0) + Number(bill?.late_fee || 0);
+}
+
+function mapBillDetail(bill) {
+  const payment = Array.isArray(bill.payments)
+    ? bill.payments.find((item) => item.status === 'completed') || bill.payments[0]
+    : null;
   return {
-    report: {
-      billCount: 0,
-      paidCount: 0,
-      totalBilled: 0,
-      totalCollected: 0,
-      totalOutstanding: 0,
-      collectionRate: 0,
-      byBlock: [],
-      details: [],
-      period,
-    },
-    expenses: [],
-    cashPayments: [],
+    billId: bill.id,
+    unit_id: bill.unit_id,
+    unitNumber: bill.units?.unit_number || '-',
+    block: bill.units?.block || '-',
+    residentName: bill.profiles?.full_name || '-',
+    amount: billTotal(bill),
+    status: bill.status,
+    paidAt: payment?.paid_at || null,
   };
+}
+
+function mapCashPayment(payment) {
+  const bill = payment.ipl_bills || {};
+  return {
+    paymentId: payment.id,
+    paidAt: payment.paid_at,
+    amount: Number(payment.amount || 0),
+    method: payment.method,
+    unitId: bill.unit_id || null,
+    block: bill.units?.block || '-',
+    unitNumber: bill.units?.unit_number || '-',
+    residentName: payment.profiles?.full_name || '-',
+    period: bill.period || '-',
+    recordedBy: payment.recorded_by || null,
+  };
+}
+
+async function fetchMonthlyFinanceFromSupabase(token, { year, month }) {
+  const period = `${year}-${String(month).padStart(2, '0')}`;
+  const { start, end } = monthRange(year, month);
+  const client = getAuthedSupabaseClient(token);
+
+  const [billsRes, paymentsRes, expensesRes] = await Promise.all([
+    client
+      .from('ipl_bills')
+      .select('*, units(block, unit_number), profiles!ipl_bills_resident_id_fkey(full_name), payments!payments_ipl_bill_id_fkey(id, status, paid_at)')
+      .eq('period', period),
+    client
+      .from('payments')
+      .select('*, ipl_bills!payments_ipl_bill_id_fkey(period, unit_id, units(block, unit_number)), profiles!payments_resident_id_fkey(full_name)')
+      .eq('status', 'completed')
+      .gte('paid_at', `${start}T00:00:00+07:00`)
+      .lt('paid_at', `${end}T00:00:00+07:00`)
+      .order('paid_at', { ascending: false }),
+    client
+      .from('expenses')
+      .select('*')
+      .gte('expense_date', start)
+      .lt('expense_date', end)
+      .is('deleted_at', null)
+      .order('expense_date', { ascending: true }),
+  ]);
+
+  const error = billsRes.error || paymentsRes.error || expensesRes.error;
+  if (error) throw error;
+
+  const bills = billsRes.data || [];
+  const paidBills = bills.filter((bill) => bill.status === 'paid');
+  const totalBilled = bills.reduce((sum, bill) => sum + billTotal(bill), 0);
+  const totalCollected = paidBills.reduce((sum, bill) => sum + billTotal(bill), 0);
+  const byBlockMap = {};
+
+  bills.forEach((bill) => {
+    const block = bill.units?.block || '-';
+    if (!byBlockMap[block]) {
+      byBlockMap[block] = { block, billed: 0, collected: 0, count: 0, paid: 0 };
+    }
+    byBlockMap[block].billed += billTotal(bill);
+    byBlockMap[block].count += 1;
+    if (bill.status === 'paid') {
+      byBlockMap[block].collected += billTotal(bill);
+      byBlockMap[block].paid += 1;
+    }
+  });
+
+  const report = {
+    period,
+    billCount: bills.length,
+    paidCount: paidBills.length,
+    totalBilled,
+    totalCollected,
+    totalOutstanding: totalBilled - totalCollected,
+    collectionRate: totalBilled > 0 ? (totalCollected / totalBilled) * 100 : 0,
+    byBlock: Object.values(byBlockMap).sort((a, b) => String(a.block).localeCompare(String(b.block), 'id-ID', { numeric: true })),
+    details: bills.map(mapBillDetail).sort((a, b) => {
+      const blockCompare = String(a.block || '').localeCompare(String(b.block || ''), 'id-ID', { numeric: true });
+      if (blockCompare !== 0) return blockCompare;
+      return String(a.unitNumber || '').localeCompare(String(b.unitNumber || ''), 'id-ID', { numeric: true });
+    }),
+  };
+
+  return {
+    report,
+    expenses: (expensesRes.data || []).map((expense) => ({
+      ...expense,
+      date: expense.expense_date,
+      amount: Number(expense.amount || 0),
+    })),
+    cashPayments: (paymentsRes.data || []).map(mapCashPayment),
+  };
+}
+
+async function fetchRunningBalanceFromSupabase(token, { year, month }) {
+  const client = getAuthedSupabaseClient(token);
+  const startYear = 2026;
+  const startMonth = 7;
+  const { end } = monthRange(year, month);
+  const start = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
+
+  const [paymentsRes, expensesRes] = await Promise.all([
+    client
+      .from('payments')
+      .select('id, amount, paid_at')
+      .eq('status', 'completed')
+      .gte('paid_at', `${start}T00:00:00+07:00`)
+      .lt('paid_at', `${end}T00:00:00+07:00`),
+    client
+      .from('expenses')
+      .select('id, amount, expense_date')
+      .gte('expense_date', start)
+      .lt('expense_date', end)
+      .is('deleted_at', null),
+  ]);
+
+  const error = paymentsRes.error || expensesRes.error;
+  if (error) throw error;
+
+  const paymentsByMonth = {};
+  (paymentsRes.data || []).forEach((payment) => {
+    const key = monthKeyFromDate(payment.paid_at);
+    if (!paymentsByMonth[key]) paymentsByMonth[key] = { total: 0, count: 0 };
+    paymentsByMonth[key].total += Number(payment.amount || 0);
+    paymentsByMonth[key].count += 1;
+  });
+
+  const expensesByMonth = {};
+  (expensesRes.data || []).forEach((expense) => {
+    const key = monthKeyFromDate(expense.expense_date);
+    if (!expensesByMonth[key]) expensesByMonth[key] = { total: 0, count: 0 };
+    expensesByMonth[key].total += Number(expense.amount || 0);
+    expensesByMonth[key].count += 1;
+  });
+
+  const chain = [];
+  let openingBalance = 15000000;
+  let cursorYear = startYear;
+  let cursorMonth = startMonth;
+
+  while (cursorYear < year || (cursorYear === year && cursorMonth <= month)) {
+    const period = `${cursorYear}-${String(cursorMonth).padStart(2, '0')}`;
+    const income = paymentsByMonth[period] || { total: 0, count: 0 };
+    const expense = expensesByMonth[period] || { total: 0, count: 0 };
+    const closingBalance = openingBalance + income.total - expense.total;
+    chain.push({
+      period,
+      year: cursorYear,
+      month: cursorMonth,
+      openingBalance,
+      totalIncome: income.total,
+      totalExpense: expense.total,
+      closingBalance,
+      incomeCount: income.count,
+      expenseCount: expense.count,
+    });
+    openingBalance = closingBalance;
+    cursorMonth += 1;
+    if (cursorMonth > 12) {
+      cursorMonth = 1;
+      cursorYear += 1;
+    }
+  }
+
+  return { chain };
 }
 
 export async function fetchRunningBalance(token, { year, month }) {
@@ -1127,8 +1316,8 @@ export async function fetchRunningBalance(token, { year, month }) {
     });
   } catch (error) {
     if (isEmptyOkResponse(error)) {
-      console.warn('Running balance API returned an empty 200 response; treating it as an empty balance chain.');
-      return { chain: [] };
+      console.warn('Running balance API returned an empty 200 response; falling back to Supabase.');
+      return fetchRunningBalanceFromSupabase(token, { year, month });
     }
     throw error;
   }
@@ -1151,8 +1340,16 @@ export async function fetchMonthlyFinance(token, { year, month }) {
     });
   } catch (error) {
     if (isEmptyOkResponse(error)) {
-      console.warn('Monthly finance API returned an empty 200 response; treating it as an empty report period.');
-      return buildEmptyMonthlyFinance(year, month);
+      console.warn('Monthly finance API returned an empty 200 response; falling back to Supabase.');
+      try {
+        return await fetchMonthlyFinanceFromSupabase(token, { year, month });
+      } catch (fallbackError) {
+        console.warn('Monthly finance Supabase fallback failed:', fallbackError);
+        throw new PortalApiError('API laporan kosong dan fallback Supabase gagal memuat data laporan.', {
+          code: 'REPORT_FALLBACK_FAILED',
+          details: fallbackError,
+        });
+      }
     }
     throw error;
   }
