@@ -1097,6 +1097,23 @@ function isEmptyOkResponse(error) {
     && error.status === 200;
 }
 
+function decodeJwtPayload(token) {
+  try {
+    const payload = String(token || '').split('.')[1];
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+function isSupabaseJwt(token) {
+  const payload = decodeJwtPayload(token);
+  return typeof payload?.iss === 'string' && payload.iss.includes('.supabase.co/auth/v1');
+}
+
 function getAuthedSupabaseClient(token) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mzjgliclzihrdjaqzmqg.supabase.co';
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -1316,6 +1333,11 @@ export async function fetchRunningBalance(token, { year, month }) {
     });
   } catch (error) {
     if (isEmptyOkResponse(error)) {
+      if (!isSupabaseJwt(token)) {
+        throw new PortalApiError('API saldo berjalan mengembalikan response kosong. Token portal tidak dapat dipakai langsung ke Supabase.', {
+          code: 'REPORT_API_EMPTY_RESPONSE',
+        });
+      }
       console.warn('Running balance API returned an empty 200 response; falling back to Supabase.');
       return fetchRunningBalanceFromSupabase(token, { year, month });
     }
@@ -1340,6 +1362,11 @@ export async function fetchMonthlyFinance(token, { year, month }) {
     });
   } catch (error) {
     if (isEmptyOkResponse(error)) {
+      if (!isSupabaseJwt(token)) {
+        throw new PortalApiError('API laporan keuangan mengembalikan response kosong. Token portal tidak dapat dipakai langsung ke Supabase.', {
+          code: 'REPORT_API_EMPTY_RESPONSE',
+        });
+      }
       console.warn('Monthly finance API returned an empty 200 response; falling back to Supabase.');
       try {
         return await fetchMonthlyFinanceFromSupabase(token, { year, month });
