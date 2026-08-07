@@ -77,6 +77,50 @@ function normalizeRunningBalance(value) {
   return data.chain;
 }
 
+function isReportApiEmptyResponse(error) {
+  return error?.code === 'REPORT_API_EMPTY_RESPONSE';
+}
+
+function sumAmounts(items = []) {
+  return items.reduce((sum, item) => sum + Number(item?.amount || 0), 0);
+}
+
+function createPeriod(year, month) {
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+function buildMonthlyFallbackChain(finData, year, month, openingBalance = 15000000) {
+  const expenses = Array.isArray(finData?.expenses) ? finData.expenses : [];
+  const cashPayments = Array.isArray(finData?.cashPayments) ? finData.cashPayments : [];
+  const totalIncome = cashPayments.length > 0
+    ? sumAmounts(cashPayments)
+    : Number(finData?.report?.totalCollected || 0);
+  const totalExpense = sumAmounts(expenses);
+
+  return [{
+    period: createPeriod(year, month),
+    year,
+    month,
+    openingBalance,
+    totalIncome,
+    totalExpense,
+    closingBalance: openingBalance + totalIncome - totalExpense,
+    incomeCount: cashPayments.length,
+    expenseCount: expenses.length,
+  }];
+}
+
+function buildYearlyFallbackChain(financeByPeriod, periods, openingBalance = 15000000) {
+  let runningBalance = openingBalance;
+
+  return periods.map(({ year, month }) => {
+    const finData = financeByPeriod[createPeriod(year, month)];
+    const chainItem = buildMonthlyFallbackChain(finData, year, month, runningBalance)[0];
+    runningBalance = chainItem.closingBalance;
+    return chainItem;
+  });
+}
+
 async function mapWithConcurrency(items, concurrency, mapper) {
   const results = new Array(items.length);
   let nextIndex = 0;
@@ -125,15 +169,21 @@ export default function Reports() {
     setLoadError('');
     try {
       if (reportType === 'monthly') {
-        const [finRes, balRes] = await Promise.all([
-          fetchMonthlyFinance(session?.access_token, { year, month }),
-          fetchRunningBalance(session?.access_token, { year, month })
-        ]);
+        const finRes = await fetchMonthlyFinance(session?.access_token, { year, month });
         const finData = normalizeMonthlyFinance(finRes);
         setReport(finData.report);
         setExpenses(finData.expenses);
         setCashPayments(finData.cashPayments);
-        setRunningChain(normalizeRunningBalance(balRes));
+
+        try {
+          const balRes = await fetchRunningBalance(session?.access_token, { year, month });
+          setRunningChain(normalizeRunningBalance(balRes));
+        } catch (balanceError) {
+          if (!isReportApiEmptyResponse(balanceError)) {
+            throw balanceError;
+          }
+          setRunningChain(buildMonthlyFallbackChain(finData, year, month));
+        }
       } else {
         // Yearly mode: July Y to June Y+1
         const monthsOfFiscalYear = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
@@ -146,11 +196,6 @@ export default function Reports() {
           return fetchMonthlyFinance(session?.access_token, { year: y, month: m });
         });
 
-        // Fetch running balance up to the end of the fiscal year (June Y+1) to get the correct balance chain
-        const balRes = await fetchRunningBalance(session?.access_token, { year: year + 1, month: 6 });
-        const allChain = normalizeRunningBalance(balRes);
-        setRunningChain(allChain);
-
         // Aggregate 12 months data
         let totalBilled = 0;
         let totalCollected = 0;
@@ -160,9 +205,12 @@ export default function Reports() {
         const aggregatedDetails = [];
         const aggregatedExpenses = [];
         const aggregatedPayments = [];
+        const financeByPeriod = {};
 
-        results.forEach((res) => {
+        results.forEach((res, index) => {
           const data = normalizeMonthlyFinance(res);
+          const periodInfo = periods[index];
+          financeByPeriod[createPeriod(periodInfo.year, periodInfo.month)] = data;
           const rep = data.report || {};
           
           totalBilled += Number(rep.totalBilled || 0);
@@ -263,6 +311,17 @@ export default function Reports() {
 
         setExpenses(aggregatedExpenses);
         setCashPayments(aggregatedPayments);
+
+        try {
+          // Fetch running balance up to the end of the fiscal year (June Y+1) to get the correct balance chain
+          const balRes = await fetchRunningBalance(session?.access_token, { year: year + 1, month: 6 });
+          setRunningChain(normalizeRunningBalance(balRes));
+        } catch (balanceError) {
+          if (!isReportApiEmptyResponse(balanceError)) {
+            throw balanceError;
+          }
+          setRunningChain(buildYearlyFallbackChain(financeByPeriod, periods));
+        }
       }
     } catch (err) {
       setLoadError(err.message || 'Gagal memuat data laporan keuangan.');
