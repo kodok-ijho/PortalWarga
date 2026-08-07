@@ -14,7 +14,7 @@ import {
   formatRupiah,
   formatDate,
   billStatusLabel,
-  hasMinRole,
+  canViewFinancialReports,
 } from '../services/dataHelpers';
 import {
   fetchRunningBalance,
@@ -273,7 +273,7 @@ export default function Reports() {
   }, [session?.access_token, year, month, reportType, toast]);
 
   useEffect(() => {
-    if (hasMinRole(role, 'pengurus')) {
+    if (canViewFinancialReports(role)) {
       loadData();
     }
   }, [loadData, role]);
@@ -402,8 +402,8 @@ export default function Reports() {
   // Daftar bulan: tampilkan 12 bulan penuh
   const availableMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-  // Staff-only (pengurus, bendahara, admin)
-  if (!hasMinRole(role, 'pengurus')) {
+  // Financial reports are visible to koordinator, bendahara, admin, and admin viewer.
+  if (!canViewFinancialReports(role)) {
     return <Navigate to="/" replace />;
   }
 

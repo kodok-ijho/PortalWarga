@@ -1090,15 +1090,48 @@ export async function verifyQrisPayment(token, { parent_order_id } = {}) {
   });
 }
 
+function isEmptyOkResponse(error) {
+  return error instanceof PortalApiError
+    && error.code === 'INVALID_API_RESPONSE'
+    && error.status === 200;
+}
+
+function buildEmptyMonthlyFinance(year, month) {
+  const period = `${year}-${String(month).padStart(2, '0')}`;
+  return {
+    report: {
+      billCount: 0,
+      paidCount: 0,
+      totalBilled: 0,
+      totalCollected: 0,
+      totalOutstanding: 0,
+      collectionRate: 0,
+      byBlock: [],
+      details: [],
+      period,
+    },
+    expenses: [],
+    cashPayments: [],
+  };
+}
+
 export async function fetchRunningBalance(token, { year, month }) {
   if (IS_DEMO) {
     const mock = await getMockData();
     return { chain: mock.computeRunningBalance(year, month) };
   }
-  return portalApiPost('/reports/running-balance', {
-    token,
-    body: { year, month }
-  });
+  try {
+    return await portalApiPost('/reports/running-balance', {
+      token,
+      body: { year, month }
+    });
+  } catch (error) {
+    if (isEmptyOkResponse(error)) {
+      console.warn('Running balance API returned an empty 200 response; treating it as an empty balance chain.');
+      return { chain: [] };
+    }
+    throw error;
+  }
 }
 
 export async function fetchMonthlyFinance(token, { year, month }) {
@@ -1111,10 +1144,18 @@ export async function fetchMonthlyFinance(token, { year, month }) {
       cashPayments: mock.getPaymentsByMonth(year, month)
     };
   }
-  return portalApiPost('/reports/monthly-finance', {
-    token,
-    body: { year, month }
-  });
+  try {
+    return await portalApiPost('/reports/monthly-finance', {
+      token,
+      body: { year, month }
+    });
+  } catch (error) {
+    if (isEmptyOkResponse(error)) {
+      console.warn('Monthly finance API returned an empty 200 response; treating it as an empty report period.');
+      return buildEmptyMonthlyFinance(year, month);
+    }
+    throw error;
+  }
 }
 
 // =====================================================================

@@ -26,6 +26,7 @@ import {
   isBendaharaOrAbove,
   hasMinRole,
   canModifyData,
+  canViewFinancialReports,
   roleLabel,
 } from '../services/dataHelpers';
 import { fetchDashboardData, fetchMyEventAccess } from '../services/dataService';
@@ -151,6 +152,10 @@ export default function Header() {
         ...(isStaffRole(role)
           ? [
               { to: '/expenses', label: 'Pengeluaran', icon: AiOutlineWallet, desc: 'Catat & kelola pengeluaran' },
+            ]
+          : []),
+        ...(canViewFinancialReports(role)
+          ? [
               { to: '/reports', label: 'Laporan Keuangan', icon: AiOutlineBarChart, desc: 'Laporan arus kas bulanan' },
             ]
           : []),

@@ -11,6 +11,7 @@ import NotFound from './pages/NotFound';
 // Lazy-load halaman berat untuk code-splitting (recharts, papaparse)
 import { lazy, Suspense } from 'react';
 import { useAuth } from './hooks/useAuth';
+import { canViewFinancialReports } from './services/dataHelpers';
 const Residents = lazy(() => import('./pages/Residents'));
 const Houses = lazy(() => import('./pages/Houses'));
 const PaymentMatrix = lazy(() => import('./pages/PaymentMatrix'));
@@ -35,9 +36,9 @@ const PageLoader = () => (
  * RoleGuard — renders children only if user has one of the allowed roles.
  * Otherwise redirects to home page.
  */
-function RoleGuard({ allowed, children }) {
+function RoleGuard({ allowed, canAccess, children }) {
   const { role } = useAuth();
-  if (!role || !allowed.includes(role)) {
+  if (!role || (canAccess ? !canAccess(role) : !allowed.includes(role))) {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -96,7 +97,7 @@ export default function App() {
                   path="/reports"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin', 'admin_viewer']}>
+                      <RoleGuard canAccess={canViewFinancialReports}>
                         <Reports />
                       </RoleGuard>
                     </Suspense>

@@ -142,6 +142,10 @@ export function isBendaharaOrAbove(role) {
   return hasMinRole(role, 'bendahara');
 }
 
+export function canViewFinancialReports(role) {
+  return ['pengurus', 'bendahara', 'admin', 'admin_viewer'].includes(role);
+}
+
 export function isAdminRole(role) {
   return role === 'admin';
 }
