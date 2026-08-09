@@ -25,14 +25,14 @@ import {
   occupancyStatusLabel,
   occupancyStatusColor,
   OCCUPANCY_STATUS,
-  isStaffRole,
+  canManageResidents,
 } from '../services/dataHelpers';
 
 export default function Residents() {
-  const { role, session } = useAuth();
+  const { role, session, isReadOnly } = useAuth();
   const token = session?.access_token;
   const toast = useToast();
-  const isStaff = isStaffRole(role);
+  const canManage = canManageResidents(role, isReadOnly);
 
   // Data states
   const [profiles, setProfiles] = useState([]);
@@ -127,6 +127,10 @@ export default function Residents() {
 
   // ── Handlers ──────────────────────────────────────────
   const handleSaveProfile = async (data) => {
+    if (!canManage) {
+      toast.error('Hanya Admin yang dapat mengubah data penghuni.');
+      return;
+    }
     setIsSaving(true);
     try {
       if (modalAddEdit === 'add') {
@@ -163,6 +167,10 @@ export default function Residents() {
     );
 
   const handleDelete = async (profile) => {
+    if (!canManage) {
+      toast.error('Hanya Admin yang dapat menghapus data penghuni.');
+      return;
+    }
     if (!confirm(`Hapus warga "${profile.full_name}"? Tindakan ini tidak dapat dibatalkan.`)) return;
     setIsSaving(true);
     try {
@@ -284,7 +292,7 @@ export default function Residents() {
           <p className="text-sm text-forest-500">{filtered.length} dari {profiles.length} penghuni</p>
         </div>
         <div className="flex gap-2">
-          {isStaff && (
+          {canManage && (
             <>
               <button onClick={() => setModalUpload(true)} className="pv-btn-ghost text-xs">
                 <AiOutlineUpload /> Upload CSV
@@ -294,9 +302,9 @@ export default function Residents() {
               </button>
             </>
           )}
-          <button onClick={handleExportCSV} className="pv-btn-ghost text-xs">
+          {canManage && <button onClick={handleExportCSV} className="pv-btn-ghost text-xs">
             <AiOutlineDownload /> Export
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -446,7 +454,7 @@ export default function Residents() {
        {selected && (
          <DetailModal
            profile={selected}
-           isStaff={isStaff}
+           canManage={canManage}
            getUnitById={getUnitById}
            getUnitOwner={getUnitOwner}
            onClose={() => setSelectedId(null)}
@@ -459,7 +467,7 @@ export default function Residents() {
        )}
  
        {/* Modal add/edit */}
-       {modalAddEdit && (
+       {modalAddEdit && canManage && (
          <ProfileFormModal
            profile={modalAddEdit === 'add' ? null : modalAddEdit}
            onSave={handleSaveProfile}
@@ -470,7 +478,7 @@ export default function Residents() {
        )}
  
        {/* Modal upload CSV */}
-       {modalUpload && (
+       {modalUpload && canManage && (
          <UploadCSVModal
            onImport={handleImportCSV}
            onClose={() => setModalUpload(false)}
@@ -483,7 +491,7 @@ export default function Residents() {
  
  // ── Sub-komponen ──────────────────────────────────────────────────
  
- function DetailModal({ profile, isStaff, getUnitById, getUnitOwner, onClose, onEdit, onDelete }) {
+ function DetailModal({ profile, canManage, getUnitById, getUnitOwner, onClose, onEdit, onDelete }) {
    const unit = getUnitById(profile.unit_id);
   const owner = profile.occupancy_status === 'tenant' ? getUnitOwner(profile.unit_id) : null;
   return (
@@ -517,7 +525,7 @@ export default function Residents() {
           <Row label="Pemilik Unit" value={owner.full_name} />
         )}
       </div>
-      {isStaff && (
+      {canManage && (
         <div className="mt-6 pt-4 border-t border-forest-100 flex gap-2">
           <button onClick={onEdit} className="pv-btn-ghost flex-1 text-xs">
             <AiOutlineEdit /> Edit

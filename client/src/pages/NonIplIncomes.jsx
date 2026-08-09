@@ -9,7 +9,7 @@ import {
   fetchMyEventAccess,
   fetchNonIplIncomes,
 } from '../services/dataService';
-import { formatDate, formatRupiah } from '../services/dataHelpers';
+import { canManageGeneralExpenses, formatDate, formatRupiah } from '../services/dataHelpers';
 
 const EMPTY_FORM = {
   income_date: new Date().toISOString().slice(0, 10),
@@ -36,7 +36,7 @@ export default function NonIplIncomes() {
   const [editingId, setEditingId] = useState(null);
   const [filterScope, setFilterScope] = useState('all');
   const [filterEventId, setFilterEventId] = useState('');
-  const canManageGeneral = !isReadOnly && (role === 'admin' || role === 'bendahara');
+  const canManageGeneral = canManageGeneralExpenses(role, isReadOnly);
 
   const load = useCallback(async () => {
     setLoading(true);

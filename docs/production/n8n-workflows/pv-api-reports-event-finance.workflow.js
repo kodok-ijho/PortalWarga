@@ -43,7 +43,7 @@ const extractBearerToken = node({
         "const headers = source.headers ?? {};\n" +
         "const now = new Date().toISOString();\n" +
         "const requestId = headers['x-request-id'] || headers['X-Request-Id'] || body.request_id || query.request_id || 'reports_event_finance_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);\n" +
-        "const authHeader = headers.authorization || headers.Authorization || '';\n" +
+        "const authHeader = headers['x-portal-authorization'] || headers['X-Portal-Authorization'] || headers.authorization || headers.Authorization || '';\n" +
         "const match = String(authHeader).match(/^Bearer\\s+(.+)$/i);\n" +
         "function failure(statusCode, code, message, details = {}) {\n" +
         "  return { statusCode, response: { ok: false, data: null, error: { code, message, details }, meta: { request_id: requestId, timestamp: now } } };\n" +

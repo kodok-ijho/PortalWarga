@@ -123,11 +123,17 @@ export function isPendingVerificationStatus(status, options) {
   return normalizePaymentStatus(status, options) === 'pending_verification';
 }
 
-const ROLE_HIERARCHY = ['warga', 'pengurus', 'bendahara', 'admin', 'admin_viewer'];
+// `admin_viewer` is a local/demo read-only overlay, not a database role. Keep
+// the production hierarchy limited to the four canonical Supabase roles.
+const ROLE_HIERARCHY = ['warga', 'pengurus', 'bendahara', 'admin'];
 const READ_ONLY_ROLES = new Set(['admin_viewer']);
 
 export function hasMinRole(userRole, minRole) {
-  return ROLE_HIERARCHY.indexOf(userRole) >= ROLE_HIERARCHY.indexOf(minRole);
+  const minimumIndex = ROLE_HIERARCHY.indexOf(minRole);
+  if (minimumIndex < 0) return false;
+  if (userRole === 'admin_viewer') return true;
+  const userIndex = ROLE_HIERARCHY.indexOf(userRole);
+  return userIndex >= minimumIndex;
 }
 
 export function canModifyData(role) {
@@ -148,6 +154,66 @@ export function canViewFinancialReports(role) {
 
 export function isAdminRole(role) {
   return role === 'admin';
+}
+
+export function isAdminViewerRole(role) {
+  return role === 'admin_viewer';
+}
+
+export function canViewResidents(role) {
+  return ROLE_HIERARCHY.includes(role) || isAdminViewerRole(role);
+}
+
+export function canManageResidents(role, isReadOnly = false) {
+  return role === 'admin' && !isReadOnly;
+}
+
+export function canViewHouses(role) {
+  return hasMinRole(role, 'pengurus');
+}
+
+export function canManageHouses(role, isReadOnly = false) {
+  return role === 'admin' && !isReadOnly;
+}
+
+export function canViewUsers(role) {
+  return hasMinRole(role, 'pengurus');
+}
+
+export function canViewUserApproval(role) {
+  return hasMinRole(role, 'pengurus');
+}
+
+export function canManageUsers(role, isReadOnly = false) {
+  return role === 'admin' && !isReadOnly;
+}
+
+export function canViewPaymentVerification(role) {
+  return hasMinRole(role, 'bendahara');
+}
+
+export function canViewSettings(role) {
+  return hasMinRole(role, 'pengurus');
+}
+
+export function canManageSettings(role, isReadOnly = false) {
+  return role === 'admin' && !isReadOnly;
+}
+
+export function canManagePaymentSchemas(role, isReadOnly = false) {
+  return hasMinRole(role, 'bendahara') && !isReadOnly;
+}
+
+export function canViewExpenses(role) {
+  return hasMinRole(role, 'pengurus');
+}
+
+export function canManageGeneralExpenses(role, isReadOnly = false) {
+  return hasMinRole(role, 'bendahara') && !isReadOnly;
+}
+
+export function canViewLogs(role) {
+  return hasMinRole(role, 'admin');
 }
 
 export function roleLabel(role) {

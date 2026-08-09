@@ -522,8 +522,13 @@ function useProductionAuth() {
   }, [persist]);
 
   useEffect(() => {
-    registerUnauthorizedHandler(() => {
-      persist(null, null);
+    registerUnauthorizedHandler(({ path } = {}) => {
+      // Only the canonical session validation endpoint can invalidate the
+      // browser session. A 401 from a secondary page endpoint must remain a
+      // page-level error and must never log the user out.
+      if (path === '/auth/me') {
+        persist(null, null);
+      }
     });
   }, [signOut, persist]);
 

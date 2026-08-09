@@ -27,6 +27,8 @@ import {
   hasMinRole,
   canModifyData,
   canViewFinancialReports,
+  canViewPaymentVerification,
+  canViewLogs,
   roleLabel,
 } from '../services/dataHelpers';
 import { fetchDashboardData, fetchMyEventAccess } from '../services/dataService';
@@ -138,7 +140,7 @@ export default function Header() {
       activePaths: ['/payment-matrix', '/payment-verification', '/expenses', '/reports', '/events', '/incomes'],
       items: [
         { to: '/payment-matrix', label: 'Matriks Bayar', icon: AiOutlineTable, desc: 'Matriks pembayaran IPL unit' },
-        ...(isStaffRole(role)
+        ...(canViewPaymentVerification(role)
           ? [
               {
                 to: '/payment-verification',
@@ -205,7 +207,7 @@ export default function Header() {
             activePaths: ['/settings', '/logs'],
             items: [
               { to: '/settings', label: 'Pengaturan', icon: AiOutlineSetting, desc: 'Atur tarif IPL dan denda' },
-                ...(hasMinRole(role, 'admin')
+                ...(canViewLogs(role)
                   ? [{ to: '/logs', label: 'Log Sistem', icon: AiOutlineFileText, desc: 'Audit log aktivitas portal' }]
                   : []),
             ],

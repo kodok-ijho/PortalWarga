@@ -15,7 +15,7 @@ import {
   roleLabel,
   roleColor,
   isStaffRole,
-  canModifyData,
+  canManageUsers,
 } from '../services/dataHelpers';
 import { AiOutlinePlus, AiOutlineEdit, AiOutlineUserDelete, AiOutlineUnlock } from 'react-icons/ai';
 
@@ -23,7 +23,9 @@ export default function Users() {
   const { role, session, isReadOnly } = useAuth();
   const token = session?.access_token;
   const toast = useToast();
-  const canWrite = canModifyData(role) && !isReadOnly;
+  // Viewing the directory is a staff capability; role/activation mutations
+  // are reserved for Admin and must match the production RBAC contract.
+  const canWrite = canManageUsers(role, isReadOnly);
 
   const [users, setUsers] = useState([]);
   const [units, setUnits] = useState([]);

@@ -145,7 +145,7 @@ QRIS is optional if the project keeps a strict zero-monthly-cost / low-cost manu
 
 | Workflow | Method | Route | Minimum Role | Purpose |
 | --- | --- | --- | --- | --- |
-| `PV API - Expenses List` | `POST` | `/portal-v1/expenses/list` | `bendahara` | List all expense records |
+| `PV API - Expenses List` | `POST` | `/portal-v1/expenses/list` | `warga` (scoped) | List general expenses for management roles and event expenses for assigned event members |
 | `PV API - Expenses Create` | `POST` | `/portal-v1/expenses/create` | `bendahara` | Create expense record with optional receipt upload |
 | `PV API - Expenses Update` | `POST` | `/portal-v1/expenses/update` | `bendahara` | Update existing expense record |
 | `PV API - Expenses Delete` | `POST` | `/portal-v1/expenses/delete` | `bendahara` | Delete expense record |

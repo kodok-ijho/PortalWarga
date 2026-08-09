@@ -18,7 +18,7 @@ const statusWebhook = trigger({
     name: 'POST /portal-v1/payments/qris/status',
     position: [180, 300],
     parameters: {
-      authentication: 'jwtAuth',
+      authentication: 'none',
       httpMethod: 'POST',
       path: 'portal-v1/payments/qris/status',
       responseMode: 'responseNode',
@@ -27,7 +27,6 @@ const statusWebhook = trigger({
         ignoreBots: true,
       },
     },
-    credentials: { jwtAuth: newCredential('PV App JWT') },
   },
 });
 
@@ -45,8 +44,75 @@ const body = source.body ?? {};
 const headers = source.headers ?? {};
 const parentOrderId = String(body.parent_order_id || '').trim();
 const valid = /^PV-QRIS-[0-9]+-[0-9]+-[a-z0-9]+$/i.test(parentOrderId);
-const authorization = headers.authorization || headers.Authorization || '';
-return [{ json: { valid, parent_order_id: parentOrderId, authorization } }];`,
+const authorization = headers['x-portal-authorization'] || headers['X-Portal-Authorization'] || headers.authorization || headers.Authorization || '';
+const match = String(authorization).match(/^Bearer\s+(.+)$/i);
+return [{ json: { valid, parent_order_id: parentOrderId, tokenPresent: Boolean(match?.[1]), token: match?.[1]?.trim() || '' } }];`,
+    },
+  },
+});
+
+const tokenPresent = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Token Present?',
+    position: [720, 300],
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
+        conditions: [{ leftValue: expr('{{ $json.tokenPresent }}'), operator: { type: 'boolean', operation: 'true' }, rightValue: true }],
+        combinator: 'and',
+      },
+    },
+  },
+});
+
+const verifyAppJwt = node({
+  type: 'n8n-nodes-base.jwt',
+  version: 1,
+  config: {
+    name: 'Verify App JWT',
+    position: [960, 220],
+    onError: 'continueRegularOutput',
+    parameters: {
+      operation: 'verify',
+      token: expr('{{ $json.token }}'),
+      options: { complete: false, ignoreExpiration: false, ignoreNotBefore: false, clockTolerance: 30, algorithm: 'HS256' },
+    },
+    credentials: { jwtAuth: newCredential('PV App JWT') },
+  },
+});
+
+const validateAppClaims = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Validate App Claims',
+    position: [1200, 220],
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: `const input = $input.first()?.json ?? {};
+const payload = input.payload && typeof input.payload === 'object' ? input.payload : input;
+let request = {};
+try { request = $items('Normalize Request', 0, 0)?.[0]?.json ?? {}; } catch (error) {}
+const audienceOk = Array.isArray(payload.aud) ? payload.aud.includes('portal-palm-village-web') : payload.aud === 'portal-palm-village-web';
+const claimsValid = payload.iss === 'portal-palm-village' && audienceOk && Boolean(payload.sub);
+return [{ json: { claimsValid, valid: request.valid, parent_order_id: request.parent_order_id, user_id: payload.sub || null } }];`,
+    },
+  },
+});
+
+const claimsValid = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Claims Valid?',
+    position: [1440, 220],
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
+        conditions: [{ leftValue: expr('{{ $json.claimsValid }}'), operator: { type: 'boolean', operation: 'true' }, rightValue: true }],
+        combinator: 'and',
+      },
     },
   },
 });
@@ -249,6 +315,20 @@ const respondBadRequest = node({
   },
 });
 
+const respondUnauthorized = node({
+  type: 'n8n-nodes-base.respondToWebhook',
+  version: 1.5,
+  config: {
+    name: 'Respond Unauthorized',
+    position: [1020, 540],
+    parameters: {
+      respondWith: 'json',
+      responseBody: expr("{{ { ok: false, data: null, error: { code: 'UNAUTHORIZED', message: 'Sesi tidak valid. Silakan login ulang.' } } }}"),
+      options: { responseCode: 401, responseHeaders: jsonHeaders },
+    },
+  },
+});
+
 const respondProviderError = node({
   type: 'n8n-nodes-base.respondToWebhook',
   version: 1.5,
@@ -299,14 +379,20 @@ const releaseUnavailablePayment = node({
 export default workflow('pv-api-payments-qris-status', 'PV API - Payments QRIS Status')
   .add(statusWebhook)
   .to(normalizeRequest)
-  .to(requestValid
-    .onTrue(getMidtransStatus
-      .to(analyzeProviderStatus)
-      .to(providerStatusValid
-        .onTrue(fetchStatusPayments
-          .to(buildStatusUpdate)
-          .to(paymentSettled
-            .onTrue(updatePaymentsSettled.to(updateBillsSettled.to(respondSuccess)))
-            .onFalse(respondSuccess)))
-        .onFalse(releaseUnavailablePayment.to(respondProviderError))))
-    .onFalse(respondBadRequest));
+  .to(tokenPresent
+    .onTrue(verifyAppJwt
+      .to(validateAppClaims)
+      .to(claimsValid
+        .onTrue(requestValid
+          .onTrue(getMidtransStatus
+            .to(analyzeProviderStatus)
+            .to(providerStatusValid
+              .onTrue(fetchStatusPayments
+                .to(buildStatusUpdate)
+                .to(paymentSettled
+                  .onTrue(updatePaymentsSettled.to(updateBillsSettled.to(respondSuccess)))
+                  .onFalse(respondSuccess)))
+              .onFalse(releaseUnavailablePayment.to(respondProviderError))))
+          .onFalse(respondBadRequest))
+        .onFalse(respondUnauthorized)))
+    .onFalse(respondUnauthorized));

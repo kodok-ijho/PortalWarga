@@ -142,7 +142,9 @@ export async function fetchDashboardData(token, { role, period } = {}) {
     };
   }
 
-  // Production: fetch real pending counts and report
+  // Production: fetch real pending counts and report. Header calls this
+  // without a period, so always provide a safe current-month default.
+  const resolvedPeriod = period || new Date().toISOString().slice(0, 7);
   let pendingRegistrationCount = 0;
   let pendingPaymentCount = 0;
   let report = null;
@@ -165,7 +167,7 @@ export async function fetchDashboardData(token, { role, period } = {}) {
       try {
         const payments = await fetchPayments(token);
         pendingPaymentCount = payments.filter((p) => isPendingVerificationStatus(p.status)).length;
-        const [yearStr, monthStr] = period.split('-');
+        const [yearStr, monthStr] = resolvedPeriod.split('-');
         const year = Number(yearStr);
         const month = Number(monthStr);
         if (year && month) {
@@ -265,20 +267,6 @@ export async function upsertUnit(token, payload) {
   }
   const data = await portalApiPost('/units/upsert', { token, body: payload });
   return { ok: true, data };
-}
-
-export async function deleteUnit(token, unitId) {
-  if (IS_DEMO) {
-    const mock = await getMockData();
-    const idx = mock.mockUnits.findIndex((u) => u.id === Number(unitId));
-    if (idx >= 0) {
-      mock.mockUnits.splice(idx, 1);
-      return { ok: true };
-    }
-    return { ok: false, error: 'Unit not found' };
-  }
-  await portalApiPost('/units/delete', { token, body: { unit_id: unitId } });
-  return { ok: true };
 }
 
 // =====================================================================

@@ -53,13 +53,15 @@ export default function Expenses() {
   const { role, profile, session, isReadOnly, isAuthenticated } = useAuth();
   const token = session?.access_token;
   const toast = useToast();
-  const [eventAccess, setEventAccess] = useState({ events: [] });
+  // `null` means capability discovery is still in flight. Do not redirect an
+  // assigned event user while the asynchronous access response is pending.
+  const [eventAccess, setEventAccess] = useState(null);
   const [eventOptions, setEventOptions] = useState([]);
   const isStaff = hasMinRole(role, 'pengurus');
   const canEditGeneral = isBendaharaOrAbove(role);
   const manageableEventIds = useMemo(() => new Set(
-    (eventAccess.events || []).filter((item) => item.can_manage_finance).map((item) => item.event_id)
-  ), [eventAccess.events]);
+    (eventAccess?.events || []).filter((item) => item.can_manage_finance).map((item) => item.event_id)
+  ), [eventAccess?.events]);
   const canEdit = canEditGeneral || manageableEventIds.size > 0;
   const canWrite = (canModifyData(role) || manageableEventIds.size > 0) && !isReadOnly;
 
@@ -131,6 +133,10 @@ export default function Expenses() {
   const totalAmount = filtered.reduce((s, e) => s + e.amount, 0);
 
   // Staff-only (pengurus, bendahara, admin)
+  if (!isStaff && eventAccess === null) {
+    return <div className="pv-card p-8 text-center text-sm text-forest-500">Memeriksa akses event...</div>;
+  }
+
   if (!isStaff && manageableEventIds.size === 0) {
     return <Navigate to="/" replace />;
   }

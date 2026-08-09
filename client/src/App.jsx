@@ -11,7 +11,16 @@ import NotFound from './pages/NotFound';
 // Lazy-load halaman berat untuk code-splitting (recharts, papaparse)
 import { lazy, Suspense } from 'react';
 import { useAuth } from './hooks/useAuth';
-import { canViewFinancialReports } from './services/dataHelpers';
+import {
+  canViewFinancialReports,
+  canViewResidents,
+  canViewHouses,
+  canViewSettings,
+  canViewUsers,
+  canViewLogs,
+  canViewPaymentVerification,
+  canViewUserApproval,
+} from './services/dataHelpers';
 const Residents = lazy(() => import('./pages/Residents'));
 const Houses = lazy(() => import('./pages/Houses'));
 const PaymentMatrix = lazy(() => import('./pages/PaymentMatrix'));
@@ -71,7 +80,9 @@ export default function App() {
                   path="/residents"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <Residents />
+                      <RoleGuard canAccess={canViewResidents}>
+                        <Residents />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />
@@ -79,7 +90,7 @@ export default function App() {
                   path="/houses"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin', 'admin_viewer']}>
+                      <RoleGuard canAccess={canViewHouses}>
                         <Houses />
                       </RoleGuard>
                     </Suspense>
@@ -107,7 +118,7 @@ export default function App() {
                   path="/settings"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin', 'admin_viewer']}>
+                      <RoleGuard canAccess={canViewSettings}>
                         <Settings />
                       </RoleGuard>
                     </Suspense>
@@ -149,7 +160,7 @@ export default function App() {
                   path="/users"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin', 'admin_viewer']}>
+                      <RoleGuard canAccess={canViewUsers}>
                         <Users />
                       </RoleGuard>
                     </Suspense>
@@ -159,7 +170,7 @@ export default function App() {
                   path="/logs"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['admin', 'admin_viewer']}>
+                      <RoleGuard canAccess={canViewLogs}>
                         <Logs />
                       </RoleGuard>
                     </Suspense>
@@ -169,7 +180,7 @@ export default function App() {
                   path="/user-approval"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['pengurus', 'bendahara', 'admin', 'admin_viewer']}>
+                      <RoleGuard canAccess={canViewUserApproval}>
                         <UserApproval />
                       </RoleGuard>
                     </Suspense>
@@ -179,7 +190,7 @@ export default function App() {
                   path="/payment-verification"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RoleGuard allowed={['bendahara', 'admin', 'admin_viewer']}>
+                      <RoleGuard canAccess={canViewPaymentVerification}>
                         <PaymentVerification />
                       </RoleGuard>
                     </Suspense>

@@ -53,7 +53,7 @@ const extractToken = node({
 const headers = source.headers ?? {};
 const now = new Date().toISOString();
 const requestId = headers['x-request-id'] || headers['X-Request-Id'] || 'payment_smoke_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
-const authHeader = headers.authorization || headers.Authorization || '';
+const authHeader = headers['x-portal-authorization'] || headers['X-Portal-Authorization'] || headers.authorization || headers.Authorization || '';
 const match = String(authHeader).match(/^Bearer\\s+(.+)$/i);
 function failure(statusCode, code, message) {
   return { statusCode, response: { ok: false, data: null, error: { code, message, details: {} }, meta: { request_id: requestId, timestamp: now } } };

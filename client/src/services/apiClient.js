@@ -24,9 +24,9 @@ export function registerUnauthorizedHandler(handler) {
   unauthorizedHandler = handler;
 }
 
-function triggerUnauthorized() {
+function triggerUnauthorized(details = {}) {
   if (unauthorizedHandler) {
-    unauthorizedHandler();
+    unauthorizedHandler(details);
   }
 }
 
@@ -71,12 +71,15 @@ export async function portalApiPost(path, { token, body } = {}) {
     body: JSON.stringify(body || {}),
   });
 
-  if (response.status === 401) {
-    triggerUnauthorized();
-  }
-
   const rawText = await response.clone().text().catch(() => '');
   const payload = await response.json().catch(() => null);
+  // A business endpoint may legitimately return 401 because of a route or
+  // transport configuration problem. Session invalidation is owned by
+  // /auth/me in AuthContext, so never clear a valid session as a side effect
+  // of a secondary request.
+  if (response.status === 401) {
+    triggerUnauthorized({ path, status: response.status, payload });
+  }
   if (!payload) {
     throw new PortalApiError(`Respons API tidak valid. (HTTP ${response.status}: ${rawText.substring(0, 100)})`, {
       code: 'INVALID_API_RESPONSE',
@@ -122,11 +125,10 @@ export async function portalApiUpload(path, { token, file, fields } = {}) {
     body: formData,
   });
 
-  if (response.status === 401) {
-    triggerUnauthorized();
-  }
-
   const payload = await response.json().catch(() => null);
+  if (response.status === 401) {
+    triggerUnauthorized({ path, status: response.status, payload });
+  }
   if (!payload) {
     throw new PortalApiError('Respons API tidak valid.', {
       code: 'INVALID_API_RESPONSE',

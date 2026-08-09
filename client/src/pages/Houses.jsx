@@ -24,7 +24,7 @@ import {
   formatRupiah,
   computeSchemaAmount,
   getSchemaById,
-  canModifyData,
+  canManageHouses,
 } from '../services/dataHelpers';
 
 const EMPTY_FORM = {
@@ -43,7 +43,9 @@ export default function Houses() {
   const token = session?.access_token;
   const toast = useToast();
   const isStaff = isStaffRole(role);
-  const canWrite = canModifyData(role) && !isReadOnly;
+  // Unit master data is an Admin capability. Staff can inspect it, but the
+  // live /units/upsert workflow correctly rejects non-admin mutations.
+  const canWrite = canManageHouses(role, isReadOnly);
 
   // Data states
   const [units, setUnits] = useState([]);
@@ -498,7 +500,7 @@ export default function Houses() {
         <UnitFormModal
           unit={formUnit}
           owners={profiles.filter((profile) => profile.role !== 'admin')}
-          canEditSchema={isBendaharaOrAbove(role) && canWrite}
+          canEditSchema={canWrite}
           iplSchemas={iplSchemas}
           onClose={() => setFormUnit(null)}
           onSave={handleSave}

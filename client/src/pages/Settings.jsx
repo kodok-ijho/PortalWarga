@@ -17,6 +17,8 @@ import {
   hasMinRole,
   isBendaharaOrAbove,
   canModifyData,
+  canManageSettings,
+  canManagePaymentSchemas,
 } from '../services/dataHelpers';
 import {
   fetchSettings,
@@ -93,9 +95,11 @@ export default function Settings() {
   }
 
   const canWrite = canModifyData(role) && !isReadOnly;
-  const canEdit = role === 'admin' && canWrite;
-  const canEditSchema = isBendaharaOrAbove(role) && canWrite;
-  const canEditBilling = isBendaharaOrAbove(role) && canWrite;
+  const canEdit = canManageSettings(role, isReadOnly);
+  const canEditSchema = canManagePaymentSchemas(role, isReadOnly);
+  // Global billing/due-date controls are Admin-only. Bendahara may maintain
+  // IPL component schemas, matching the production role contract.
+  const canEditBilling = canManageSettings(role, isReadOnly);
 
   const handleAddSchema = () => {
     const newId = `schema-${Date.now()}`;
