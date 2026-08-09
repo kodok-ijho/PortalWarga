@@ -1,4 +1,10 @@
-const API_BASE_URL = (import.meta.env.VITE_N8N_API_BASE_URL || '').replace(/\/+$/, '');
+const CONFIGURED_API_BASE_URL = (import.meta.env.VITE_N8N_API_BASE_URL || '').replace(/\/+$/, '');
+// The n8n host is protected by HTTP Basic Auth. Browsers cannot send that
+// transport credential and the portal Bearer token in the same Authorization
+// header, so both local and production traffic must use the same-origin proxy.
+const API_BASE_URL = import.meta.env.VITE_USE_N8N_PROXY === 'false'
+  ? CONFIGURED_API_BASE_URL
+  : '/api/n8n';
 const API_TIMEOUT_MS = 45000;
 
 export class PortalApiError extends Error {

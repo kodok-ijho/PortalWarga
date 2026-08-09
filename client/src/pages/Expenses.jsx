@@ -92,7 +92,16 @@ export default function Expenses() {
         setEventAccess({ events: [] });
       }
     } catch (err) {
-      toast.error('Gagal mengambil data pengeluaran.');
+      // A 401 is handled centrally by AuthContext. Avoid showing a second,
+      // misleading data error while the app redirects to the login page.
+      if (err?.status !== 401) {
+        const message = err?.code === 'API_TIMEOUT'
+          ? 'Koneksi ke layanan pengeluaran terlalu lama. Silakan coba lagi.'
+          : err?.code === 'INVALID_API_RESPONSE' || err?.code === 'INVALID_EXPENSES_RESPONSE'
+            ? 'Layanan pengeluaran mengembalikan respons yang tidak valid.'
+            : err?.message || 'Gagal mengambil data pengeluaran.';
+        toast.error(message);
+      }
     } finally {
       setIsLoading(false);
     }

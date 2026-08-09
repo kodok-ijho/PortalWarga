@@ -1594,19 +1594,15 @@ export async function fetchExpenses(token, filters = {}) {
       && (!filters.event_id || expense.event_id === filters.event_id)
     ));
   }
-  try {
-    const result = await portalApiPost('/expenses/list', { token, body: filters });
-    return result?.expenses || [];
-  } catch (error) {
-    // Older n8n list workflows can return an empty webhook response when the
-    // database query has no rows. Preserve that valid empty state without
-    // hiding authentication, network, or server errors.
-    if (error instanceof PortalApiError && error.code === 'INVALID_API_RESPONSE' && error.status === 200) {
-      console.warn('Expenses API returned an empty 200 response; treating it as an empty list.');
-      return [];
-    }
-    throw error;
+  const result = await portalApiPost('/expenses/list', { token, body: filters });
+  if (!Array.isArray(result?.expenses)) {
+    throw new PortalApiError('Respons daftar pengeluaran tidak memiliki format yang valid.', {
+      code: 'INVALID_EXPENSES_RESPONSE',
+      status: 200,
+      details: result,
+    });
   }
+  return result.expenses;
 }
 
 export async function createExpense(token, {
