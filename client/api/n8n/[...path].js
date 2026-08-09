@@ -13,7 +13,9 @@ function standardError(code, message, details = {}) {
 
 function resolveTargetPath(req) {
   const rawPath = req.query?.path;
-  const parts = Array.isArray(rawPath) ? rawPath : [rawPath].filter(Boolean);
+  const parts = Array.isArray(rawPath)
+    ? rawPath
+    : String(rawPath || '').split('/').filter(Boolean);
   return parts.map((part) => encodeURIComponent(String(part))).join('/');
 }
 

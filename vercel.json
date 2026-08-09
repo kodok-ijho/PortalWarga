@@ -4,8 +4,8 @@
   "buildCommand": "npm --prefix client run build",
   "outputDirectory": "client/dist",
   "framework": "vite",
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/api/n8n/:path*", "destination": "/api/n8n?path=:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
