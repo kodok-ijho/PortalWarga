@@ -223,7 +223,7 @@ export default function Home() {
 
       {/* Kontak Darurat & SOS Satpam */}
       <section className="pv-card overflow-hidden border-l-4 border-l-red-500 shadow-sm">
-        <div className="p-5 sm:p-6 bg-gradient-to-r from-red-50/50 via-white to-red-50/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="p-5 sm:p-6 bg-gradient-to-r from-red-50/50 via-white to-red-50/20 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 border border-red-200 flex items-center justify-center text-red-600 text-2xl shadow-sm animate-pulse">
               🚨
@@ -234,25 +234,62 @@ export default function Home() {
                 <span className="pv-badge bg-red-100 text-red-700 font-bold text-[10px] uppercase">Siaga 24 Jam</span>
               </div>
               <p className="text-xs text-forest-600 mt-1 max-w-xl leading-relaxed">
-                Keadaan darurat, keamanan lingkungan, atau bantuan mendesak? Hubungi langsung petugas keamanan atau layanan pos satpam Perumahan Palm Village.
+                Keadaan darurat, keamanan lingkungan, atau bantuan mendesak? Hubungi langsung petugas satpam Perumahan Palm Village melalui WhatsApp atau Telepon langsung.
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-0 border-forest-100">
-            <a
-              href="https://wa.me/6281234567890?text=Halo%20Pos%20Satpam%20Palm%20Village,%20saya%20warga%20membutuhkan%20bantuan%20darurat%20sekarang."
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2.5 text-xs shadow-sm transition-all duration-200"
-            >
-              <span>💬 WhatsApp Satpam</span>
-            </a>
-            <a
-              href="tel:081234567890"
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2.5 text-xs shadow-sm transition-all duration-200"
-            >
-              <span>📞 Telepon SOS (Darurat)</span>
-            </a>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-0 border-forest-100">
+            {/* Satpam Riki */}
+            <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white border border-forest-100 shadow-xs">
+              <div className="min-w-0 pr-1">
+                <p className="text-xs font-bold text-forest-900 truncate">👮 Satpam Riki</p>
+                <p className="text-[11px] text-forest-500 font-mono">0895-3231-36366</p>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <a
+                  href="https://wa.me/62895323136366?text=Halo%20Pak%20Satpam%20Riki,%20saya%20warga%20Palm%20Village%20membutuhkan%20bantuan."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-2.5 py-1.5 text-xs shadow-xs transition-colors"
+                  title="Chat WhatsApp Satpam Riki"
+                >
+                  <span>💬 WA</span>
+                </a>
+                <a
+                  href="tel:+62895323136366"
+                  className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium px-2.5 py-1.5 text-xs shadow-xs transition-colors"
+                  title="Telepon Satpam Riki"
+                >
+                  <span>📞 Call</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Satpam Roni */}
+            <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white border border-forest-100 shadow-xs">
+              <div className="min-w-0 pr-1">
+                <p className="text-xs font-bold text-forest-900 truncate">👮 Satpam Roni</p>
+                <p className="text-[11px] text-forest-500 font-mono">0881-0103-57049</p>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <a
+                  href="https://wa.me/62881010357049?text=Halo%20Pak%20Satpam%20Roni,%20saya%20warga%20Palm%20Village%20membutuhkan%20bantuan."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-2.5 py-1.5 text-xs shadow-xs transition-colors"
+                  title="Chat WhatsApp Satpam Roni"
+                >
+                  <span>💬 WA</span>
+                </a>
+                <a
+                  href="tel:+62881010357049"
+                  className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium px-2.5 py-1.5 text-xs shadow-xs transition-colors"
+                  title="Telepon Satpam Roni"
+                >
+                  <span>📞 Call</span>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>

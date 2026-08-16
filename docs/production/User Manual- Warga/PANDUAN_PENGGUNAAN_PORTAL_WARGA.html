@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panduan Penggunaan Portal Warga - Perumahan Palm Village</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #173829;
+      --primary-dark: #0e241a;
+      --primary-light: #245740;
+      --accent: #cfa035;
+      --accent-hover: #b88a28;
+      --bg: #f4f6f3;
+      --surface: #ffffff;
+      --border: #e2e8e0;
+      --text: #1d2b24;
+      --text-muted: #5f7167;
+      --badge-bg: #eaf3ed;
+      --badge-text: #173829;
+      --shadow-sm: 0 2px 8px rgba(23, 56, 41, 0.06);
+      --shadow-md: 0 8px 24px rgba(23, 56, 41, 0.08);
+      --shadow-lg: 0 16px 36px rgba(23, 56, 41, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header Banner */
+    .hero-banner {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, var(--primary-light) 100%);
+      color: #fff;
+      padding: 60px 24px 50px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      border-bottom: 4px solid var(--accent);
+    }
+
+    .hero-banner::after {
+      content: "";
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(207, 160, 53, 0.15) 0%, rgba(207, 160, 53, 0) 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .logo-container {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      padding: 10px 24px;
+      border-radius: 99px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      margin-bottom: 20px;
+    }
+
+    .logo-icon {
+      font-size: 24px;
+    }
+
+    .logo-text {
+      font-size: 15px;
+      letter-spacing: 2px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #f1ebd8;
+    }
+
+    .hero-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 38px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+      color: #fff;
+    }
+
+    .hero-subtitle {
+      font-size: 17px;
+      color: #d1dfd7;
+      max-width: 680px;
+      margin: 0 auto 24px;
+    }
+
+    .meta-tags {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      font-size: 13px;
+    }
+
+    .tag-pill {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 6px 14px;
+      border-radius: 30px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #e5efe9;
+    }
+
+    /* Main Container */
+    .main-wrapper {
+      max-width: 1100px;
+      margin: -30px auto 60px;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 30px;
+      align-items: start;
+    }
+
+    /* Navigation Sidebar */
+    .nav-sidebar {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      position: sticky;
+      top: 24px;
+    }
+
+    .nav-title {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-menu {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .nav-link {
+      display: block;
+      padding: 8px 12px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .nav-link:hover {
+      background: var(--badge-bg);
+      color: var(--primary);
+      transform: translateX(4px);
+    }
+
+    /* Content Area */
+    .content-area {
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+    }
+
+    .guide-card {
+      background: var(--surface);
+      border-radius: 18px;
+      padding: 36px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid var(--badge-bg);
+    }
+
+    .section-num {
+      width: 40px;
+      height: 40px;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 800;
+      font-size: 18px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 10px rgba(23, 56, 41, 0.2);
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--primary-dark);
+    }
+
+    /* Steps Layout */
+    .step-block {
+      margin-top: 28px;
+      padding-top: 24px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .step-block:first-of-type {
+      border-top: none;
+      padding-top: 0;
+      margin-top: 0;
+    }
+
+    .step-heading {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-desc {
+      font-size: 15px;
+      color: #43554c;
+      margin-bottom: 18px;
+    }
+
+    /* Screenshot Frame */
+    .screenshot-wrapper {
+      background: #f8faf8;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin: 18px 0 24px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .screenshot-img {
+      max-width: 100%;
+      max-height: 520px;
+      height: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: var(--shadow-md);
+      transition: transform 0.2s ease;
+    }
+
+    .screenshot-img:hover {
+      transform: scale(1.01);
+    }
+
+    .screenshot-caption {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 12px;
+      font-style: italic;
+    }
+
+    /* Callout Boxes */
+    .alert-box {
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 20px 0;
+      display: flex;
+      gap: 14px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .alert-info {
+      background: #eef7f2;
+      border-left: 4px solid var(--primary);
+      color: #1a4231;
+    }
+
+    .alert-warning {
+      background: #fff8e8;
+      border-left: 4px solid var(--accent);
+      color: #72510b;
+    }
+
+    .alert-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    /* Table Styles */
+    .table-container {
+      overflow-x: auto;
+      margin: 20px 0;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      text-align: left;
+    }
+
+    th {
+      background: #edf3ef;
+      color: var(--primary-dark);
+      padding: 14px 16px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #edf1ed;
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background-color: #fbfdfb;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-lunas { background: #d7f4e2; color: #0d6832; }
+    .badge-pending { background: #fff0d4; color: #8a5700; }
+    .badge-unpaid { background: #fef7da; color: #7d6500; }
+    .badge-danger { background: #fde6e6; color: #9c1c1c; }
+    .badge-selected { background: #173829; color: #ffffff; }
+
+    /* FAQ List */
+    .faq-item {
+      margin-bottom: 18px;
+      background: #fbfdfb;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+
+    .faq-q {
+      font-weight: 700;
+      color: var(--primary);
+      font-size: 15px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .faq-a {
+      font-size: 14px;
+      color: #4b5d53;
+      padding-left: 26px;
+    }
+
+    /* Print Optimization */
+    @media print {
+      body { background: #fff; color: #000; font-size: 12pt; }
+      .hero-banner { background: #173829 !important; color: #fff; -webkit-print-color-adjust: exact; }
+      .nav-sidebar { display: none; }
+      .main-wrapper { display: block; margin: 0; padding: 0; }
+      .guide-card { border: none; box-shadow: none; padding: 10px 0 25px; page-break-inside: avoid; }
+      .screenshot-img { max-height: 380px; }
+    }
+
+    /* Responsive */
+    @media (max-width: 860px) {
+      .main-wrapper {
+        grid-template-columns: 1fr;
+      }
+      .nav-sidebar {
+        display: none;
+      }
+      .hero-title {
+        font-size: 28px;
+      }
+      .guide-card {
+        padding: 24px 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero Header -->
+  <header class="hero-banner">
+    <div class="logo-container">
+      <span class="logo-icon">🌴</span>
+      <span class="logo-text">Palm Village</span>
+    </div>
+    <h1 class="hero-title">Panduan Penggunaan Portal Warga</h1>
+    <p class="hero-subtitle">Buku panduan lengkap transaksi pembayaran IPL (QRIS & Transfer Bank), pemantauan status transparansi iuran, serta layanan informasi hunian.</p>
+    
+    <div class="meta-tags">
+      <span class="tag-pill">📱 Versi Mobile Web</span>
+      <span class="tag-pill">⚡ Verifikasi QRIS Otomatis</span>
+      <span class="tag-pill">🛡️ Login Aman Akun Google</span>
+      <span class="tag-pill">🕒 Update Realtime</span>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <div class="main-wrapper">
+
+    <!-- Sticky Navigation Sidebar -->
+    <aside class="nav-sidebar">
+      <div class="nav-title">Daftar Isi Panduan</div>
+      <ul class="nav-menu">
+        <li><a href="#login" class="nav-link">1. Cara Masuk / Login</a></li>
+        <li><a href="#beranda" class="nav-link">2. Beranda Utama</a></li>
+        <li><a href="#matriks" class="nav-link">3. Matriks Tagihan IPL</a></li>
+        <li><a href="#qris" class="nav-link">4. Bayar via QRIS Otomatis</a></li>
+        <li><a href="#transfer" class="nav-link">5. Bayar via Transfer Bank</a></li>
+        <li><a href="#status" class="nav-link">6. Arti Status Warna</a></li>
+        <li><a href="#fitur-lain" class="nav-link">7. Layanan Darurat & Warga</a></li>
+        <li><a href="#faq" class="nav-link">8. Tanya Jawab (FAQ)</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content Articles -->
+    <main class="content-area">
+
+      <!-- Section 1: Login -->
+      <section id="login" class="guide-card">
+        <div class="section-header">
+          <div class="section-num">1</div>
+          <h2 class="section-title">Cara Masuk / Login ke Portal</h2>
+        </div>
+        <p class="step-desc">Portal Warga Palm Village menggunakan autentikasi terpadu Akun Google yang aman dan tidak memerlukan pembuatan password baru.</p>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 1.1: Buka Portal & Klik Masuk dengan Google</h3>
+          <p class="step-desc">Buka tautan Portal Warga pada peramban HP Anda (Chrome/Safari). Klik tombol putih bertuliskan <strong>"Sign in with Google"</strong>.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/01-halaman-login.jpg" alt="Halaman Login Portal Warga" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 1: Tampilan awal halaman masuk Portal Warga</div>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 1.2: Pilih Akun Google Terdaftar</h3>
+          <p class="step-desc">Pilih akun Gmail Anda yang sudah terdaftar di database pengurus RT Palm Village.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/02-pilih-akun-google.jpg" alt="Pilih Akun Google" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 2: Memilih email Google pada perangkat Anda</div>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 1.3: Konfirmasi Akun</h3>
+          <p class="step-desc">Jika muncul konfirmasi satu sentuhan (*One-Tap Login*), tekan akun Anda untuk langsung masuk ke dashboard.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/03-konfirmasi-login.jpg" alt="Konfirmasi Login Google" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 3: Konfirmasi masuk menggunakan akun Google terverifikasi</div>
+          </div>
+        </div>
+
+        <div class="alert-box alert-info">
+          <span class="alert-icon">💡</span>
+          <div><strong>Catatan Aktivasi:</strong> Jika setelah login nama atau unit rumah Anda belum terhubung secara otomatis, silakan hubungi admin/pengurus untuk menghubungkan email Anda dengan data kepemilikan unit.</div>
+        </div>
+      </section>
+
+      <!-- Section 2: Beranda -->
+      <section id="beranda" class="guide-card">
+        <div class="section-header">
+          <div class="section-num">2</div>
+          <h2 class="section-title">Mengenal Beranda Utama Portal</h2>
+        </div>
+        <p class="step-desc">Setelah masuk, Anda akan diarahkan ke halaman utama yang menyajikan menu akses cepat layanan komplek.</p>
+
+        <div class="screenshot-wrapper">
+          <img src="screenshots/04-beranda-utama.jpg" alt="Beranda Utama Warga" class="screenshot-img">
+          <div class="screenshot-caption">Gambar 4: Tampilan Beranda Utama Portal Warga Palm Village</div>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">Fitur-Fitur Utama di Beranda:</h3>
+          <ul style="padding-left: 20px; color: var(--text); font-size: 14.5px; line-height: 1.8;">
+            <li><strong>🌴 Kartu Sapaan & Peran:</strong> Menampilkan nama Anda dan status hak akses sebagai <code>WARGA</code>.</li>
+            <li><strong>👤 Menu Penghuni:</strong> Direktori daftar tetangga dan status hunian rumah di seluruh blok.</li>
+            <li><strong>▦ Menu Matriks Bayar:</strong> Halaman utama untuk memeriksa status tagihan dan membayar IPL secara mandiri.</li>
+            <li><strong>🚨 Kontak Darurat & Pos Satpam (SOS):</strong> Akses panggilan darurat 24 jam langsung ke pos keamanan komplek.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Section 3: Matriks Pembayaran -->
+      <section id="matriks" class="guide-card">
+        <div class="section-header">
+          <div class="section-num">3</div>
+          <h2 class="section-title">Melihat Matriks Pembayaran IPL</h2>
+        </div>
+        <p class="step-desc">Matriks IPL menyajikan transparansi seluruh iuran warga kompleks per bulan dalam satu tabel interaktif.</p>
+
+        <div class="step-block">
+          <h3 class="step-heading">Filter Tahun Buku & Legenda Warna</h3>
+          <p class="step-desc">Pada bagian atas halaman, Anda dapat memilih <strong>Tahun Buku</strong> (misalnya <em>2026/2027</em>) dan melihat panduan warna status.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/05-matriks-ipl-legenda.jpg" alt="Filter & Legenda Matriks" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 5: Filter Tahun Buku dan arti warna status iuran</div>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">Menemukan Unit Rumah Anda ("RUMAH SAYA")</h3>
+          <p class="step-desc">Unit rumah Anda secara otomatis ditandai dengan latar belakang kekuningan dan badge kuning bertuliskan <strong>"RUMAH SAYA"</strong> (contoh: <code>Blok CB1/8</code>). Anda hanya dapat memilih dan membayar tagihan pada baris rumah Anda.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/06-tabel-matriks-rumah-saya.jpg" alt="Sorotan Rumah Saya di Tabel" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 6: Baris unit rumah warga yang disorot otomatis</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4: Pembayaran QRIS -->
+      <section id="qris" class="guide-card">
+        <div class="section-header">
+          <div class="section-num">4</div>
+          <h2 class="section-title">Pembayaran IPL via QRIS Otomatis (Instan)</h2>
+        </div>
+        <p class="step-desc">Metode QRIS sangat direkomendasikan karena pembayaran diverifikasi langsung oleh sistem secara <em>real-time</em> tanpa perlu verifikasi manual pengurus.</p>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 4.1: Pilih Bulan Tagihan</h3>
+          <p class="step-desc">Ketuk kotak bulan yang belum lunas pada baris <strong>RUMAH SAYA</strong>. Kotak yang dipilih akan berubah warna menjadi gelap dan bertanda centang (✓). Pembayaran dapat dilakukan untuk 1 bulan atau beberapa bulan sekaligus.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/07-pilih-bulan-tagihan.jpg" alt="Memilih Bulan Tagihan" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 7: Menandai bulan tagihan yang hendak dibayar</div>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 4.2: Periksa Total & Klik Lanjutkan</h3>
+          <p class="step-desc">Panel ringkasan di bawah layar akan menampilkan jumlah bulan dan total rupiah. Klik tombol kuning <strong>"Lanjutkan Pembayaran →"</strong>.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/08-total-tagihan-lanjut-bayar.jpg" alt="Panel Total Tagihan" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 8: Panel rincian total nominal tagihan di bagian bawah</div>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 4.3: Pilih Metode QRIS</h3>
+          <p class="step-desc">Pada jendela konfirmasi, pastikan pilihan metode berada di <strong>"QRIS"</strong>, lalu tekan tombol kuning <strong>"Lanjut ke QRIS"</strong>.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/09-pilih-metode-qris.jpg" alt="Konfirmasi Metode QRIS" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 9: Konfirmasi pilihan metode pembayaran QRIS</div>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 4.4: Kode QRIS Dinamis Muncul</h3>
+          <p class="step-desc">Layar akan menampilkan QR Code dinamis khusus untuk tagihan Anda beserta <strong>Order ID</strong> dan total nominal yang tepat.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/10-qr-code-qris.jpg" alt="QR Code QRIS" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 10: Kode QRIS dinamis siap dipindai</div>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 4.5: Bayar Melalui Aplikasi E-Wallet / Mobile Banking</h3>
+          <p class="step-desc">
+            Buka aplikasi perbankan atau e-wallet Anda (seperti GoPay, OVO, ShopeePay, DANA, BCA Mobile, Livin Mandiri, BRImo, Jago, dll.):
+            <br>• <strong>Jika 1 HP:</strong> Ambil screenshot layar QRIS, buka menu Scan QR di aplikasi bank/e-wallet, lalu pilih ambil gambar dari galeri foto.
+            <br>• <strong>Jika 2 Perangkat:</strong> Langsung arahkan scanner kamera ke QR Code di layar.
+            <br>Pastikan merchant tujuan tertera <strong>"Palm Village - Social"</strong> dengan nominal yang sesuai, lalu selesaikan pembayaran.
+          </p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/11-bayar-ewallet-m-banking.jpg" alt="Konfirmasi Pembayaran di Aplikasi Bank" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 11: Contoh konfirmasi scan QRIS pada aplikasi e-wallet</div>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 4.6: Konfirmasi Selesai & Status Otomatis Hijau</h3>
+          <p class="step-desc">Setelah transaksi di HP Anda berhasil, kembali ke Portal Warga dan tekan <strong>"✓ Saya Sudah Selesai Membayar"</strong>. Status tagihan otomatis terupdate menjadi <strong>Lunas (Hijau)</strong>.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/12-notifikasi-qris-ditutup.jpg" alt="Selesai Pembayaran QRIS" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 12: Notifikasi sistem saat pembayaran berhasil diselesaikan</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 5: Transfer Bank Manual -->
+      <section id="transfer" class="guide-card">
+        <div class="section-header">
+          <div class="section-num">5</div>
+          <h2 class="section-title">Pembayaran IPL via Transfer Bank Manual</h2>
+        </div>
+        <p class="step-desc">Jika Anda lebih nyaman mentransfer langsung ke rekening kas RT/RW, Anda dapat mengunggah bukti transfer manual untuk diverifikasi pengurus.</p>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 5.1: Pilih Tab "Transfer Bank"</h3>
+          <p class="step-desc">Pada pop-up *Konfirmasi Pembayaran IPL*, ketuk pilihan tombol <strong>"Transfer Bank"</strong>.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/13-metode-transfer-bank-manual.jpg" alt="Pilih Transfer Bank Manual" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 13: Formulir unggah bukti transfer bank manual</div>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 5.2: Pilih File Bukti Transfer</h3>
+          <p class="step-desc">Transfer nominal tagihan ke rekening pengurus, lalu klik tombol <strong>"Choose File"</strong> dan pilih foto atau screenshot bukti transfer dari galeri foto HP Anda (format JPG/PNG maks 2 MB).</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/14-pilih-foto-bukti-transfer.jpg" alt="Pilih File dari Galeri HP" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 14: Memilih file bukti transfer dari galeri perangkat</div>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">Langkah 5.3: Kirim Bukti Transfer</h3>
+          <p class="step-desc">Setelah file terunggah (ditandai nama file & tanda centang hijau), tuliskan catatan opsional jika diperlukan (contoh: *Transfer via Bank Mandiri an. Budi*), kemudian tekan tombol kuning <strong>"Kirim Bukti Transfer"</strong>.</p>
+          <div class="screenshot-wrapper">
+            <img src="screenshots/15-kirim-bukti-transfer.jpg" alt="Kirim Bukti Transfer" class="screenshot-img">
+            <div class="screenshot-caption">Gambar 15: Konfirmasi file terlampir dan pengiriman bukti transfer</div>
+          </div>
+        </div>
+
+        <div class="alert-box alert-warning">
+          <span class="alert-icon">⏳</span>
+          <div><strong>Proses Verifikasi Manual:</strong> Setelah bukti dikirim, status akan berubah menjadi <strong>Menunggu Verifikasi (Oranye)</strong> sampai bendahara memeriksa mutasi rekening dan menyetujui tagihan menjadi <strong>Lunas (Hijau)</strong>.</div>
+        </div>
+      </section>
+
+      <!-- Section 6: Status Warna -->
+      <section id="status" class="guide-card">
+        <div class="section-header">
+          <div class="section-num">6</div>
+          <h2 class="section-title">Arti Status Warna Tagihan IPL</h2>
+        </div>
+        <p class="step-desc">Gunakan tabel referensi berikut untuk memahami arti setiap kotak warna pada matriks pembayaran:</p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Warna Kotak</th>
+                <th>Status</th>
+                <th>Keterangan Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="status-badge badge-lunas">● Hijau Muda</span></td>
+                <td><strong>Lunas</strong></td>
+                <td>Tagihan telah berhasil dibayar dan diverifikasi. Tertera nominal dan tanggal pembayaran.</td>
+              </tr>
+              <tr>
+                <td><span class="status-badge badge-pending">● Oranye / Kuning Tua</span></td>
+                <td><strong>Menunggu Verifikasi</strong></td>
+                <td>Bukti transfer manual sudah diunggah oleh warga dan sedang dalam antrean review oleh pengurus.</td>
+              </tr>
+              <tr>
+                <td><span class="status-badge badge-unpaid">● Kuning Pucat</span></td>
+                <td><strong>Belum Bayar</strong></td>
+                <td>Tagihan bulan berjalan atau bulan baru yang belum dilakukan pembayaran.</td>
+              </tr>
+              <tr>
+                <td><span class="status-badge badge-danger">● Merah Muda</span></td>
+                <td><strong>Terlambat / Ditolak</strong></td>
+                <td>Melewati batas jatuh tempo atau bukti transfer manual yang diunggah ditolak karena tidak sesuai.</td>
+              </tr>
+              <tr>
+                <td><span class="status-badge" style="background:#edf1ed; color:#5f7167;">● Abu-abu</span></td>
+                <td><strong>Dibatalkan</strong></td>
+                <td>Tagihan atau transaksi pembayaran dibatalkan oleh sistem.</td>
+              </tr>
+              <tr>
+                <td><span class="status-badge badge-selected">● Hijau Tua (Gelap)</span></td>
+                <td><strong>Dipilih</strong></td>
+                <td>Bulan tagihan yang sedang Anda klik/centang untuk dibayarkan saat ini.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Section 7: Layanan Lainnya -->
+      <section id="fitur-lain" class="guide-card">
+        <div class="section-header">
+          <div class="section-num">7</div>
+          <h2 class="section-title">Layanan Lainnya (Daftar Penghuni & SOS)</h2>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">1. Direktori Penghuni Kompleks</h3>
+          <p class="step-desc">Menu <strong>Penghuni</strong> memudahkan Anda mencari informasi tetangga kompleks berdasarkan nomor blok dan status hunian (Dihuni Pemilik, Kontrak, atau Rumah Kosong).</p>
+        </div>
+
+        <div class="step-block">
+          <h3 class="step-heading">2. Kontak Darurat & Pos Satpam 24 Jam (SOS)</h3>
+          <p class="step-desc">Untuk situasi darurat keamanan, tamu tidak dikenal, insiden medis, atau penerimaan paket penting, Anda dapat langsung menekan tombol panggilan cepat atau WhatsApp ke Pos Satpam Siaga 24 Jam yang tertera di halaman depan portal.</p>
+        </div>
+      </section>
+
+      <!-- Section 8: FAQ -->
+      <section id="faq" class="guide-card">
+        <div class="section-header">
+          <div class="section-num">8</div>
+          <h2 class="section-title">Tanya Jawab (FAQ) & Bantuan</h2>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">❓ Mengapa saya tidak bisa mengklik bulan November jika bulan Oktober belum dibayar?</div>
+          <div class="faq-a">Sistem menerapkan aturan pembayaran berurutan dari bulan terlama yang belum lunas. Hal ini untuk memastikan tidak ada tunggakan masa lalu yang terlewat. Selesaikan bulan sebelumnya terlebih dahulu.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">❓ Apakah saya bisa membayar beberapa bulan sekaligus (misal 3, 6, atau 12 bulan)?</div>
+          <div class="faq-a">Bisa. Anda cukup mengetuk beberapa bulan secara berurutan pada baris unit rumah Anda. Total tagihan akan otomatis dijumlahkan dan dapat dibayar sekaligus dalam 1 kali transaksi QRIS atau Transfer Bank.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">❓ Berapa lama proses verifikasi QRIS vs Transfer Bank?</div>
+          <div class="faq-a">Pembayaran QRIS terverifikasi secara <strong>instan dan otomatis (hitungan detik)</strong>. Sementara Transfer Bank manual memerlukan waktu pengecekan mutasi oleh bendahara (biasanya 1x24 jam).</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q">❓ Bagaimana jika salah upload foto atau nomor rekening saat transfer manual?</div>
+          <div class="faq-a">Segera hubungi pengurus/bendahara RT melalui kontak yang tersedia agar pengurus dapat membantu menolak atau memperbarui status transaksi tersebut.</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer style="text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13.5px; border-top: 1px solid var(--border); background: #fff;">
+    <p><strong>Portal Warga Palm Village</strong> &bull; Sistem Layanan IPL & Transparansi Hunian</p>
+    <p style="margin-top: 6px;">Dikembangkan untuk kenyamanan, kemudahan, dan kebersamaan seluruh warga Palm Village.</p>
+  </footer>
+
+</body>
+</html>

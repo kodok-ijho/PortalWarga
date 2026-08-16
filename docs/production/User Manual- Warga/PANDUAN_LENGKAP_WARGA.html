@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Buku Panduan Pintar Portal Warga Palm Village</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 14mm 14mm 14mm;
+      @bottom-right {
+        content: counter(page);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 9pt;
+        color: #71877b;
+      }
+    }
+
+    :root {
+      --primary: #123e2b;
+      --primary-light: #1b573d;
+      --emerald: #10b981;
+      --accent-gold: #d99a19;
+      --accent-gold-light: #fef3c7;
+      --accent-orange: #f97316;
+      --bg-cream: #fafbf9;
+      --card-bg: #ffffff;
+      --text-dark: #14281f;
+      --text-muted: #526b5e;
+      --border-color: #e2ebe5;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg-cream);
+      color: var(--text-dark);
+      line-height: 1.55;
+      font-size: 13.5px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+
+    .avoid-break {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    /* ================= COVER PAGE ================= */
+    .cover-container {
+      height: 260mm;
+      background: linear-gradient(145deg, #092016 0%, #123e2b 45%, #19583c 80%, #0d3021 100%);
+      border-radius: 20px;
+      padding: 40px 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: #ffffff;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 15px 35px rgba(18, 62, 43, 0.25);
+      border: 2px solid rgba(217, 154, 25, 0.35);
+    }
+
+    .cover-container::before {
+      content: "";
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 380px;
+      height: 380px;
+      background: radial-gradient(circle, rgba(217, 154, 25, 0.25) 0%, rgba(217, 154, 25, 0) 70%);
+      border-radius: 50%;
+    }
+
+    .cover-container::after {
+      content: "";
+      position: absolute;
+      bottom: -80px;
+      left: -80px;
+      width: 320px;
+      height: 320px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0) 70%);
+      border-radius: 50%;
+    }
+
+    .cover-badge-top {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 8px 20px;
+      border-radius: 30px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #fae8b2;
+      backdrop-filter: blur(5px);
+      align-self: flex-start;
+    }
+
+    .cover-hero {
+      margin-top: 20px;
+      z-index: 2;
+    }
+
+    .cover-palm-icon {
+      font-size: 46px;
+      margin-bottom: 12px;
+      display: inline-block;
+      filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3));
+    }
+
+    .cover-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 36px;
+      font-weight: 900;
+      line-height: 1.15;
+      color: #ffffff;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+
+    .cover-title span {
+      color: #f6c042;
+      display: block;
+    }
+
+    .cover-subtitle {
+      font-size: 15px;
+      color: #d1e7dc;
+      max-width: 90%;
+      line-height: 1.5;
+      margin-bottom: 24px;
+      font-weight: 500;
+    }
+
+    .cover-features-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 15px 0;
+      z-index: 2;
+    }
+
+    .cover-feature-box {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      backdrop-filter: blur(4px);
+    }
+
+    .cover-feature-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #f6c042 0%, #d99a19 100%);
+      color: #123e2b;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 800;
+      flex-shrink: 0;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+
+    .cover-feature-text h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 2px;
+    }
+
+    .cover-feature-text p {
+      font-size: 11px;
+      color: #b5d5c5;
+      line-height: 1.3;
+    }
+
+    .cover-footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      padding-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #9ec4b2;
+      z-index: 2;
+    }
+
+    .cover-footer-brand {
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ================= HEADER DI DALAM ISI ================= */
+    .section-header {
+      background: linear-gradient(135deg, #123e2b 0%, #1b573d 100%);
+      color: #ffffff;
+      border-radius: 14px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      border-left: 6px solid #f6c042;
+      box-shadow: 0 4px 12px rgba(18, 62, 43, 0.1);
+    }
+
+    .section-header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .section-header-num {
+      background: #f6c042;
+      color: #123e2b;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 900;
+      font-size: 17px;
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .section-header-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.2px;
+    }
+
+    .section-header-badge {
+      background: rgba(255, 255, 255, 0.18);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      color: #fae8b2;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ================= STEP CARD & SCREENSHOT ================= */
+    .step-card {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 18px;
+      box-shadow: 0 3px 10px rgba(18, 62, 43, 0.04);
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .step-badge {
+      background: #eef7f2;
+      color: #123e2b;
+      font-weight: 800;
+      font-size: 11.5px;
+      padding: 4px 9px;
+      border-radius: 6px;
+      border: 1px solid #c7e3d2;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .step-title {
+      font-size: 14.5px;
+      font-weight: 800;
+      color: #123e2b;
+    }
+
+    .step-desc {
+      font-size: 12.5px;
+      color: #40564b;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    .step-grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .step-grid-3col {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .phone-mockup {
+      background: #f1f5f2;
+      border: 1px solid #d5e2d9;
+      border-radius: 14px;
+      padding: 8px;
+      text-align: center;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+    }
+
+    .phone-mockup img {
+      width: 100%;
+      height: auto;
+      max-height: 270px;
+      object-fit: contain;
+      border-radius: 10px;
+      display: block;
+      margin: 0 auto;
+      background: #fff;
+    }
+
+    .phone-caption {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #557263;
+      margin-top: 6px;
+    }
+
+    /* ================= HIGHLIGHT / TIPS / ALERTS ================= */
+    .alert-box {
+      border-radius: 10px;
+      padding: 11px 14px;
+      margin: 12px 0;
+      display: flex;
+      gap: 10px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .alert-tip {
+      background: #f0fdf4;
+      border-left: 4px solid #10b981;
+      color: #065f46;
+    }
+
+    .alert-gold {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      color: #92400e;
+    }
+
+    .alert-info {
+      background: #eff6ff;
+      border-left: 4px solid #3b82f6;
+      color: #1e40af;
+    }
+
+    .alert-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    /* ================= FAST FLOW INFOGRAPHIC ================= */
+    .quick-flow-box {
+      background: linear-gradient(135deg, #eefbf3 0%, #e6f7ec 100%);
+      border: 1.5px dashed #10b981;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .quick-flow-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      color: #0f4d30;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .quick-flow-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .quick-step-item {
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #c7e3d2;
+      box-shadow: 0 2px 6px rgba(18, 62, 43, 0.05);
+    }
+
+    .quick-step-circle {
+      width: 26px;
+      height: 26px;
+      background: #123e2b;
+      color: #fae8b2;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+      margin: 0 auto 6px;
+    }
+
+    .quick-step-text h5 {
+      font-size: 11px;
+      font-weight: 800;
+      color: #123e2b;
+      margin-bottom: 2px;
+    }
+
+    .quick-step-text p {
+      font-size: 9.5px;
+      color: #557263;
+      line-height: 1.25;
+    }
+
+    /* ================= TABLES ================= */
+    .custom-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+      margin: 10px 0;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+    }
+
+    .custom-table th {
+      background: #123e2b;
+      color: #ffffff;
+      font-weight: 800;
+      padding: 9px 12px;
+      text-align: left;
+    }
+
+    .custom-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid #eef3f0;
+      vertical-align: middle;
+    }
+
+    .custom-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .badge-status {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .status-green { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+    .status-orange { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
+    .status-yellow { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .status-red { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .status-dark { background: #123e2b; color: #ffffff; }
+
+    /* ================= FAQ BOX ================= */
+    .faq-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .faq-item {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+
+    .faq-q {
+      font-size: 12px;
+      font-weight: 800;
+      color: #123e2b;
+      margin-bottom: 4px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .faq-a {
+      font-size: 11px;
+      color: #496355;
+      line-height: 1.4;
+      padding-left: 18px;
+    }
+
+    /* ================= EMERGENCY / FOOTER BANNER ================= */
+    .sos-banner {
+      background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+      border: 1.5px solid #fecdd3;
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 15px;
+    }
+
+    .sos-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sos-icon {
+      font-size: 28px;
+    }
+
+    .sos-text h4 {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #9f1239;
+    }
+
+    .sos-text p {
+      font-size: 11px;
+      color: #be123c;
+    }
+
+    .sos-badge {
+      background: #e11d48;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ================= HALAMAN 1: COVER ================= -->
+  <div class="cover-container">
+    <div>
+      <div class="cover-badge-top">
+        <span>🌿</span> PERUMAHAN PALM VILLAGE &bull; BUKU RESMI WARGA
+      </div>
+
+      <div class="cover-hero">
+        <div class="cover-palm-icon">🌴✨</div>
+        <h1 class="cover-title">
+          Panduan Pintar
+          <span>Portal Warga</span>
+        </h1>
+        <p class="cover-subtitle">
+          Buku petunjuk lengkap dan ceria untuk seluruh warga Palm Village. Bayar IPL semudah scan bayar kopi, pantau transparansi iuran secara terbuka, dan akses bantuan keamanan 24 jam!
+        </p>
+      </div>
+
+      <div class="cover-features-grid">
+        <div class="cover-feature-box">
+          <div class="cover-feature-icon">⚡</div>
+          <div class="cover-feature-text">
+            <h4>QRIS Instan & Otomatis</h4>
+            <p>Langsung terverifikasi lunas dalam hitungan detik tanpa kirim slip</p>
+          </div>
+        </div>
+
+        <div class="cover-feature-box">
+          <div class="cover-feature-icon">🔑</div>
+          <div class="cover-feature-text">
+            <h4>Login Sekali Klik</h4>
+            <p>Masuk aman dengan Akun Google tanpa pusing bikin password</p>
+          </div>
+        </div>
+
+        <div class="cover-feature-box">
+          <div class="cover-feature-icon">📊</div>
+          <div class="cover-feature-text">
+            <h4>Matriks Transparan</h4>
+            <p>Lihat status iuran seluruh unit secara terbuka dan rapi</p>
+          </div>
+        </div>
+
+        <div class="cover-feature-box">
+          <div class="cover-feature-icon">🚨</div>
+          <div class="cover-feature-text">
+            <h4>SOS Satpam Siaga 24 Jam</h4>
+            <p>Panggilan darurat terpadu ke pos keamanan kompleks</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cover-footer">
+      <div class="cover-footer-brand">
+        <span>🌴</span> Palm Village Residence Portal
+      </div>
+      <div>Tahun Buku 2026 / 2027 &bull; Versi Digital Warga</div>
+    </div>
+  </div>
+
+  <!-- ================= HALAMAN 2: ALUR KILAT & CARA LOGIN ================= -->
+  <div class="page-break"></div>
+
+  <!-- Infografis Kilat -->
+  <div class="quick-flow-box avoid-break">
+    <div class="quick-flow-title">
+      <span>🚀</span> ALUR KILAT BAYAR IPL (Cuma 3 Menit Langsung Beres!)
+    </div>
+    <div class="quick-flow-steps">
+      <div class="quick-step-item">
+        <div class="quick-step-circle">1</div>
+        <div class="quick-step-text">
+          <h5>Masuk Akun</h5>
+          <p>Klik "Sign in with Google" dengan email terdaftar</p>
+        </div>
+      </div>
+      <div class="quick-step-item">
+        <div class="quick-step-circle">2</div>
+        <div class="quick-step-text">
+          <h5>Pilih Tagihan</h5>
+          <p>Cari "RUMAH SAYA" & centang bulan yang mau dibayar</p>
+        </div>
+      </div>
+      <div class="quick-step-item">
+        <div class="quick-step-circle">3</div>
+        <div class="quick-step-text">
+          <h5>Scan QRIS</h5>
+          <p>Buka GoPay/BCA/Shopee/OVO & scan QR Code</p>
+        </div>
+      </div>
+      <div class="quick-step-item">
+        <div class="quick-step-circle">4</div>
+        <div class="quick-step-text">
+          <h5>Otomatis Lunas!</h5>
+          <p>Status langsung berubah hijau (Lunas) realtime</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BAB 1: CARA MASUK / LOGIN -->
+  <div class="section-header avoid-break">
+    <div class="section-header-left">
+      <div class="section-header-num">1</div>
+      <div class="section-header-title">Cara Masuk / Login ke Portal Warga</div>
+    </div>
+    <div class="section-header-badge">Aman & Cepat</div>
+  </div>
+
+  <div class="step-card avoid-break">
+    <div class="step-header">
+      <span class="step-badge">Langkah 1.1 s/d 1.3</span>
+      <span class="step-title">Autentikasi Akun Google Praktis</span>
+    </div>
+    <p class="step-desc">
+      Buka alamat portal di browser HP Anda (Google Chrome atau Safari). Anda tidak perlu menghafal kata sandi rumit, cukup gunakan email Google yang sudah didaftarkan ke pengurus!
+    </p>
+
+    <div class="step-grid-3col">
+      <div class="phone-mockup">
+        <img src="screenshots/01-halaman-login.jpg" alt="1. Klik Sign in Google">
+        <div class="phone-caption">1. Klik "Sign in with Google"</div>
+      </div>
+      <div class="phone-mockup">
+        <img src="screenshots/02-pilih-akun-google.jpg" alt="2. Pilih Akun Email">
+        <div class="phone-caption">2. Pilih Email Terdaftar Anda</div>
+      </div>
+      <div class="phone-mockup">
+        <img src="screenshots/03-konfirmasi-login.jpg" alt="3. Konfirmasi Masuk">
+        <div class="phone-caption">3. Konfirmasi & Masuk Portal</div>
+      </div>
+    </div>
+
+    <div class="alert-box alert-tip" style="margin-top: 14px;">
+      <span class="alert-icon">💡</span>
+      <div><strong>Tips Warga:</strong> Jika akun Google Anda belum terhubung dengan blok rumah, silakan hubungi pengurus RT/RW untuk mengaitkan email Anda dengan data unit.</div>
+    </div>
+  </div>
+
+  <!-- BAB 2: MENGENAL BERANDA -->
+  <div class="section-header avoid-break" style="margin-top: 24px;">
+    <div class="section-header-left">
+      <div class="section-header-num">2</div>
+      <div class="section-header-title">Mengenal Beranda Utama & Menu Favorit</div>
+    </div>
+    <div class="section-header-badge">Navigasi Simpel</div>
+  </div>
+
+  <div class="step-card avoid-break">
+    <div class="step-grid-2col">
+      <div>
+        <div class="step-header">
+          <span class="step-badge">Tampilan Utama</span>
+          <span class="step-title">Semua Layanan dalam 1 Genggaman</span>
+        </div>
+        <p class="step-desc">
+          Setelah berhasil masuk, Anda langsung melihat dashboard modern dengan sapaan hangat dan tombol akses cepat:
+        </p>
+        <ul style="padding-left: 18px; font-size: 12px; line-height: 1.7; color: #334d40;">
+          <li><strong>🌴 Profil & Sapaan:</strong> Menampilkan nama Anda dan status hak akses <code>WARGA</code>.</li>
+          <li><strong>👥 Menu Penghuni:</strong> Lihat daftar tetangga dan data status hunian kompleks.</li>
+          <li><strong>▦ Matriks Bayar:</strong> Menu utama untuk memantau dan membayar IPL.</li>
+          <li><strong>🚨 Pos Satpam (SOS 24 Jam):</strong> Tombol cepat menghubungi satpam darurat.</li>
+        </ul>
+      </div>
+      <div class="phone-mockup">
+        <img src="screenshots/04-beranda-utama.jpg" alt="Beranda Utama Portal Warga">
+        <div class="phone-caption">Tampilan Beranda Utama Warga</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= HALAMAN 3: MATRIKS & QRIS ================= -->
+  <div class="page-break"></div>
+
+  <!-- BAB 3: MATRIKS PEMBAYARAN IPL -->
+  <div class="section-header avoid-break">
+    <div class="section-header-left">
+      <div class="section-header-num">3</div>
+      <div class="section-header-title">Melihat Matriks Tagihan & "RUMAH SAYA"</div>
+    </div>
+    <div class="section-header-badge">Transparansi 100%</div>
+  </div>
+
+  <div class="step-card avoid-break">
+    <div class="step-grid-2col">
+      <div>
+        <div class="step-header">
+          <span class="step-badge">Fitur Cerdas</span>
+          <span class="step-title">Sorotan Otomatis Unit Rumah Anda</span>
+        </div>
+        <p class="step-desc">
+          Di halaman <strong>Matriks Pembayaran IPL</strong>, Anda bisa memilih <strong>Tahun Buku</strong> (misal <em>2026/2027</em>).
+        </p>
+        <p class="step-desc">
+          Sistem secara otomatis memberikan sorotan warna kuning lembut dan pin emas bertuliskan <strong>"RUMAH SAYA"</strong> (contoh: <code>Blok CB1/8</code>). Anda cukup fokus pada baris rumah Anda untuk membayar tagihan.
+        </p>
+        <div class="alert-box alert-gold">
+          <span class="alert-icon">✨</span>
+          <div><strong>Aturan Urutan:</strong> Pembayaran dilakukan berurutan dari bulan terlama agar tidak ada riwayat yang melompat.</div>
+        </div>
+      </div>
+      <div class="phone-mockup">
+        <img src="screenshots/06-tabel-matriks-rumah-saya.jpg" alt="Baris Rumah Saya">
+        <div class="phone-caption">Baris "RUMAH SAYA" ditandai otomatis</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BAB 4: BAYAR VIA QRIS OTOMATIS -->
+  <div class="section-header avoid-break" style="margin-top: 24px;">
+    <div class="section-header-left">
+      <div class="section-header-num">4</div>
+      <div class="section-header-title">Cara Bayar IPL via QRIS Otomatis (Rekomendasi!)</div>
+    </div>
+    <div class="section-header-badge">Paling Cepat & Praktis</div>
+  </div>
+
+  <div class="step-card avoid-break">
+    <div class="step-header">
+      <span class="step-badge">Tahap 1: Pemilihan Bulan & Rincian</span>
+      <span class="step-title">Pilih Bulan & Lanjutkan ke Pembayaran</span>
+    </div>
+    <p class="step-desc">
+      Ketuk kotak bulan yang ingin dibayar. Bisa 1 bulan atau beberapa bulan sekaligus. Panel bawah akan otomatis menghitung total rupiahnya!
+    </p>
+
+    <div class="step-grid-3col">
+      <div class="phone-mockup">
+        <img src="screenshots/07-pilih-bulan-tagihan.jpg" alt="Pilih Bulan">
+        <div class="phone-caption">1. Centang Bulan Tagihan</div>
+      </div>
+      <div class="phone-mockup">
+        <img src="screenshots/08-total-tagihan-lanjut-bayar.jpg" alt="Total Tagihan">
+        <div class="phone-caption">2. Klik "Lanjutkan Pembayaran"</div>
+      </div>
+      <div class="phone-mockup">
+        <img src="screenshots/09-pilih-metode-qris.jpg" alt="Pilih QRIS">
+        <div class="phone-caption">3. Pilih Metode "QRIS"</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= HALAMAN 4: PROSES SCAN QRIS & TRANSFER BANK ================= -->
+  <div class="page-break"></div>
+
+  <div class="step-card avoid-break">
+    <div class="step-header">
+      <span class="step-badge">Tahap 2: Scan & Verifikasi Realtime</span>
+      <span class="step-title">Scan QRIS di Aplikasi E-Wallet / Mobile Banking Anda</span>
+    </div>
+    <p class="step-desc">
+      Kode QRIS unik akan muncul di layar bersama Order ID dan nominal tagihan. Buka aplikasi pembayaran favorit Anda (GoPay, OVO, ShopeePay, DANA, BCA Mobile, Livin Mandiri, BRImo, Jago, dll.) untuk membayar.
+    </p>
+
+    <div class="step-grid-3col">
+      <div class="phone-mockup">
+        <img src="screenshots/10-qr-code-qris.jpg" alt="Kode QRIS Dinamis">
+        <div class="phone-caption">4. Kode QRIS Unik Muncul</div>
+      </div>
+      <div class="phone-mockup">
+        <img src="screenshots/11-bayar-ewallet-m-banking.jpg" alt="Scan & Bayar">
+        <div class="phone-caption">5. Konfirmasi Bayar di E-Wallet</div>
+      </div>
+      <div class="phone-mockup">
+        <img src="screenshots/12-notifikasi-qris-ditutup.jpg" alt="Status Sukses">
+        <div class="phone-caption">6. Selesai! Otomatis Jadi Lunas</div>
+      </div>
+    </div>
+
+    <div class="alert-box alert-tip" style="margin-top: 14px;">
+      <span class="alert-icon">📱</span>
+      <div><strong>Trik Praktis Jika Hanya Memakai 1 HP:</strong> Cukup ambil <em>screenshot</em> tampilan QR Code &bull; Buka aplikasi m-Banking/E-Wallet Anda &bull; Pilih menu Scan QR &bull; Tekan ikon <strong>"Galeri Foto"</strong> &bull; Pilih screenshot tadi &bull; Bayar seketika!</div>
+    </div>
+  </div>
+
+  <!-- BAB 5: TRANSFER BANK MANUAL -->
+  <div class="section-header avoid-break" style="margin-top: 24px;">
+    <div class="section-header-left">
+      <div class="section-header-num">5</div>
+      <div class="section-header-title">Cara Bayar via Transfer Bank Manual</div>
+    </div>
+    <div class="section-header-badge">Metode Alternatif</div>
+  </div>
+
+  <div class="step-card avoid-break">
+    <div class="step-header">
+      <span class="step-badge">Upload Bukti Transfer</span>
+      <span class="step-title">Unggah Struk / Bukti Transfer dari Galeri HP</span>
+    </div>
+    <p class="step-desc">
+      Jika memilih transfer manual ke rekening bank pengurus, silakan transfer terlebih dahulu, lalu unggah foto bukti transfer untuk diverifikasi oleh bendahara:
+    </p>
+
+    <div class="step-grid-3col">
+      <div class="phone-mockup">
+        <img src="screenshots/13-metode-transfer-bank-manual.jpg" alt="Pilih Transfer Bank">
+        <div class="phone-caption">1. Pilih Tab "Transfer Bank"</div>
+      </div>
+      <div class="phone-mockup">
+        <img src="screenshots/14-pilih-foto-bukti-transfer.jpg" alt="Pilih dari Galeri">
+        <div class="phone-caption">2. Ambil Foto dari Galeri</div>
+      </div>
+      <div class="phone-mockup">
+        <img src="screenshots/15-kirim-bukti-transfer.jpg" alt="Kirim Bukti">
+        <div class="phone-caption">3. Klik "Kirim Bukti Transfer"</div>
+      </div>
+    </div>
+
+    <div class="alert-box alert-gold" style="margin-top: 14px;">
+      <span class="alert-icon">⏳</span>
+      <div><strong>Catatan Verifikasi:</strong> Setelah bukti dikirim, status kotak akan berwarna <strong>Oranye (Menunggu Verifikasi)</strong> sampai bendahara memeriksa mutasi rekening dan menyetujui status menjadi <strong>Lunas (Hijau)</strong>.</div>
+    </div>
+  </div>
+
+  <!-- ================= HALAMAN 5: KAMUS WARNA, SOS & FAQ ================= -->
+  <div class="page-break"></div>
+
+  <!-- BAB 6: KAMUS WARNA STATUS -->
+  <div class="section-header avoid-break">
+    <div class="section-header-left">
+      <div class="section-header-num">6</div>
+      <div class="section-header-title">Kamus Warna Status Tagihan Matriks IPL</div>
+    </div>
+    <div class="section-header-badge">Panduan Visual</div>
+  </div>
+
+  <div class="step-card avoid-break">
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th style="width: 25%;">Warna Kotak</th>
+          <th style="width: 25%;">Nama Status</th>
+          <th style="width: 50%;">Penjelasan Lengkap untuk Warga</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge-status status-green">● Hijau Muda</span></td>
+          <td><strong>LUNAS</strong></td>
+          <td>Iuran sudah selesai dibayar & diverifikasi. Tertera nominal dan tanggal pembayaran yang sah.</td>
+        </tr>
+        <tr>
+          <td><span class="badge-status status-orange">● Oranye / Kuning Tua</span></td>
+          <td><strong>MENUNGGU VERIFIKASI</strong></td>
+          <td>Bukti transfer manual sudah diunggah oleh warga dan sedang dalam antrean review oleh bendahara.</td>
+        </tr>
+        <tr>
+          <td><span class="badge-status status-yellow">● Kuning Pucat</span></td>
+          <td><strong>BELUM BAYAR</strong></td>
+          <td>Tagihan bulan berjalan atau bulan baru yang belum dilakukan pembayaran oleh warga.</td>
+        </tr>
+        <tr>
+          <td><span class="badge-status status-red">● Merah Muda</span></td>
+          <td><strong>TERLAMBAT / DITOLAK</strong></td>
+          <td>Iuran telah melewati batas jatuh tempo atau bukti transfer manual ditolak (misal slip buram/salah nominal).</td>
+        </tr>
+        <tr>
+          <td><span class="badge-status" style="background:#f1f5f9; color:#475569;">● Abu-abu</span></td>
+          <td><strong>DIBATALKAN</strong></td>
+          <td>Transaksi tagihan dibatalkan oleh sistem atau kesepakatan pengurus.</td>
+        </tr>
+        <tr>
+          <td><span class="badge-status status-dark">● Hijau Tua (Gelap)</span></td>
+          <td><strong>SEDANG DIPILIH</strong></td>
+          <td>Kotak bulan yang sedang Anda klik/centang untuk dibayarkan pada sesi transaksi saat ini.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- BAB 7 & 8: FAQ & LAYANAN DARURAT -->
+  <div class="section-header avoid-break" style="margin-top: 20px;">
+    <div class="section-header-left">
+      <div class="section-header-num">7</div>
+      <div class="section-header-title">Tanya Jawab Favorit Warga (FAQ)</div>
+    </div>
+    <div class="section-header-badge">Solusi Cepat</div>
+  </div>
+
+  <div class="faq-grid avoid-break">
+    <div class="faq-item">
+      <div class="faq-q">❓ Bisa bayar 6 bulan atau 1 tahun langsung?</div>
+      <div class="faq-a"><strong>Bisa banget!</strong> Anda cukup mengetuk beberapa kotak bulan sekaligus secara berurutan. Total akan terakumulasi otomatis dan bisa dibayar dalam 1 kali scan QRIS.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">❓ Kenapa tidak bisa pilih bulan depan?</div>
+      <div class="faq-a">Sistem mewajibkan pelunasan berurutan dari bulan terlama. Hal ini agar tidak ada tunggakan masa lalu yang tertinggal tanpa disadari.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">❓ Apakah bayar via QRIS ada biaya admin?</div>
+      <div class="faq-a">Pembayaran QRIS diproses sesuai nominal tagihan yang tertera di sistem Portal Warga tanpa potongan tersembunyi.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">❓ Bagaimana jika salah kirim slip bukti?</div>
+      <div class="faq-a">Jangan panik! Cukup hubungi pengurus RT/RW atau bendahara melalui WhatsApp untuk membantu membatalkan verifikasi slip tersebut.</div>
+    </div>
+  </div>
+
+  <!-- Layanan Darurat SOS -->
+  <div class="sos-banner avoid-break" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+      <div class="sos-left">
+        <div class="sos-icon">🚨</div>
+        <div class="sos-text">
+          <h4>Pos Satpam & Kontak Darurat Palm Village (Siaga 24 Jam)</h4>
+          <p>Butuh bantuan darurat keamanan, paket mendesak, atau laporan warga? Hubungi langsung satpam bertugas:</p>
+        </div>
+      </div>
+      <div class="sos-badge">SIAGA 24 JAM</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 4px;">
+      <div style="background: #ffffff; border: 1px solid #fecdd3; border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div style="font-weight: 800; font-size: 11.5px; color: #123e2b;">👮 Satpam Riki</div>
+          <div style="font-size: 10px; color: #557263; font-family: monospace;">0895-3231-36366</div>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <span style="background: #10b981; color: #fff; font-size: 9px; font-weight: 700; padding: 3px 6px; border-radius: 4px;">💬 WA</span>
+          <span style="background: #e11d48; color: #fff; font-size: 9px; font-weight: 700; padding: 3px 6px; border-radius: 4px;">📞 Call</span>
+        </div>
+      </div>
+      <div style="background: #ffffff; border: 1px solid #fecdd3; border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div style="font-weight: 800; font-size: 11.5px; color: #123e2b;">👮 Satpam Roni</div>
+          <div style="font-size: 10px; color: #557263; font-family: monospace;">0881-0103-57049</div>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <span style="background: #10b981; color: #fff; font-size: 9px; font-weight: 700; padding: 3px 6px; border-radius: 4px;">💬 WA</span>
+          <span style="background: #e11d48; color: #fff; font-size: 9px; font-weight: 700; padding: 3px 6px; border-radius: 4px;">📞 Call</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align: center; margin-top: 22px; font-size: 11.5px; color: #698375;">
+    <strong>Portal Warga Palm Village</strong> &bull; Nyaman, Asri, Transparan, dan Rukun Bersama &copy; 2026
+  </div>
+
+</body>
+</html>
