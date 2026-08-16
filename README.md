@@ -10,13 +10,12 @@ Kelola data warga, tagihan IPL (Iuran Pemeliharaan Lingkungan), pembayaran QRIS,
 
 ---
 
-## Changelog v1.3.12 — Midtrans QRIS Sandbox
+## Changelog v1.4.1 — DOKU QRIS Production & Transactional Email System
 
-- Pembayaran QRIS melalui Midtrans Sandbox sudah terhubung end-to-end melalui n8n, termasuk pembuatan checkout dan pembaruan status melalui webhook.
-- Selama proses review Midtrans, QRIS hanya tersedia untuk **Admin** dan **Admin Demo** (`admin_viewer`).
-- Admin Demo tetap read-only untuk fitur lain; pengecualian hak tulis hanya berlaku saat membuat pembayaran QRIS.
-- Warga, Pengurus, dan Bendahara tetap menggunakan metode transfer/tunai sesuai otorisasi sebelumnya.
-- Refresh status QRIS berjalan di background tanpa memicu fullscreen loading atau blinking pada matriks pembayaran.
+- **Universal QRIS Production**: Integrasi DOKU QRIS Production aktif dan dapat digunakan langsung oleh seluruh warga dan pengurus perumahan.
+- **Resilient Checkout & Cancellation**: Tombol pembatalan transaksi QRIS yang mengembalikan tagihan secara instan tanpa mengganjal atau memblokir pembayaran via metode lain (Transfer Bank atau Tunai).
+- **Automated Transactional Emails**: Integrasi email transaksional otomatis via worker n8n yang mengirimkan kuitansi berstandar resmi ke Warga serta notifikasi pembayaran masuk ke jajaran Admin, Bendahara, dan Pengurus.
+- **Clean UI & Versioning**: Tampilan antarmuka bersih tanpa embel-embel nama vendor gateway, dilengkapi badge versi aplikasi (`v1.4.1`) di Header, Halaman Login, dan Footer.
 
 ---
 
@@ -130,11 +129,12 @@ Portal Warga Palm Village telah dilengkapi dengan inovasi arsitektur mutakhir un
 | 💰 Pengeluaran | ✅ | CRUD dengan kwitansi, kategori, filter bulan |
 | ⚙️ Pengaturan IPL | ✅ | Komponen IPL, denda, jatuh tempo, penerima |
 | 📱 PWA (Installable) | ✅ | Service worker, manifest, icon, update prompt |
-| 💵 Integrasi Midtrans QRIS Sandbox | 🧪 | Checkout + webhook aktif; sementara hanya untuk Admin dan Admin Demo selama review Midtrans |
+| 💳 Integrasi QRIS DOKU Production | ✅ | Universal access (Warga, Pengurus, Bendahara, Admin), webhook real-time, auto-update tagihan |
+| 📧 Notifikasi Transaksional Email | ✅ | n8n MIME worker: Kuitansi Warga & Notifikasi Masuk ke Admin/Bendahara/Pengurus |
+| 🤖 Otomasi n8n | ✅ | Endpoint QRIS Create DOKU, Webhook Production & Transactional Email Worker |
 | 📅 Kalender Acara | 🚧 | Schema DB siap, UI placeholder Phase 2 |
 | 💬 Forum Diskusi | 🚧 | Schema DB siap (nested comments), UI Phase 2 |
-| 🤖 Otomasi n8n | 🧪 | API QRIS create + webhook aktif; workflow billing, denda, dan notifikasi dikembangkan bertahap |
-| 📲 Notifikasi WA/Email | 🚧 | Via n8n (Fonnte/Wablas + SMTP) |
+| 📲 Notifikasi WhatsApp | 🚧 | Via n8n gateway (Fonnte/Wablas) |
 
 > **Legenda:** ✅ Implemented &nbsp;|&nbsp; 🧪 Sandbox / Review &nbsp;|&nbsp; 🚧 Phase 2 / Planned &nbsp;|&nbsp; ⏳ Future
 
@@ -617,8 +617,9 @@ Didesain mengikuti logo Palm Village — nuansa **hijau hutan** yang menenangkan
 | 🛡️ **Route Protection** | `ProtectedLayout` guard + per-page role check |
 | 🔁 **Session** | Auto-refresh token, persist via HttpOnly cookie |
 | 🚫 **Sequential Payment** | `canPayBill()` — cegah pembayaran jika masih ada tagihan periode sebelumnya |
-| 💵 **QRIS Authorization** | UI dan endpoint n8n hanya menerima Admin serta akun Admin Demo resmi selama masa review |
-| 🔐 **Midtrans Credential** | Server Key disimpan sebagai credential server-side n8n, tidak boleh dimasukkan ke source code atau di-push ke GitHub |
+| 💵 **QRIS Production** | Universal access untuk seluruh role warga dan staff, divalidasi end-to-end melalui gateway DOKU Production |
+| 🔐 **Asymmetric Signature Security** | RSA-SHA256 asymmetric signature + Client-ID auth untuk menjamin integritas komunikasi API dengan DOKU |
+| 🛡️ **Credential Isolation** | Private key (`*.key` / `*.pem`) dan Secret Keys dikelola terisolasi di n8n server-side, tidak pernah terekspos ke bundle frontend |
 
 ---
 
@@ -630,23 +631,26 @@ Didesain mengikuti logo Palm Village — nuansa **hijau hutan** yang menenangkan
 2. **Import** project di [Vercel](https://vercel.com)
 3. **Set Root Directory** → `client`
 4. **Set Environment Variables:**
-   ```
+   ```env
    VITE_DEMO_MODE=false
-   VITE_SUPABASE_URL=your_url
-   VITE_SUPABASE_ANON_KEY=your_key
+   VITE_ENABLE_DEMO_ADMIN=false
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   VITE_N8N_API_BASE_URL=https://n8n-icyxwmjq.runner.web.id/webhook
+   VITE_GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
    ```
 5. **Deploy!** Build command & output auto-detected (`npm run build` → `dist/`)
 
 ### Backend → Supabase Cloud
-- Database: managed PostgreSQL
-- Auth: Google OAuth + App JWT
-- Storage: untuk kwitansi & receipt
-- Tabel pembayaran/tagihan diperbarui oleh workflow n8n setelah notifikasi Midtrans tervalidasi
+- Database: managed PostgreSQL dengan RLS di seluruh tabel
+- Auth: Google OAuth 2.0 + App JWT
+- Storage: bucket storage terenkripsi untuk bukti transfer & kwitansi pengeluaran
+- Otomasi DB: Trigger & functions untuk auto-update status tagihan dan trigger notifikasi
 
-### Automation → n8n (self-hosted)
-- Endpoint pembuatan checkout QRIS Midtrans Sandbox
-- Webhook Midtrans untuk sinkronisasi status pembayaran
-- Credential Midtrans dikelola di n8n dan tidak diekspos ke frontend
+### Automation → n8n Production (`n8n-icyxwmjq.runner.web.id`)
+- `PV API - Payments QRIS Create DOKU Production`: Generator checkout QRIS dengan signature RSA-SHA256
+- `PV API - Payments QRIS DOKU Production Webhook`: Receiver notifikasi webhook pembayaran sukses real-time
+- `PV Notifications - Transactional Email v2`: MIME worker untuk kuitansi warga & notifikasi pembayaran ke pengurus/bendahara/admin
 
 ---
 
@@ -660,9 +664,9 @@ Didesain mengikuti logo Palm Village — nuansa **hijau hutan** yang menenangkan
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Roadmap Pengembangan
 
-### ✅ Phase 1 & Phase 5 — Core & Advanced RBAC (Current)
+### ✅ Phase 1 — Core RBAC & Basic Operations (Completed)
 - [x] Autentikasi dual-mode (Demo + Supabase) & Registrasi Mandiri (HP)
 - [x] 4-Tier RBAC (Warga, Pengurus, Bendahara, Admin) & Kontrol UI/UX per Role
 - [x] Workflow Approval User baru oleh Pengurus
@@ -674,22 +678,28 @@ Didesain mengikuti logo Palm Village — nuansa **hijau hutan** yang menenangkan
 - [x] Pengeluaran + kwitansi & Audit Log Sistem (Login, Akses, Transaksi)
 - [x] Pengaturan IPL (komponen-based) & Dasbor Proaktif dengan Banner/Badge
 - [x] PWA (installable, offline-ready)
-- [x] Integrasi Midtrans QRIS Sandbox melalui n8n untuk Admin dan Admin Demo
-- [x] Webhook Midtrans untuk sinkronisasi status pembayaran QRIS
 
-### 🚧 Phase 2 — Integrasi & Komunitas
-- [ ] Aktivasi QRIS untuk role lain setelah review dan persetujuan Midtrans selesai
-- [ ] Migrasi credential dan endpoint dari Midtrans Sandbox ke Production setelah persetujuan eksplisit
-- [ ] Otomasi n8n (billing, denda, notifikasi)
-- [ ] Kalender acara + RSVP
-- [ ] Forum diskusi (nested comments)
-- [ ] Notifikasi WhatsApp & Email
+### ✅ Phase 2 — Payment Gateway & Transactional Automation (Completed)
+- [x] Integrasi DOKU QRIS Production end-to-end via n8n
+- [x] Otentikasi Asymmetric RSA-SHA256 + Client-ID Gateway DOKU
+- [x] Universal QRIS Checkout untuk seluruh warga dan pengurus
+- [x] Tombol & Mekanisme Pembatalan Transaksi QRIS non-blocking (`✕ Batalkan Pembayaran`)
+- [x] Webhook DOKU Production untuk auto-update status tagihan (`paid`)
+- [x] Worker Notifikasi Email Transaksional otomatis (Kuitansi Warga + Notifikasi Admin/Bendahara/Pengurus)
+- [x] Badge Versi Aplikasi (`v1.4.1`) di Header, Login, dan Footer
 
-### ⏳ Phase 3 — Enhancement
-- [ ] Push notifications
-- [ ] Multi-complex support
-- [ ] Mobile app (React Native / Capacitor)
-- [ ] Advanced analytics dashboard
+### 🚧 Phase 3 — Enhanced Community & Automation (Current / Up Next)
+- [ ] **Cron Otomatis Pembuatan Tagihan IPL Bulanan**: n8n scheduled trigger setiap tanggal 1 bulan berjalan
+- [ ] **Cron Denda Keterlambatan**: n8n automated check tanggal 11 bulan berjalan untuk tagihan overdue
+- [ ] **WhatsApp Gateway Notification**: Notifikasi tagihan dan kuitansi instan via WhatsApp (Fonnte/Wablas)
+- [ ] **Kalender Acara Lingkungan & RSVP**: Pengumuman kegiatan komplek & konfirmasi kehadiran warga
+- [ ] **Forum Diskusi Warga**: Ruang aspirasi warga dengan nested komentar dan moderasi pengurus
+
+### ⏳ Phase 4 — Enterprise & Multi-Complex Enhancement
+- [ ] Web Push Notifications (Service Worker FCM)
+- [ ] Dukungan Multi-Kompleks / Multi-Cluster Perumahan
+- [ ] Mobile App Native Wrapper (Capacitor / React Native)
+- [ ] Dasbor Analitik & Prediksi Keuangan Berbasis AI
 
 ---
 

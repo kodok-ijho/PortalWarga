@@ -1,16 +1,14 @@
-# Portal Warga Palm Village — Rencana Pengembangan (v2, di-polish)
+# Portal Warga Palm Village — Rencana Pengembangan (v1.4.1)
 
-> Revisi dari PLAN.md v1. Backend Express/MongoDB diganti dengan **Supabase (Postgres + Auth + RLS)** + **n8n** untuk otomasi. Peluncuran bertahap (MVP), RBAC 3 level, notifikasi WhatsApp + Email, kepatuhan UU PDP.
+> Dokumentasi arsitektur dan peta jalan pengembangan (Roadmap) Portal Warga Palm Village. Backend mengandalkan **Supabase (PostgreSQL + Auth + RLS)** dengan **n8n Automation Engine** untuk integrasi Payment Gateway **DOKU QRIS Production** dan Notifikasi Email/WhatsApp Transaksional.
 
-## Ringkasan Perubahan dari v1
+## Ringkasan Perubahan & Fitur Terbaru (v1.4.1)
 
-1. **Stack backend diganti total**: Express/MongoDB → **Supabase (Postgres + Auth + RLS)** + **n8n** untuk otomasi. Backend Node yang lama akan di-deprecate (diarsipkan, bukan dihapus).
-2. **Peluncuran bertahap (MVP)**: Phase 1 = Login + Daftar Penghuni + Tagihan/QRIS. Kalender & Forum menyusul di Phase 2.
-3. **RBAC 4 level**: `admin`, `bendahara`, `pengurus`, `warga` (diperluas dari 3 level untuk pemisahan hak akses pengeluaran dan verifikasi kas).
-4. **Notifikasi WhatsApp + Email** via n8n & Proactive Notifications Alert di UI (banner & bell badge).
-5. **Frontend diperbaiki & di-enhance**: struktur dipecah, mobile menu 100% solid dengan React Portal, update profil mandiri via modal, integrasi `@supabase/supabase-js` + React Query.
-6. Penambahan: kepatuhan **UU PDP No.27/2022**, denda keterlambatan, generasi tagihan otomatis tiap bulan.
-7. **Inovasi Phase 5**: Alur verifikasi pendaftaran warga baru, kompresi gambar bukti transfer otomatis sisi klien (<500 KB), verifikasi pembayaran transfer dengan high-res zoom, dan neraca kumulatif Running Balance real-time.
+1. **Payment Gateway DOKU QRIS Production**: Integrasi penuh pembuatan QRIS checkout via signature RSA-SHA256 asimetris dan webhook auto-settlement.
+2. **Universal Resident Payment Access**: QRIS dibuka untuk seluruh warga dan pengurus tanpa pembatasan hak akses.
+3. **Resilient Cancellation Flow**: Tombol `✕ Batalkan Pembayaran` yang instan dan non-blocking, memudahkan warga berganti metode bayar ke Transfer Bank atau Tunai.
+4. **Automated Transactional Emails**: Worker n8n otomatis mendistribusikan email bukti kuitansi ke Warga dan notifikasi pembayaran masuk ke Admin, Bendahara, dan Pengurus.
+5. **Solid React Portal UI & Versioning**: Mobile drawer bebas clipping/transform, badge versi `v1.4.1` terpasang di seluruh view, dan tampilan bersih dari label vendor.
 
 ---
 
@@ -18,30 +16,35 @@
 
 | Lapisan | Teknologi | Catatan |
 |---|---|---|
-| Frontend | React 18 + Vite + TailwindCSS | Diperbaiki dari scaffold existing |
-| Data fetching | React Query (`@tanstack/react-query`) | caching, invalidation |
-| Supabase client | `@supabase/supabase-js` | akses Postgres + Auth dari frontend |
-| Backend data & auth | **Supabase** (Postgres + Auth + Row Level Security) | CRUD otomatis via PostgREST, RBAC di level DB |
-| Logika sinkron/QRIS | **Supabase Edge Functions** (Deno/TS) | generate QRIS Mayar |
-| Otomasi/event | **n8n** (`n8n-icyxwmjq.runner.web.id`) | webhook Mayar, cron tagihan bulanan, notifikasi WA+email |
-| Pembayaran | **API Mayar** (QRIS) | sandbox → produksi |
-| Notifikasi | WhatsApp (Fonnte/Wablas) + Email (SMTP) | via node n8n |
-| Kalender UI | `@fullcalendar/react` | Phase 2 |
+| Frontend | React 18 + Vite + TailwindCSS | PWA ready, mobile-first responsive |
+| Data Fetching | React Query (`@tanstack/react-query`) | Caching, dynamic invalidation & polling |
+| Backend & Database | **Supabase** (PostgreSQL + Auth + RLS) | Real-time DB, RLS 4-Tier, PostgREST API |
+| Payment Gateway | **DOKU QRIS Production** | Merchant Direct API, Signature Asimetris RSA-SHA256 |
+| Automation & API Engine | **n8n** (`n8n-icyxwmjq.runner.web.id`) | QRIS Create, Webhook Receiver, MIME Email Worker |
+| Notifikasi | Transaksional Email (MIME) + WhatsApp (Gateway) | Otomatisasi via webhook & worker n8n |
+| PWA & Storage | VitePWA + Supabase Storage | Penyimpanan bukti transfer & kuitansi terenkripsi |
 
 ---
 
 ## 2. Arsitektur Sistem
 
 ```
-┌──────────────┐    direct (RLS-secured)     ┌──────────────────┐
-│  React/Vite  │ ───────────────────────────▶│     Supabase     │
-│  (Frontend)  │ ◀───────────────────────────│ Postgres+Auth+RLS│
-└──────┬───────┘                             └────────┬─────────┘
-       │ Edge Function (generate QRIS)               │ DB webhook/trigger
-       ▼                                             ▼
-┌──────────────┐   webhook pembayaran   ┌──────────────────────────┐
-│  Mayar QRIS  │ ─────────────────────▶ │           n8n            │
-└──────────────┘                        │  • konfirmasi & update   │
+┌─────────────────┐        Direct RLS REST/JWT       ┌────────────────────────┐
+│   React / Vite  │ ───────────────────────────────▶ │     Supabase Cloud     │
+│   (Frontend)    │ ◀─────────────────────────────── │ PostgreSQL + Auth + RLS│
+└────────┬────────┘                                  └───────────┬────────────┘
+         │                                                       │
+         │ API Request (QRIS Create / Session)                   │ DB Triggers &
+         │                                                       │ Webhooks
+         ▼                                                       ▼
+┌─────────────────┐        RSA-SHA256 Signature      ┌────────────────────────┐
+│  DOKU Gateway   │ ◀──────────────────────────────▶ │     n8n Automation     │
+│(QRIS Production)│ ───────────────────────────────▶ │   • QRIS Create API    │
+└─────────────────┘        Payment Webhook           │   • Webhook Receiver   │
+                                                     │   • Transactional Mail │
+                                                     │   • Billing Cron Jobs  │
+                                                     └────────────────────────┘
+```            │  • konfirmasi & update   │
                                         │    status pembayaran     │
                                         │  • cron generate tagihan │
                                         │    bulanan per unit      │
@@ -104,76 +107,57 @@ Tabel utama (semua dengan RLS policy per role):
 
 ---
 
-## 5. Workflow n8n (4 workflow)
+## 5. Workflow n8n (Production Integrations)
 
-1. **Webhook Mayar** → verifikasi signature → update `payments` + `ipl_bills.status` → kirim WA+Email konfirmasi.
-2. **Cron Tagihan Bulanan** (sekali tiap awal bulan) → baca `units` aktif → insert `ipl_bills` untuk periode berjalan.
-3. **Cek Denda Jatuh Tempo** (harian) → tagihan lewat `due_date` & belum `paid` → hitung denda → set `overdue` → notifikasi.
-4. **Notifikasi** (sub-workflow terpusat) → template WA (Fonnte/Wablas) + Email (SMTP) → log pengiriman.
+1. **`PV API - Payments QRIS Create DOKU Production`**: Validasi sesi JWT → generate RSA-SHA256 signature → call DOKU Gateway API → insert payment & link bills → return checkout QRIS.
+2. **`PV API - Payments QRIS DOKU Production Webhook`**: Terima notifikasi webhook DOKU → verifikasi signature & digest → update `payments` (`settlement`) & `ipl_bills` (`paid`) → trigger notifikasi email.
+3. **`PV Notifications - Transactional Email v2`**: Terima trigger webhook pembayaran → siapkan data breakdown (Nama Pemilik, Nomor Unit, Metode, Periode, Nominal) → generate MIME Email → kirim Kuitansi ke Warga & Notifikasi Pembayaran Masuk ke Admin/Bendahara/Pengurus.
+4. **Cron Tagihan Bulanan (Phase 3)**: Scheduled trigger tanggal 1 tiap bulan → baca unit aktif → generate tagihan `ipl_bills` periode berjalan.
+5. **Cron Denda Keterlambatan (Phase 3)**: Scheduled trigger tanggal 11 tiap bulan → cek tagihan belum lunas → kalkulasi denda & update status `overdue`.
 
 ---
 
 ## 6. Implementation Plan (Tahapan)
 
-| Phase | Fokus | Output |
-|---|---|---|
-| **0 — Migrasi & Fondasi** | Buat project Supabase; definisikan skema tabel + RLS; arsip backend Express lama ke `legacy-backend/`; perbaiki config frontend rusak (`vite.config.js`, `postcss.config.js`, `index.css`, path logo, hapus import mati); install deps (`@supabase/supabase-js`, `react-query`, `react-icons`); pecah `App.jsx` → `pages/`,`components/`,`services/`,`hooks/`,`context/`; setup Supabase client + AuthContext. | Repo bersih, frontend bisa jalan (halaman welcome + nav), Supabase siap. |
-| **1 — MVP: Auth + Penghuni + Tagihan/QRIS** | Halaman Login/Logout (Supabase Auth); proteksi route berbasis role; halaman Daftar Penghuni (tabel, search, filter, export CSV); halaman Tagihan (list, filter status); Edge Function generate QRIS Mayar; tombol Bayar + tampilkan QR + polling status; workflow n8n Webhook Mayar + cron tagihan + denda + notifikasi WA/Email; seed data penghuni via CSV. | **MVP siap diuji & dipakai warga.** |
-| **2 — Fitur Esensial Warga** | Model + RLS `announcements`, `helpdesk_tickets`, `events`/`rsvp`; Papan Pengumuman RT (broadcast WA/Email); Helpdesk Lapor RT (pengaduan & tracking status); Kalender Acara (FullCalendar + RSVP); Forum silaturahmi warga. | Fitur esensial lingkungan lengkap & interaktif. |
-| **3 — Polish, Deploy & Launch** | Hardening (rate-limit, validasi, UU PDP review, RBAC test menyeluruh); unit/integration test critical path (auth, pembayaran, RLS); deploy frontend ke Vercel/Netlify + custom domain + HTTPS; dokumentasi (README, panduan warga & admin); soft launch 1 RT → kumpulkan feedback → perbaiki → peluncuran resmi + monitoring. | Sistem produksi stabil. |
+| Phase | Fokus | Status | Output |
+|---|---|:---:|---|
+| **0 — Migrasi & Fondasi** | Skema Supabase, RLS 4-Tier, React 18 + Vite, TailwindCSS, Mobile Portal Drawer | ✅ Selesai | Fondasi sistem siap, RBAC database aktif |
+| **1 — Core RBAC & Keuangan** | Autentikasi Google OAuth 2.0, Approval User, Verifikasi Transfer + Zoom, Running Balance, Pengeluaran & Audit Logs | ✅ Selesai | Operasional RT/RW dan bendahara berjalan |
+| **2 — Payment Gateway & Transaksional** | Integrasi DOKU QRIS Production, Resilient Cancellation Flow, Webhook Auto-Settlement, Transactional Email Worker, Version Badge (`v1.4.1`) | ✅ Selesai | Pembayaran QRIS & kuitansi otomatis aktif |
+| **3 — Otomasi Billing & Komunitas** | Cron auto-generate tagihan awal bulan, cron denda keterlambatan, WhatsApp Gateway notification, Kalender Acara, Forum Diskusi | 🚧 Up Next | Otomasi penuh operasional bulanan & interaksi warga |
+| **4 — Enterprise & Multi-Complex** | Web Push Notification (FCM), Multi-Cluster, Mobile App Native Wrapper, AI Financial Dashboard | ⏳ Planned | Skalabilitas multi-lingkungan |
 
 ---
 
-## 7. Daftar Tugas (Task List)
+## 7. Daftar Tugas & Status Pengerjaan
 
-### Phase 0 — Migrasi & Fondasi
+### Phase 1 & 2 — Selesai & Beroperasi Penuh ✅
 
-- **T1**: Buat project Supabase (DB + Auth), kumpulkan URL/keys ke `.env` (frontend `VITE_SUPABASE_*`).
-- **T2**: Definisikan skema Postgres (migration SQL) + RLS policy untuk semua tabel sesuai role.
-- **T3**: Arsipkan backend Express lama ke `legacy-backend/`; update README stack baru.
-- **T4**: Perbaiki frontend config: buat `vite.config.js`, `postcss.config.js`, `src/index.css` (direktif Tailwind), perbaiki path logo & hapus import mati.
-- **T5**: Install deps frontend: `@supabase/supabase-js`, `@tanstack/react-query`, `react-icons`, dll.
-- **T6**: Restrukturisasi frontend: pecah `App.jsx` → `pages/`, `components/`, `services/supabaseClient.js`, `hooks/`, `context/AuthContext.jsx`; layout (Header/Footer) jadi komponen.
-- **T7**: Setup Supabase client + `AuthContext` (sesi, role) + provider React Query.
+- [x] **T1 - T7**: Setup Supabase DB, RLS 4-Level (`admin`, `bendahara`, `pengurus`, `warga`), React Vite client & AuthContext.
+- [x] **T8 - T10**: Google OAuth 2.0 Sign-In, Alur Approval Pendaftaran User baru oleh Pengurus, Direktori Warga & Ekspor CSV.
+- [x] **T11 - T13**: Matriks Pembayaran Lintas Tahun, Verifikasi Transfer dengan Image Compression & High-Res Zoom, Laporan Neraca Running Balance.
+- [x] **T14 - T17**: Integrasi DOKU QRIS Production via n8n (RSA-SHA256 asymmetric signature auth).
+- [x] **T18 - T20**: Webhook DOKU Production auto-update status tagihan (`paid`) & pembatalan tagihan non-blocking (`✕ Batalkan Pembayaran`).
+- [x] **T21 - T23**: Worker Email Transaksional otomatis via n8n (Kuitansi Warga & Notifikasi Admin/Bendahara/Pengurus).
+- [x] **T24**: Tampilan bersih tanpa vendor branding dan badge versi aplikasi (`v1.4.1`) di seluruh halaman.
 
-### Phase 1 — MVP
+### Phase 3 — Otomasi Bulanan & Interaksi Komunitas (Current Roadmap) 🚧
 
-- **T8**: Halaman Login/Register/Logout (Supabase Auth); proteksi route berbasis role (route guard).
-- **T9**: Halaman Daftar Penghuni — tabel, search, filter blok/status, detail profil, export CSV (admin).
-- **T10**: Skema + seed data penghuni/unit (impor CSV awal); RBAC test.
-- **T11**: Halaman Tagihan IPL — list tagihan milik warga + filter status; (admin: semua unit).
-- **T12**: Edge Function `generate-qris` → panggil Mayar API → simpan `qris_ref` di `ipl_bills`.
-- **T13**: Tombol "Bayar" → panggil Edge Function → tampilkan QR → polling status via React Query.
-- **T14**: Workflow n8n #1 (Webhook Mayar) → update `payments`+`ipl_bills` → konfirmasi.
-- **T15**: Workflow n8n #2 (cron tagihan bulanan) + #3 (cek denda jatuh tempo).
-- **T16**: Workflow n8n #4 (notifikasi WA + Email) untuk jatuh tempo, sukses bayar, denda.
-- **T17**: Struk/riwayat pembayaran (download PDF).
-
-### Phase 2 — Fitur Esensial Warga (Pengumuman, Lapor RT, Kalender)
-
-- **T18**: **Papan Pengumuman RT (Broadcast Info Lingkungan)** — Skema + RLS `announcements`; halaman Berita & Pengumuman; kemampuan Admin & Koordinator Palm Village membuat pengumuman penting (tag: Darurat, Kegiatan, Keuangan) dengan pin di dashboard utama & broadcast notifikasi via n8n (WA/Email).
-- **T19**: **Helpdesk / Lapor RT (Pengaduan & Aspirasi Warga)** — Skema + RLS `helpdesk_tickets`; halaman Lapor RT untuk warga mengajukan keluhan (kebersihan, keamanan, lampu jalan mati, fasilitas umum); tracking status tiket (Open, In Progress, Resolved) & balasan diskusi antar warga dengan Koordinator Palm Village/Admin.
-- **T20**: **Kalender Acara & RSVP Kegiatan** — Skema + RLS `events` + `rsvp`; halaman Kalender Kegiatan (FullCalendar) untuk agenda kerja bakti, rapat RT, posyandu, dan perayaan; fitur RSVP partisipasi warga & export agenda ke `.ics` / Google Calendar.
-- **T21 (opsional)**: **Forum Komunitas Warga** — Skema + RLS forum (`categories`/`threads`/`posts` nested); wadah diskusi silaturahmi antar warga dengan moderasi (pin/lock/hapus) untuk Admin/RT.
-
-### Phase 3 — Polish, Deploy & Launch
-
-- **T21**: Hardening — validasi input (Zod di Edge Function), rate-limit, audit RLS, review kepatuhan UU PDP.
-- **T22**: Unit + integration test critical path (auth, alur bayar QRIS, RLS per role) — target ~50–60% coverage critical path.
-- **T23**: Deploy frontend ke Vercel/Netlify; konfigurasi env, custom domain, HTTPS.
-- **T24**: Dokumentasi — README update, panduan warga (PDF), panduan admin (moderasi & manajemen).
-- **T25**: Soft launch ke 1 RT → kumpulkan feedback → perbaikan bug.
-- **T26**: Peluncuran resmi + monitoring (log n8n, Supabase logs, alert uptime).
+- [ ] **T25**: **Cron Generator Tagihan Otomatis** — n8n cron scheduled tanggal 1 awal bulan untuk membuat tagihan seluruh unit aktif.
+- [ ] **T26**: **Cron Denda Overdue** — n8n cron scheduled tanggal 11 untuk cek jatuh tempo dan penerapan persentase denda keterlambatan.
+- [ ] **T27**: **WhatsApp Notification Gateway** — Pengiriman pengingat tagihan dan kuitansi instan ke nomor WhatsApp warga via Fonnte/Wablas.
+- [ ] **T28**: **Papan Pengumuman & Berita Lingkungan** — Broadcast pengumuman penting RT/RW dengan pin di dashboard utama.
+- [ ] **T29**: **Kalender Acara & RSVP Kegiatan** — Agenda kerja bakti, rapat warga, dan posyandu dengan konfirmasi kehadiran warga.
+- [ ] **T30**: **Forum Aspirasi & Diskusi Warga** — Ruang diskusi tertutup warga dengan nested comments dan moderasi pengurus.
 
 ---
 
-## 8. Catatan
+## 8. Catatan Keamanan & Operasional
 
-- **Prioritas**: Selesaikan Phase 0 & 1 dulu (MVP: Login + Penghuni + Tagihan/QRIS) karena paling krusial. Kalender/Forum boleh menyusul.
-- Backend Express lama **tidak dipakai lagi** — diarsipkan ke `legacy-backend/`, bukan dihapus (jaga-jaga referensi).
-- Setiap task bersifat incremental; selesai satu → commit (jika repo git diinisialisasi).
-- n8n sudah tersedia di `n8n-icyxwmjq.runner.web.id`; webhook Mayar mengarah ke sana.
+- **Credential Isolation**: Seluruh Private Key RSA, Client Secret, dan Service Account dikelola terpusat di server n8n dan tidak pernah dimasukkan ke bundle frontend.
+- **RLS Enforced**: Seluruh akses data database Supabase dibatasi ketat oleh PostgreSQL Row-Level Security berdasarkan token JWT pengguna.
+- **Non-Blocking Billing Flow**: Mekanisme pembatalan QRIS menjamin tidak ada tagihan yang terkunci atau macet saat warga berganti metode pembayaran.
 
 ---
 
-*Rencana ini acuan dinamis — dapat disesuaikan sesuai temuan teknis & umpan balik stakeholder selama pengembangan.*
+*Dokumen ini diperbarui secara berkala mengikuti iterasi rilis Portal Warga Palm Village.*
