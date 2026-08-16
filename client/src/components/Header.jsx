@@ -32,6 +32,9 @@ import {
   roleLabel,
 } from '../services/dataHelpers';
 import { fetchDashboardData, fetchMyEventAccess } from '../services/dataService';
+import pkg from '../../package.json';
+
+const APP_VERSION = `v${pkg.version || '1.4.1'}`;
 
 export default function Header() {
   const { isAuthenticated, profile, role, isReadOnly, signOut, updateProfile, session } = useAuth();
@@ -233,6 +236,9 @@ export default function Header() {
           <div>
             <h1 className="text-sm md:text-base font-bold text-white leading-none tracking-wide flex items-center gap-1.5 font-display">
               Palm Village
+              <span className="inline-flex items-center rounded bg-gold-500/20 text-gold-300 px-1.5 py-0.5 text-[10px] font-mono font-bold border border-gold-400/30">
+                {APP_VERSION}
+              </span>
               {IS_DEMO_MODE && (
                 <span className="bg-amber-400/90 text-forest-900 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider scale-90 origin-left">
                   Demo

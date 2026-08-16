@@ -10,8 +10,10 @@ import {
 import { mockUnits, roleLabel, roleColor } from '../services/mockData';
 import { AiOutlineSafetyCertificate, AiOutlineCloudSync, AiOutlineClose, AiOutlineHome } from 'react-icons/ai';
 import { FcGoogle } from 'react-icons/fc';
+import pkg from '../../package.json';
 
 const GOOGLE_SCRIPT_ID = 'google-identity-services';
+const APP_VERSION = `v${pkg.version || '1.4.1'}`;
 
 export default function Login() {
   const {
@@ -245,8 +247,11 @@ export default function Login() {
             alt="Logo Palm Village"
             className="h-24 w-auto rounded-2xl object-cover mx-auto ring-4 ring-gold-500/40 shadow-2xl mb-3"
           />
-          <h1 className="text-2xl font-bold text-white font-display tracking-wide">
-            Portal Warga Palm Village
+          <h1 className="text-2xl font-bold text-white font-display tracking-wide flex items-center justify-center gap-2">
+            <span>Portal Warga Palm Village</span>
+            <span className="inline-flex items-center rounded-full bg-gold-500/20 text-gold-300 px-2 py-0.5 text-xs font-mono font-bold border border-gold-400/30">
+              {APP_VERSION}
+            </span>
           </h1>
           <p className="text-xs text-forest-300 uppercase tracking-wider mt-1">
             Sistem Layanan IPL &amp; Informasi Hunian
@@ -519,8 +524,8 @@ export default function Login() {
 
         {/* Footer info */}
         <div className="mt-6 text-center space-y-1">
-          <p className="text-[11px] text-forest-400">
-            Portal Warga Palm Village
+          <p className="text-[11px] text-forest-400 font-mono">
+            Portal Warga Palm Village {APP_VERSION} &bull; &copy; {new Date().getFullYear()}
           </p>
         </div>
       </div>
