@@ -59,7 +59,8 @@ export default function Home() {
   const getFeatures = () => {
     const base = [
       { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Lihat daftar penghuni kompleks.' },
-      { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Bayar IPL beberapa bulan sekaligus via transfer bank.' },
+      { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Lihat daftar rumah & nomor unit.' },
+      { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Bayar & pantau iuran IPL unit Anda.' },
     ];
     if (hasMinRole(role, 'admin')) {
       return [

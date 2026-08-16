@@ -20,6 +20,9 @@ import {
   canViewLogs,
   canViewPaymentVerification,
   canViewUserApproval,
+  canViewExpenses,
+  canViewEvents,
+  canViewIncomes,
 } from './services/dataHelpers';
 const Residents = lazy(() => import('./pages/Residents'));
 const Houses = lazy(() => import('./pages/Houses'));
@@ -128,7 +131,9 @@ export default function App() {
                   path="/expenses"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <Expenses />
+                      <RoleGuard canAccess={canViewExpenses}>
+                        <Expenses />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />
@@ -136,7 +141,9 @@ export default function App() {
                   path="/events"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <Events />
+                      <RoleGuard canAccess={canViewEvents}>
+                        <Events />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />
@@ -144,7 +151,9 @@ export default function App() {
                   path="/events/:eventId"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <EventFinance />
+                      <RoleGuard canAccess={canViewEvents}>
+                        <EventFinance />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />
@@ -152,7 +161,9 @@ export default function App() {
                   path="/incomes"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <NonIplIncomes />
+                      <RoleGuard canAccess={canViewIncomes}>
+                        <NonIplIncomes />
+                      </RoleGuard>
                     </Suspense>
                   }
                 />

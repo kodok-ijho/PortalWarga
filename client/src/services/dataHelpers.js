@@ -169,11 +169,19 @@ export function canManageResidents(role, isReadOnly = false) {
 }
 
 export function canViewHouses(role) {
-  return hasMinRole(role, 'pengurus');
+  return ROLE_HIERARCHY.includes(role) || isAdminViewerRole(role);
 }
 
 export function canManageHouses(role, isReadOnly = false) {
   return role === 'admin' && !isReadOnly;
+}
+
+export function canViewEvents(role) {
+  return hasMinRole(role, 'pengurus');
+}
+
+export function canViewIncomes(role) {
+  return hasMinRole(role, 'pengurus');
 }
 
 export function canViewUsers(role) {

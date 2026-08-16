@@ -28,6 +28,7 @@ import {
   canModifyData,
   canViewFinancialReports,
   canViewPaymentVerification,
+  canViewHouses,
   canViewLogs,
   roleLabel,
 } from '../services/dataHelpers';
@@ -164,7 +165,7 @@ export default function Header() {
               { to: '/reports', label: 'Laporan Keuangan', icon: AiOutlineBarChart, desc: 'Laporan arus kas bulanan' },
             ]
           : []),
-        ...((role === 'admin' || role === 'bendahara' || role === 'admin_viewer' || (eventAccess?.events || []).length > 0)
+        ...(isStaffRole(role) || role === 'bendahara' || role === 'admin_viewer'
           ? [
               { to: '/events', label: 'Event / Kegiatan', icon: AiOutlineCalendar, desc: 'Master dan akses event' },
               { to: '/incomes', label: 'Pemasukan Non-IPL', icon: AiOutlineWallet, desc: 'Pemasukan umum dan event' },
@@ -186,9 +187,13 @@ export default function Header() {
       activePaths: ['/residents', '/houses', '/user-approval', '/users'],
       items: [
         { to: '/residents', label: 'Daftar Penghuni', icon: AiOutlineUser, desc: 'Direktori penghuni kompleks' },
+        ...(canViewHouses(role)
+          ? [
+              { to: '/houses', label: 'Daftar Rumah', icon: AiOutlineHome, desc: isStaffRole(role) ? 'Maintain data unit & mapsite' : 'Data nomor rumah & status hunian' },
+            ]
+          : []),
         ...(isStaffRole(role)
           ? [
-              { to: '/houses', label: 'Daftar Rumah', icon: AiOutlineHome, desc: 'Maintain data unit & mapsite' },
               {
                 to: '/user-approval',
                 label: 'Approval User',
