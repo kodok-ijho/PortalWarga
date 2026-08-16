@@ -207,12 +207,12 @@ export function canManagePaymentSchemas(role, isReadOnly = false) {
 const PAYMENT_ROLES = ['warga', 'pengurus', 'bendahara', 'admin'];
 
 export function getQrisProviderLabel(provider) {
-  const value = String(provider || 'midtrans').trim().toLowerCase();
+  const value = String(provider || 'doku').trim().toLowerCase();
   const map = {
     midtrans: 'Midtrans',
     doku: 'DOKU',
   };
-  return map[value] || 'Midtrans';
+  return map[value] || 'DOKU';
 }
 
 export function canUseQrisPayment(role, { qrisEnabled = false, isReadOnly = false } = {}) {

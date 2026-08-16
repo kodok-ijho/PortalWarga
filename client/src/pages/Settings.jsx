@@ -48,7 +48,7 @@ export default function Settings() {
   const [lateFeeValue, setLateFeeValue] = useState(5);
   const [billRecipient, setBillRecipient] = useState('occupant');
   const [qrisEnabled, setQrisEnabled] = useState(true);
-  const [qrisProvider, setQrisProvider] = useState('midtrans');
+  const [qrisProvider, setQrisProvider] = useState('doku');
   const [schemas, setSchemas] = useState([]);
   const [smokeTest, setSmokeTest] = useState(null);
 
@@ -63,12 +63,8 @@ export default function Settings() {
       setLateFeeValue(data.late_fee_value);
       setBillRecipient(data.bill_recipient || 'occupant');
       setQrisEnabled(data.qris_enabled ?? true);
-      setQrisProvider(String(data.qris_provider || 'midtrans').toLowerCase());
+      setQrisProvider(String(data.qris_provider || 'doku').toLowerCase());
       setSmokeTest({
-        enabled: data.smoke_test?.enabled ?? false,
-        frequency: data.smoke_test?.frequency || 'daily',
-        run_hour: Number(data.smoke_test?.run_hour ?? 9),
-        timezone: data.smoke_test?.timezone || 'Asia/Jakarta',
         notification_email: data.smoke_test?.notification_email || session?.user?.email || '',
         notify_recovery: data.smoke_test?.notify_recovery ?? true,
         last_run: data.smoke_test?.last_run || { status: 'never', checks: [] },
@@ -470,7 +466,7 @@ export default function Settings() {
             <div className="max-w-2xl">
               <h3 className="text-sm font-semibold text-forest-800">QRIS & Provider</h3>
               <p className="mt-1 text-[11px] text-forest-500">
-                Aktifkan QRIS untuk warga, pengurus, bendahara, dan admin. Provider aktif bisa diganti antara Midtrans dan DOKU; DOKU dipakai dari sandbox dulu.
+                Aktifkan QRIS untuk warga, pengurus, bendahara, dan admin. Provider aktif: DOKU Production.
               </p>
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-forest-200 bg-forest-50 px-3 py-2 text-xs text-forest-600">

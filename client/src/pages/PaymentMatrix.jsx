@@ -1246,7 +1246,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
                     : 'bg-white text-forest-600 border-forest-200 hover:bg-forest-50'
                 }`}
               >
-                QRIS Midtrans
+                💳 QRIS (DOKU)
               </button>
             )}
             <button
@@ -1297,7 +1297,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
 
         {method === 'qris' && (
           <div className="rounded-lg border border-gold-200 bg-gold-50 p-3 text-xs text-gold-800">
-            QRIS akan dibuka melalui checkout Midtrans Sandbox. Setelah pembayaran terkonfirmasi oleh webhook, status tagihan diperbarui otomatis.
+            QRIS akan dibuka melalui checkout DOKU. Setelah pembayaran terkonfirmasi, status tagihan diperbarui otomatis dan kuitansi dikirim ke email.
           </div>
         )}
 
@@ -1505,7 +1505,7 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
 
         {method === 'qris' && (
           <div className="rounded-lg border border-gold-200 bg-gold-50 p-3 text-xs text-gold-800">
-            QRIS akan dibuka melalui checkout Midtrans Sandbox. Pembayaran dicatat untuk unit yang dipilih dan dikonfirmasi melalui webhook.
+            QRIS akan dibuka melalui checkout DOKU. Pembayaran dicatat untuk unit yang dipilih dan dikonfirmasi otomatis.
           </div>
         )}
 
