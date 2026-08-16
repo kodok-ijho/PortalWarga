@@ -1335,6 +1335,7 @@ Validation:
 Notes:
 - Settings are loaded/saved directly via `/settings/get` and `/settings/update` endpoints in production.
 - `Settings.jsx` migrated fully to use the new settings services with loading states, error states, and saving overlay text.
+- QRIS settings live on the same settings row: `qris_enabled` toggles visibility and `qris_provider` selects the active workflow branch (`midtrans` or `doku`).
 - Update workflow performs role-based authorization check:
   - Admin (rank 40) is allowed to write all keys.
   - Bendahara (rank 30) is allowed to write ONLY `billing.ipl_schemas`. Other fields in the request payload throw a `403 Forbidden` error.

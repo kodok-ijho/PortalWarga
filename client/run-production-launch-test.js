@@ -410,6 +410,11 @@ function logResult(tcId, passed, notes = 'Selesai via Otomasi') {
 
       // Mock Midtrans token generation to avoid network call
       if (url.includes('/payments/qris/create') && method === 'POST') {
+        let qrisBody = {};
+        try {
+          qrisBody = JSON.parse(postData || '{}');
+        } catch {}
+        const qrisProvider = qrisBody.provider || mockSettings.qris_provider || 'midtrans';
         return route.fulfill({
           status: 200,
           headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' },
@@ -417,7 +422,9 @@ function logResult(tcId, passed, notes = 'Selesai via Otomasi') {
             ok: true,
             data: {
               token: 'mock-midtrans-snap-token-123',
-              redirect_url: 'https://app.sandbox.midtrans.com/snap/v2/vtweb/mock-midtrans-snap-token-123'
+              redirect_url: 'https://app.sandbox.midtrans.com/snap/v2/vtweb/mock-midtrans-snap-token-123',
+              provider: qrisProvider,
+              provider_label: qrisProvider === 'doku' ? 'DOKU' : 'Midtrans'
             }
           })
         });
@@ -546,6 +553,19 @@ function logResult(tcId, passed, notes = 'Selesai via Otomasi') {
             body: JSON.stringify({ ok: true, data: mockSettings })
           });
         }
+        if (url.includes('/settings/qris/get')) {
+          return route.fulfill({
+            status: 200,
+            headers: responseHeaders,
+            body: JSON.stringify({
+              ok: true,
+              data: {
+                qris_enabled: mockSettings.qris_enabled,
+                qris_provider: mockSettings.qris_provider,
+              },
+            })
+          });
+        }
         if (url.includes('/settings/update')) {
           const previousSmokeTest = mockSettings.smoke_test;
           Object.assign(mockSettings, bodyObj);
@@ -555,6 +575,11 @@ function logResult(tcId, passed, notes = 'Selesai via Otomasi') {
               ...bodyObj.smoke_test
             };
           }
+          return route.fulfill({ status: 200, headers: responseHeaders, body: JSON.stringify({ ok: true, data: { ok: true } }) });
+        }
+        if (url.includes('/settings/qris/update')) {
+          if (bodyObj.qris_enabled !== undefined) mockSettings.qris_enabled = !!bodyObj.qris_enabled;
+          if (bodyObj.qris_provider !== undefined) mockSettings.qris_provider = String(bodyObj.qris_provider).toLowerCase();
           return route.fulfill({ status: 200, headers: responseHeaders, body: JSON.stringify({ ok: true, data: { ok: true } }) });
         }
         if (url.includes('/monitoring/payment-smoke/run')) {

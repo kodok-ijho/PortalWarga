@@ -26,6 +26,15 @@ client/build/
 **/.env
 **/.env.*
 !.env.example
+!**/.env.uat.example
+!.env.uat.server.example
+!.env.server.example
+
+# UAT secrets and compromised local staging material
+.secrets-quarantine/
+client/uat.env
+client/src/staging.env
+client/src/staging.env.*
 
 # Logs
 logs
@@ -90,3 +99,15 @@ client/login-page-debug.*
 # Screenshot utility (dev only)
 capture-screenshots.js
 docs/screenshots/capture.js
+
+# Security and secrets
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Temp and lock files
+.tmp/
+**/~$*
+graphify-out/
+

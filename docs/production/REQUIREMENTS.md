@@ -987,6 +987,8 @@ Minimum role: `admin`.
 | Settings update | No | No | No | Yes |
 | Audit logs | No | No | No | Yes |
 
+QRIS availability follows the admin setting: when `qris_enabled` is false the QRIS option is hidden and QRIS create/status requests are rejected. The active provider label follows `qris_provider` (`midtrans` or `doku`).
+
 ---
 
 ## 9. Payment Requirements

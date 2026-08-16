@@ -33,7 +33,7 @@ async function getEventMockData() {
 import { PortalApiError, portalApiPost, portalApiUpload } from './apiClient';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
-import { isPendingVerificationStatus, normalizePaymentStatus } from './dataHelpers';
+import { getQrisProviderLabel, isPendingVerificationStatus, normalizePaymentStatus } from './dataHelpers';
 
 // =====================================================================
 // USER APPROVAL
@@ -363,7 +363,21 @@ export async function fetchSettings(token) {
     return mock.mockSettings;
   }
   const data = await portalApiPost('/settings/get', { token });
-  return data;
+  try {
+    const qris = await portalApiPost('/settings/qris/get', { token });
+    return {
+      ...data,
+      qris_enabled: qris?.qris_enabled ?? qris?.enabled ?? data?.qris_enabled ?? true,
+      qris_provider: String(qris?.qris_provider || qris?.provider || data?.qris_provider || 'midtrans').toLowerCase(),
+    };
+  } catch (error) {
+    console.warn('Failed to load QRIS settings; using safe Midtrans default.', error);
+    return {
+      ...data,
+      qris_enabled: data?.qris_enabled ?? true,
+      qris_provider: String(data?.qris_provider || 'midtrans').toLowerCase(),
+    };
+  }
 }
 
 export async function fetchIPLSchemas(token) {
@@ -381,7 +395,22 @@ export async function updateSettings(token, settingsData) {
     Object.assign(mock.mockSettings, settingsData);
     return { ok: true };
   }
-  await portalApiPost('/settings/update', { token, body: settingsData });
+  const { qris_enabled, qris_provider, ...baseSettings } = settingsData || {};
+  const hasBaseSettings = Object.keys(baseSettings).length > 0;
+  const hasQrisSettings = qris_enabled !== undefined || qris_provider !== undefined;
+
+  if (hasBaseSettings) {
+    await portalApiPost('/settings/update', { token, body: baseSettings });
+  }
+  if (hasQrisSettings) {
+    await portalApiPost('/settings/qris/update', {
+      token,
+      body: {
+        ...(qris_enabled !== undefined ? { qris_enabled: !!qris_enabled } : {}),
+        ...(qris_provider !== undefined ? { qris_provider: String(qris_provider).toLowerCase() } : {}),
+      },
+    });
+  }
   return { ok: true };
 }
 
@@ -568,6 +597,15 @@ function normalizePaymentRecord(payment) {
   }
 
   const method = payment.method || payment.payment_method || payment.paymentMethod || metadata.method || '';
+  const provider = String(
+    payment.provider ||
+    payment.qris_provider ||
+    payment.gateway ||
+    metadata.provider ||
+    metadata.qris_provider ||
+    metadata.gateway ||
+    ''
+  ).trim().toLowerCase();
   const rawStatus =
     payment.status ??
     payment.payment_status ??
@@ -600,6 +638,7 @@ function normalizePaymentRecord(payment) {
       '',
     period: payment.period || payment._bill?.period || payment.ipl_bills?.period || '',
     method,
+    provider,
     status: normalizePaymentStatus(rawStatus, {
       method,
       hasProof: Boolean(proofFileUrl || proofFileName),
@@ -979,10 +1018,11 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
 
   // Strategy 4: Direct Supabase with Bearer token (app_jwt as Authorization header)
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mzjgliclzihrdjaqzmqg.supabase.co';
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const supabaseBrowserKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+    || import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  const authedClient = (token && supabaseUrl && supabaseAnonKey)
-    ? createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: `Bearer ${token}` } } })
+  const authedClient = (token && supabaseUrl && supabaseBrowserKey)
+    ? createClient(supabaseUrl, supabaseBrowserKey, { global: { headers: { Authorization: `Bearer ${token}` } } })
     : supabase;
 
   if (billId) {
@@ -1027,16 +1067,30 @@ export async function fetchPaymentByBillId(token, billId, billContext = {}) {
 }
 
 
-// Create one Midtrans QRIS checkout. Ownership and amount are resolved by the API.
-export async function createQrisPayment(token, { bill_ids } = {}) {
+function normalizeQrisProvider(provider) {
+  const value = String(provider || import.meta.env.VITE_QRIS_DEFAULT_PROVIDER || 'doku').trim().toLowerCase();
+  return value === 'midtrans' ? 'midtrans' : 'doku';
+}
+
+function qrisRoute(provider, suffix) {
+  return normalizeQrisProvider(provider) === 'doku'
+    ? `/payments/qris/doku/${suffix}`
+    : `/payments/qris/${suffix}`;
+}
+
+// Create one QRIS checkout. Ownership and amount are resolved by the API.
+export async function createQrisPayment(token, { bill_ids, provider } = {}) {
   if (!Array.isArray(bill_ids) || bill_ids.length === 0) {
     throw new Error('Pilih minimal satu tagihan untuk dibayar via QRIS.');
   }
+  const normalizedProvider = normalizeQrisProvider(provider);
 
   if (IS_DEMO) {
     return {
       token: null,
       redirect_url: null,
+      provider: normalizedProvider,
+      provider_label: getQrisProviderLabel(normalizedProvider),
       parent_order_id: `DEMO-QRIS-${Date.now()}`,
       total_amount: 0,
       bills: bill_ids.map((id) => ({ id })),
@@ -1044,25 +1098,29 @@ export async function createQrisPayment(token, { bill_ids } = {}) {
     };
   }
 
-  const data = await portalApiPost('/payments/qris/create', {
+  const data = await portalApiPost(qrisRoute(normalizedProvider, 'create'), {
     token,
-    body: { bill_ids },
+    body: { bill_ids, provider: normalizedProvider },
   });
 
+  const resolvedProvider = normalizeQrisProvider(data?.provider || normalizedProvider);
   return {
     ...data,
+    provider: resolvedProvider,
+    provider_label: data?.provider_label || getQrisProviderLabel(resolvedProvider),
     total_amount: Number(data?.total_amount ?? data?.total ?? 0),
     bills: Array.isArray(data?.bills) ? data.bills : [],
   };
 }
 
-// Reconcile the checkout against Midtrans on the server. The frontend never
-// decides that a QRIS payment is completed by itself.
-export async function verifyQrisPayment(token, { parent_order_id } = {}) {
+// Reconcile the checkout against the active QRIS provider on the server. The
+// frontend never decides that a QRIS payment is completed by itself.
+export async function verifyQrisPayment(token, { parent_order_id, provider } = {}) {
   const parentOrderId = String(parent_order_id || '').trim();
   if (!parentOrderId) {
     throw new Error('Order ID pembayaran QRIS tidak tersedia.');
   }
+  const normalizedProvider = normalizeQrisProvider(provider);
 
   if (IS_DEMO) {
     return {
@@ -1070,12 +1128,13 @@ export async function verifyQrisPayment(token, { parent_order_id } = {}) {
       transaction_status: 'settlement',
       fraud_status: 'accept',
       payment_type: 'qris',
+      provider: normalizedProvider,
     };
   }
 
-  return portalApiPost('/payments/qris/status', {
+  return portalApiPost(qrisRoute(normalizedProvider, 'status'), {
     token,
-    body: { parent_order_id: parentOrderId },
+    body: { parent_order_id: parentOrderId, provider: normalizedProvider },
   });
 }
 
@@ -1104,9 +1163,10 @@ function isSupabaseJwt(token) {
 
 function getAuthedSupabaseClient(token) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mzjgliclzihrdjaqzmqg.supabase.co';
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (!token || !supabaseUrl || !supabaseAnonKey) return supabase;
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  const supabaseBrowserKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+    || import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!token || !supabaseUrl || !supabaseBrowserKey) return supabase;
+  return createClient(supabaseUrl, supabaseBrowserKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });

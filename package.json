@@ -4,8 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "npm --prefix client run dev",
+    "dev:uat": "npm --prefix client run dev:uat",
     "build": "npm --prefix client run build",
-    "preview": "npm --prefix client run preview"
+    "preview": "npm --prefix client run preview",
+    "test:uat": "npm --prefix client run test:uat",
+    "security:uat": "node scripts/uat-secret-scan.mjs",
+    "preflight:schema:uat": "node scripts/uat-schema-preflight.mjs",
+    "qc:uat": "npm run test:uat && npm run security:uat && npm run build"
   },
   "engines": {
     "node": ">=18"

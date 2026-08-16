@@ -204,6 +204,33 @@ export function canManagePaymentSchemas(role, isReadOnly = false) {
   return hasMinRole(role, 'bendahara') && !isReadOnly;
 }
 
+const PAYMENT_ROLES = ['warga', 'pengurus', 'bendahara', 'admin'];
+
+export function getQrisProviderLabel(provider) {
+  const value = String(provider || 'midtrans').trim().toLowerCase();
+  const map = {
+    midtrans: 'Midtrans',
+    doku: 'DOKU',
+  };
+  return map[value] || 'Midtrans';
+}
+
+export function canUseQrisPayment(role, { qrisEnabled = false, isReadOnly = false } = {}) {
+  if (!qrisEnabled) return false;
+  if (isReadOnly) {
+    return role === 'admin' || role === 'admin_viewer';
+  }
+  return PAYMENT_ROLES.includes(role);
+}
+
+export function getPaymentMethodAvailability(role, { qrisEnabled = false, isReadOnly = false } = {}) {
+  return {
+    canTransfer: !isReadOnly && PAYMENT_ROLES.includes(role),
+    canCash: !isReadOnly && ['bendahara', 'admin'].includes(role),
+    canQris: canUseQrisPayment(role, { qrisEnabled, isReadOnly }),
+  };
+}
+
 export function canViewExpenses(role) {
   return hasMinRole(role, 'pengurus');
 }

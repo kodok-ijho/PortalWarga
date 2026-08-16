@@ -17,6 +17,7 @@ import {
   isStaffRole,
   isBendaharaOrAbove,
   canModifyData,
+  getQrisProviderLabel,
 } from '../services/dataHelpers';
 import {
   fetchBillMatrix,
@@ -413,10 +414,11 @@ export default function PaymentMatrix() {
         }
         const data = await createQrisPayment(session?.access_token, {
           bill_ids: payModal.map((bill) => bill.id),
+          provider: 'doku',
         });
         setQrisCheckoutData({
           ...data,
-          bills: data.bills?.length ? data.bills : payModal,
+          bills: (data.bills?.length && typeof data.bills[0] === 'object') ? data.bills : payModal,
           payments: data.payments || [],
           total: data.total_amount || totalToPay,
         });
@@ -530,10 +532,11 @@ export default function PaymentMatrix() {
         if (method === 'qris') {
           const data = await createQrisPayment(session?.access_token, {
             bill_ids: manualModal.bills.map((bill) => bill.id),
+            provider: 'doku',
           });
           setQrisCheckoutData({
             ...data,
-            bills: data.bills?.length ? data.bills : manualModal.bills,
+            bills: (data.bills?.length && typeof data.bills[0] === 'object') ? data.bills : manualModal.bills,
             payments: data.payments || [],
             total: data.total_amount || manualModal.bills.reduce(
               (sum, bill) => sum + Number(bill.amount || 0) + Number(bill.late_fee || 0),
@@ -927,8 +930,14 @@ export default function PaymentMatrix() {
       {qrisCheckoutData && (
         <QrisCheckoutModal
           data={qrisCheckoutData}
-          onClose={async () => {
-            const billIds = (qrisCheckoutData.bills || []).map((b) => b.id);
+          provider={qrisCheckoutData.provider || 'doku'}
+          onCancel={() => {
+            setQrisCheckoutData(null);
+            toast.info('Pembayaran QRIS ditutup. Anda dapat memilih metode pembayaran lain kapan saja.');
+            void loadMatrix({ silent: true });
+          }}
+          onConfirm={async () => {
+            const billIds = (qrisCheckoutData.bills || []).map((b) => (typeof b === 'object' ? b.id : b));
             if (IS_DEMO || qrisCheckoutData.demo) {
               if (isStaffRole(role)) {
                 for (const billId of billIds) {
@@ -953,10 +962,13 @@ export default function PaymentMatrix() {
                 let verification = null;
                 let transactionStatus = '';
                 let fraudStatus = '';
+                const checkoutProvider = qrisCheckoutData.provider || 'doku';
+                const checkoutProviderLabel = getQrisProviderLabel(checkoutProvider);
 
                 for (let attempt = 0; attempt < 6; attempt += 1) {
                   verification = await verifyQrisPayment(session?.access_token, {
                     parent_order_id: qrisCheckoutData.parent_order_id,
+                    provider: checkoutProvider,
                   });
                   transactionStatus = String(verification?.transaction_status || '').toLowerCase();
                   fraudStatus = String(verification?.fraud_status || '').toLowerCase();
@@ -968,7 +980,7 @@ export default function PaymentMatrix() {
                 if (transactionStatus === 'settlement' || (transactionStatus === 'capture' && fraudStatus === 'accept')) {
                   toast.success('Pembayaran QRIS terverifikasi dan tagihan sudah diperbarui.');
                 } else if (transactionStatus === 'pending') {
-                  toast.info('Midtrans belum mengirim status lunas dalam 15 detik. Tagihan belum dianggap lunas dan akan diperbarui otomatis saat konfirmasi diterima.');
+                  toast.info(`${checkoutProviderLabel} belum menerima konfirmasi lunas. Tagihan akan diperbarui otomatis saat konfirmasi diterima.`);
                 } else if (['expire', 'cancel', 'deny', 'failure'].includes(transactionStatus)) {
                   toast.warning('Pembayaran tidak berhasil. Tagihan dapat dibayar ulang.');
                 } else {
@@ -981,8 +993,6 @@ export default function PaymentMatrix() {
                 toast.info(
                   networkError
                     ? 'Koneksi ke layanan pembayaran gagal. Silakan coba lagi.'
-                    : err?.code === 'MIDTRANS_STATUS_UNAVAILABLE'
-                    ? 'Midtrans Sandbox belum menerima simulasi pembayaran. Selesaikan transaksi melalui simulator Midtrans; QRIS sandbox tidak dapat dibayar dengan aplikasi bank nyata.'
                     : (err?.message || 'Status pembayaran belum dapat diperiksa.')
                 );
               }
@@ -1535,8 +1545,10 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
 
 // Helper lokal
 function formatPeriodShort(period) {
+  if (!period || typeof period !== 'string' || !period.includes('-')) return String(period || '-');
   const [y, m] = period.split('-');
-  return `${MONTHS_LONG[parseInt(m, 10) - 1]} ${y}`;
+  const monthName = MONTHS_LONG[parseInt(m, 10) - 1] || m;
+  return `${monthName} ${y}`;
 }
 
 function isImagePaymentProof(payment) {
@@ -2122,33 +2134,55 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
   );
 }
 
-// ── Modal Instuksi QRIS Midtrans ─────────────────────────
-function QrisCheckoutModal({ data, onClose }) {
+// ── Modal Instuksi QRIS ─────────────────────────
+function QrisCheckoutModal({ data, provider, onConfirm, onCancel, onClose }) {
   const total = data.total_amount || data.total || 0;
   const redirectUrl = data.redirect_url;
+  const qrContent = data.qr_content || data.qrContent || data.raw?.qrContent;
+  const providerLabel = getQrisProviderLabel(provider || data.provider);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleCancelAction = onCancel || onClose || (() => {});
+  const handleConfirmAction = onConfirm || onClose || (() => {});
 
   const handleDone = async () => {
     setIsSubmitting(true);
     try {
-      await onClose();
+      await handleConfirmAction();
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const qrImageUrl = qrContent
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(qrContent)}`
+    : null;
+
   return (
-    <Modal open onClose={handleDone} title="Menunggu Pembayaran QRIS" size="md">
+    <Modal open onClose={handleCancelAction} title="Menunggu Pembayaran QRIS" size="md">
       <div className="space-y-4 text-center py-2">
-        <div className="mx-auto h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-xl font-bold">
-          !
+        <div className="mx-auto h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 text-xl font-bold">
+          QR
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-forest-900">Menunggu Pembayaran Anda</h3>
+          <h3 className="text-sm font-semibold text-forest-900">Scan QRIS Untuk Membayar</h3>
           <p className="text-xs text-forest-500 mt-1">
-            Transaksi QRIS Anda telah berhasil didaftarkan di Midtrans Snap.
+            {`Transaksi QRIS Anda telah berhasil dibuat via ${providerLabel}.`}
           </p>
         </div>
+
+        {qrImageUrl && (
+          <div className="flex flex-col items-center justify-center py-2 bg-white rounded-xl border border-forest-100 shadow-sm p-4">
+            <img
+              src={qrImageUrl}
+              alt="QRIS Code"
+              className="w-56 h-56 rounded-lg shadow-inner border border-gray-200"
+            />
+            <p className="text-[11px] text-forest-500 mt-2 font-medium">
+              Arahkan kamera e-wallet / mobile banking ke QR Code di atas
+            </p>
+          </div>
+        )}
 
         <div className="rounded-lg bg-forest-50 p-3 text-left text-xs space-y-1">
           <div className="flex justify-between">
@@ -2159,29 +2193,34 @@ function QrisCheckoutModal({ data, onClose }) {
             <span className="text-forest-500">Total Nominal:</span>
             <span className="font-bold text-forest-900">{formatRupiah(total)}</span>
           </div>
-          <div className="pt-1.5 border-t border-forest-200">
-            <p className="text-forest-500 font-medium mb-1">Tagihan Periode:</p>
-            <div className="flex flex-wrap gap-1">
-              {(data.bills || []).map(b => (
-                <span key={b.id} className="px-2 py-0.5 rounded bg-forest-100 text-forest-800 font-medium">
-                  {formatPeriodShort(b.period)}
-                </span>
-              ))}
+          {data.bills?.length > 0 && (
+            <div className="pt-1.5 border-t border-forest-200">
+              <p className="text-forest-500 font-medium mb-1">Tagihan Periode:</p>
+              <div className="flex flex-wrap gap-1">
+                {data.bills.map((b, idx) => {
+                  const period = typeof b === 'object' ? b.period : b;
+                  return (
+                    <span key={typeof b === 'object' ? (b.id || idx) : idx} className="px-2 py-0.5 rounded bg-forest-100 text-forest-800 font-medium">
+                      {formatPeriodShort(period)}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="rounded-lg border border-gold-200 bg-gold-50 p-3.5 text-xs text-left text-gold-800">
-          <p className="font-semibold">⚠️ Catatan Pengguna:</p>
+          <p className="font-semibold">⚠️ Catatan Pembayaran:</p>
           <ul className="list-disc pl-4 mt-1 space-y-1">
-            <li>Gunakan aplikasi e-wallet (Gopay, OVO, ShopeePay, Dana, LinkAja) atau m-banking Anda untuk memindai kode QR.</li>
-            <li>Setelah pembayaran sukses, sistem kami akan memperbarui status tagihan secara otomatis (realtime via webhook).</li>
-            <li>Jika popup terblokir oleh browser Anda, silakan klik tombol di bawah untuk membuka halaman pembayaran.</li>
+            <li>Gunakan aplikasi e-wallet (GoPay, OVO, ShopeePay, Dana, LinkAja, BCA Mobile, dll.) untuk memindai QRIS.</li>
+            <li>Setelah pembayaran berhasil di HP Anda, sistem akan mengonfirmasi otomatis via webhook.</li>
+            <li>Klik tombol di bawah setelah selesai melakukan pembayaran di aplikasi Anda.</li>
           </ul>
         </div>
 
         <div className="flex flex-col gap-2 pt-2">
-          {redirectUrl ? (
+          {redirectUrl && (
             <a
               href={redirectUrl}
               target="_blank"
@@ -2190,10 +2229,6 @@ function QrisCheckoutModal({ data, onClose }) {
             >
               Buka Halaman Pembayaran 🔗
             </a>
-          ) : (
-            <p className="rounded-lg bg-white border border-gold-200 p-3 text-xs text-gold-800">
-              Mode demo: checkout Midtrans tidak dibuka.
-            </p>
           )}
           <button
             type="button"
@@ -2202,6 +2237,14 @@ function QrisCheckoutModal({ data, onClose }) {
             className="pv-btn-primary w-full text-sm py-2.5 font-bold shadow-md disabled:opacity-50 mt-1"
           >
             {isSubmitting ? '🔄 Memeriksa Status Pembayaran...' : '✓ Saya Sudah Selesai Membayar'}
+          </button>
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={handleCancelAction}
+            className="w-full py-2 px-3 text-xs font-semibold text-forest-600 hover:text-red-600 hover:bg-red-50 rounded-lg border border-forest-200 transition"
+          >
+            ✕ Batalkan Pembayaran (Batal / Ganti Metode)
           </button>
         </div>
       </div>

@@ -6,6 +6,7 @@ import {
   fetchBillMatrix,
   fetchUnits,
   fetchResidents,
+  fetchSettings,
   approveManualPayment,
   rejectManualPayment,
   updatePayment,
@@ -19,6 +20,7 @@ import {
   canModifyData,
   normalizePaymentStatus,
   isPendingVerificationStatus,
+  getQrisProviderLabel,
 } from '../services/dataHelpers';
 import {
   getUnitById,
@@ -28,6 +30,7 @@ import {
   verifyPayment,
   rejectPayment,
   mockPayments,
+  mockSettings,
   downloadDigitalReceipt,
   sendEmailReceipt,
 } from '../services/mockData';
@@ -160,6 +163,8 @@ export default function PaymentVerification() {
   const [units, setUnits] = useState([]);
   const [residents, setResidents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [qrisEnabled, setQrisEnabled] = useState(true);
+  const [qrisProvider, setQrisProvider] = useState('midtrans');
 
   useEffect(() => {
     let active = true;
@@ -172,18 +177,25 @@ export default function PaymentVerification() {
           setPayments(mockPayments);
           setUnits([]);
           setResidents([]);
+          setQrisEnabled(mockSettings.qris_enabled ?? true);
+          setQrisProvider(String(mockSettings.qris_provider || 'midtrans').toLowerCase());
         } else {
           // Prod mode fetches from API & Supabase
-          const [payData, unitData, resData, matrixData] = await Promise.all([
+          const [payData, unitData, resData, matrixData, settingsData] = await Promise.all([
             fetchPayments(session?.access_token),
             fetchUnits(session?.access_token),
             fetchResidents(session?.access_token),
             fetchBillMatrix(session?.access_token, currentBillingYear()).catch(() => []),
+            fetchSettings(session?.access_token).catch(() => null),
           ]);
           if (active) {
             setPayments(mergePaymentSources(payData, matrixData));
             setUnits(unitData);
             setResidents(resData);
+            if (settingsData) {
+              setQrisEnabled(settingsData.qris_enabled ?? true);
+              setQrisProvider(String(settingsData.qris_provider || 'midtrans').toLowerCase());
+            }
           }
         }
       } catch (err) {
@@ -199,6 +211,8 @@ export default function PaymentVerification() {
   useEffect(() => {
     setReceiptPreviewError(false);
   }, [selectedPayment?.id]);
+
+  const showQrisOption = qrisEnabled || paymentForm.method === 'qris';
 
   const getUnit = (unitId) => {
     return units.find(u => String(u.id) === String(unitId)) || getUnitById(unitId);
@@ -747,7 +761,7 @@ export default function PaymentVerification() {
                     className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 outline-none focus:border-gold-500"
                   >
                     <option value="bank_transfer">Transfer Bank</option>
-                    <option value="qris">QRIS</option>
+                    {showQrisOption && <option value="qris">{`QRIS via ${getQrisProviderLabel(qrisProvider)}`}</option>}
                     <option value="cash">Tunai</option>
                   </select>
                 </div>

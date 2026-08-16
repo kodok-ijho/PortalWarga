@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:uat": "vite --mode uat",
     "build": "vite build",
+    "build:uat": "vite build --mode uat",
     "preview": "vite preview",
+    "test:uat": "node tests/uat-proxy-config.test.mjs",
     "generate-icons": "node generate-pwa-icons.mjs"
   },
   "dependencies": {

@@ -138,6 +138,17 @@ Naming rules:
 | --- | --- | --- | --- | --- |
 | `PV API - Payments QRIS Create` | `POST` | `/portal-v1/payments/qris/create` | `warga` | Create Midtrans QRIS transaction |
 | `PV API - Payments QRIS Status` | `POST` | `/portal-v1/payments/qris/status` | `warga` | Verify Midtrans status server-side and synchronize the existing webhook |
+| `PV API - Payments QRIS Create DOKU Sandbox` | `POST` | `/portal-v1/payments/qris/doku/create` | `warga` | Create DOKU sandbox QRIS transaction |
+| `PV API - Payments QRIS Status DOKU Sandbox` | `POST` | `/portal-v1/payments/qris/doku/status` | `warga` | Verify DOKU status server-side |
+| `PV API - Payments QRIS DOKU Webhook` | `POST` | `/portal-v1/payments/qris/doku/webhook` | Public callback | Sync DOKU payment notifications |
+
+Current DOKU sandbox workflow IDs:
+
+- `PV API - Payments QRIS Create DOKU Sandbox`: `JByxcwR64VcE5Gwz`
+- `PV API - Payments QRIS Status DOKU Sandbox`: `BQVJ1dVM471PpynS`
+- `PV API - Payments QRIS DOKU Webhook`: `WFezS99efHJcM7dq`
+
+The current DOKU sandbox create/status workflows are safe scaffolds. They validate request shape and return `DOKU_CONFIG_MISSING` until DOKU credentials and the final HTTP Request nodes are configured in n8n; they do not write payment rows or touch the existing Midtrans workflows.
 
 QRIS is optional if the project keeps a strict zero-monthly-cost / low-cost manual transfer mode. Midtrans QRIS can still incur transaction fees.
 
@@ -153,6 +164,13 @@ QRIS is optional if the project keeps a strict zero-monthly-cost / low-cost manu
 | `PV API - Reports Running Balance` | `POST` | `/portal-v1/reports/running-balance` | `pengurus` | Monthly running balance |
 | `PV API - Reports Monthly Finance` | `POST` | `/portal-v1/reports/monthly-finance` | `pengurus` | Monthly finance report details |
 | `PV API - Settings Update` | `POST` | `/portal-v1/settings/update` | `admin` | Update app/IPL settings |
+| `PV API - Settings QRIS Get` | `POST` | `/portal-v1/settings/qris/get` | approved user | Read global QRIS enabled/provider setting |
+| `PV API - Settings QRIS Update` | `POST` | `/portal-v1/settings/qris/update` | `admin` | Update global QRIS enabled/provider setting without touching legacy settings workflow |
+
+Current QRIS settings workflow IDs:
+
+- `PV API - Settings QRIS Get`: `O7PUtH1qKwZ23lHq`
+- `PV API - Settings QRIS Update`: `tkxFOH7VrfSfE0QG`
 
 ### 4.9 Operational Test Endpoint
 

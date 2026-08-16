@@ -298,6 +298,20 @@ export const mockProfiles = [
     approval_status: 'pending',
     registered_at: '2026-07-05T11:00:00Z',
   },
+  // Persona contoh untuk panduan aplikasi: pendaftar warga baru yang belum
+  // pernah memperoleh sesi aktif dan masih menunggu persetujuan pengurus.
+  {
+    id: 'pending-ngantor-matic',
+    full_name: 'Ngantor Matic',
+    phone: '0812-0000-2026',
+    role: 'warga',
+    unit_id: null,
+    occupancy_status: null,
+    is_active: false,
+    email: 'ngantormatic@gmail.com',
+    approval_status: 'pending',
+    registered_at: '2026-08-13T00:00:00Z',
+  },
 ];
 
 // Generate 50 new units and profiles for the demo meeting
@@ -359,6 +373,8 @@ export const mockSettings = {
   late_fee_type: 'percent', // 'percent' | 'fixed'
   late_fee_value: 5, // 5% atau nilai fixed (Rp)
   bill_recipient: 'occupant', // 'occupant' | 'owner' — ke siapa tagihan ditujukan
+  qris_enabled: true,
+  qris_provider: 'midtrans',
   smoke_test: {
     enabled: true,
     frequency: 'daily',
@@ -541,6 +557,8 @@ export const mockPayments = mockIPLBills
     transaction_id: `TXN-${b.payment_id}`,
     status: 'completed',
     paid_at: b.due_date, // bayar sebelum/tepat jatuh tempo
+    provider: mockSettings.qris_provider,
+    metadata: { provider: mockSettings.qris_provider },
   }));
 
 // Demo: beberapa pembayaran menunggu verifikasi (transfer oleh warga)
@@ -1206,7 +1224,12 @@ export function recordManualPayment(billId, { method, paidAt, recordedBy, note, 
     status: directPaid ? 'completed' : 'pending_verification',
     paid_at: paidAt,
     receipt_file: receiptFile || null,
-    metadata: { recorded_by: recordedBy || 'staff', note: note || '' },
+    provider: method === 'qris' ? mockSettings.qris_provider : null,
+    metadata: {
+      recorded_by: recordedBy || 'staff',
+      note: note || '',
+      provider: method === 'qris' ? mockSettings.qris_provider : null,
+    },
   };
   mockPayments.push(payment);
   return payment;
@@ -1239,7 +1262,8 @@ export function recordResidentPayment(billIds, { method, receiptFile = null, not
       status: isQris ? 'completed' : 'pending_verification',
       paid_at: paidAt,
       receipt_file: receiptFile || null,
-      metadata: { note: note || '', payer: payerName || '' },
+      provider: isQris ? mockSettings.qris_provider : null,
+      metadata: { note: note || '', payer: payerName || '', provider: isQris ? mockSettings.qris_provider : null },
     });
     count++;
   }
@@ -1471,7 +1495,14 @@ export function updatePayment(paymentId, opts = {}) {
   const payment = mockPayments.find((p) => p.id === paymentId);
   if (!payment) return null;
   if (opts.amount !== undefined && opts.amount !== '') payment.amount = Number(opts.amount);
-  if (opts.method) payment.method = opts.method;
+  if (opts.method) {
+    payment.method = opts.method;
+    payment.provider = opts.method === 'qris' ? (payment.provider || mockSettings.qris_provider) : null;
+    payment.metadata = {
+      ...(payment.metadata || {}),
+      provider: opts.method === 'qris' ? (payment.provider || mockSettings.qris_provider) : null,
+    };
+  }
   if (opts.paid_at) payment.paid_at = opts.paid_at;
   if (opts.note !== undefined) payment.metadata = { ...(payment.metadata || {}), note: opts.note };
   if (opts.file) {
