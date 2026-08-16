@@ -761,7 +761,7 @@ export default function PaymentVerification() {
                     className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 outline-none focus:border-gold-500"
                   >
                     <option value="bank_transfer">Transfer Bank</option>
-                    {showQrisOption && <option value="qris">{`QRIS via ${getQrisProviderLabel(qrisProvider)}`}</option>}
+                    {showQrisOption && <option value="qris">QRIS</option>}
                     <option value="cash">Tunai</option>
                   </select>
                 </div>

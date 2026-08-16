@@ -972,7 +972,7 @@ export default function PaymentMatrix() {
                 if (transactionStatus === 'settlement' || (transactionStatus === 'capture' && fraudStatus === 'accept')) {
                   toast.success('Pembayaran QRIS terverifikasi dan tagihan sudah diperbarui.');
                 } else if (transactionStatus === 'pending') {
-                  toast.info(`${checkoutProviderLabel} belum menerima konfirmasi lunas. Tagihan akan diperbarui otomatis saat konfirmasi diterima.`);
+                  toast.info('Sistem belum menerima konfirmasi lunas. Tagihan akan diperbarui otomatis saat konfirmasi diterima.');
                 } else if (['expire', 'cancel', 'deny', 'failure'].includes(transactionStatus)) {
                   toast.warning('Pembayaran tidak berhasil. Tagihan dapat dibayar ulang.');
                 } else {
@@ -1246,7 +1246,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
                     : 'bg-white text-forest-600 border-forest-200 hover:bg-forest-50'
                 }`}
               >
-                💳 QRIS (DOKU)
+                💳 QRIS
               </button>
             )}
             <button
@@ -1297,7 +1297,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
 
         {method === 'qris' && (
           <div className="rounded-lg border border-gold-200 bg-gold-50 p-3 text-xs text-gold-800">
-            QRIS akan dibuka melalui checkout DOKU. Setelah pembayaran terkonfirmasi, status tagihan diperbarui otomatis dan kuitansi dikirim ke email.
+            QRIS akan dibuka otomatis. Setelah pembayaran terkonfirmasi, status tagihan diperbarui otomatis dan kuitansi dikirim ke email.
           </div>
         )}
 
@@ -1505,7 +1505,7 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
 
         {method === 'qris' && (
           <div className="rounded-lg border border-gold-200 bg-gold-50 p-3 text-xs text-gold-800">
-            QRIS akan dibuka melalui checkout DOKU. Pembayaran dicatat untuk unit yang dipilih dan dikonfirmasi otomatis.
+            QRIS akan dibuka otomatis. Pembayaran dicatat untuk unit yang dipilih dan dikonfirmasi otomatis.
           </div>
         )}
 
@@ -2159,7 +2159,7 @@ function QrisCheckoutModal({ data, provider, onConfirm, onCancel, onClose }) {
         <div>
           <h3 className="text-sm font-semibold text-forest-900">Scan QRIS Untuk Membayar</h3>
           <p className="text-xs text-forest-500 mt-1">
-            {`Transaksi QRIS Anda telah berhasil dibuat via ${providerLabel}.`}
+            Transaksi QRIS Anda telah berhasil dibuat. Silakan scan QR code di bawah:
           </p>
         </div>
 
