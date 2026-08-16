@@ -368,6 +368,20 @@ export default function Header() {
         <div className="hidden md:flex items-center gap-3">
           {isAuthenticated ? (
             <>
+              {/* Shortcut 17 Agustus */}
+              <a
+                href="https://drive.google.com/drive/folders/1-CIioJe6MkyBUeepB9I9yBSjsiR1h5HY"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/90 hover:bg-red-600 text-white text-xs font-bold border border-red-400/40 shadow-xs transition-all hover:scale-105"
+                title="Dokumentasi Kegiatan 17 Agustus Palm Village (Google Drive)"
+              >
+                <span>🇮🇩</span>
+                <span className="hidden lg:inline">Dokumentasi 17-an</span>
+                <span className="lg:hidden">17-an</span>
+                <span className="text-[10px] opacity-80">↗</span>
+              </a>
+
               {profile?.full_name && (
                 <button
                   onClick={openProfileModal}
@@ -418,14 +432,13 @@ export default function Header() {
               <div className="flex items-center gap-2.5">
                 <img src="/logo.png" alt="Logo" className="h-8 w-auto rounded ring-1 ring-gold-500/40" />
                 <div>
-                  <span className="font-bold text-sm block leading-none">Portal Warga</span>
-                  <span className="text-[10px] text-gold-400 font-medium tracking-wider uppercase">Palm Village</span>
+                  <h2 className="text-sm font-bold text-white font-display">Palm Village</h2>
+                  <p className="text-[10px] text-forest-300 uppercase tracking-wider">Portal Warga</p>
                 </div>
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2 rounded-lg bg-forest-800 text-white hover:bg-forest-700 transition-colors shadow-sm"
-                aria-label="Tutup Menu"
+                className="p-2 text-forest-300 hover:text-white hover:bg-forest-800 rounded-lg transition-colors"
               >
                 <AiOutlineClose className="text-xl" />
               </button>
@@ -448,6 +461,25 @@ export default function Header() {
                 </button>
               </div>
             )}
+
+            {/* Shortcut 17 Agustus Mobile */}
+            <div className="p-3 mx-3 mt-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 border border-red-400/50 shadow-sm flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-xl">🇮🇩</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-white truncate">Dokumentasi 17 Agustus</p>
+                  <p className="text-[10px] text-red-100 truncate">Foto & video perayaan HUT RI</p>
+                </div>
+              </div>
+              <a
+                href="https://drive.google.com/drive/folders/1-CIioJe6MkyBUeepB9I9yBSjsiR1h5HY"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-1.5 bg-white hover:bg-red-50 text-red-700 text-[11px] font-bold rounded-lg shadow-xs flex-shrink-0"
+              >
+                Drive ↗
+              </a>
+            </div>
 
             {/* Menu List */}
             <div className="flex-1 overflow-y-auto py-4 px-3 space-y-4 bg-[#0a2f1d]">

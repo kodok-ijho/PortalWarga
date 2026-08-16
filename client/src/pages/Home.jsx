@@ -198,6 +198,40 @@ export default function Home() {
         </div>
       )}
 
+      {/* Momen 17 Agustus Banner Shortcut */}
+      <section className="pv-card overflow-hidden border border-red-200/80 shadow-sm bg-gradient-to-r from-red-600 via-red-500 to-rose-600 text-white relative">
+        <div className="absolute top-0 right-0 -mt-6 -mr-6 w-36 h-36 bg-white/10 rounded-full blur-xl pointer-events-none" />
+        <div className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
+          <div className="flex items-center gap-3.5">
+            <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center text-2xl shadow-inner animate-bounce">
+              🇮🇩
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-bold text-white">
+                  Momen & Dokumentasi 17 Agustus
+                </h3>
+                <span className="bg-white text-red-700 font-extrabold text-[9px] uppercase px-2 py-0.5 rounded-full shadow-xs">
+                  HUT RI Palm Village
+                </span>
+              </div>
+              <p className="text-xs text-red-100 mt-0.5 max-w-xl leading-relaxed">
+                Akses kumpulan foto, video keseruan lomba, dan kemeriahan warga perumahan Palm Village di Google Drive.
+              </p>
+            </div>
+          </div>
+          <a
+            href="https://drive.google.com/drive/folders/1-CIioJe6MkyBUeepB9I9yBSjsiR1h5HY"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-red-50 text-red-700 font-bold px-4 py-2.5 text-xs shadow-md transition-all duration-200 hover:scale-[1.02] flex-shrink-0"
+          >
+            <span>📸 Buka Google Drive</span>
+            <span className="text-xs">↗</span>
+          </a>
+        </div>
+      </section>
+
       {/* Feature cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {features.map(({ to, icon: Icon, title, desc, badge }) => (
