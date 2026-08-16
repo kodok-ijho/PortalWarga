@@ -86,7 +86,7 @@ export default function PaymentMatrix() {
   // Admin Demo memakai role internal admin_viewer dan tetap read-only untuk
   // seluruh fitur lain. QRIS adalah satu-satunya pengecualian sementara.
   const isDemoAdmin = isReadOnly && (role === 'admin' || role === 'admin_viewer');
-  const canUseQris = role === 'admin' || isDemoAdmin;
+  const canUseQris = true;
   const myUnitId = profile?.unit_id;
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -408,10 +408,6 @@ export default function PaymentMatrix() {
     let completedCount = 0;
     try {
       if (method === 'qris') {
-        if (!canUseQris) {
-          toast.error('Pembayaran QRIS sementara hanya tersedia untuk Admin dan Admin Demo.');
-          return;
-        }
         const data = await createQrisPayment(session?.access_token, {
           bill_ids: payModal.map((bill) => bill.id),
           provider: 'doku',
@@ -507,10 +503,6 @@ export default function PaymentMatrix() {
     const noteWithDate = [note?.trim(), `Tanggal diterima: ${paidAt}`].filter(Boolean).join(' | ');
     let completedCount = 0;
     try {
-      if (method === 'qris' && !canUseQris) {
-        toast.error('Pembayaran QRIS sementara hanya tersedia untuk Admin dan Admin Demo.');
-        return;
-      }
       if (method !== 'qris' && !canWrite) {
         toast.error('Akun read-only hanya diizinkan melakukan pembayaran melalui QRIS.');
         return;
