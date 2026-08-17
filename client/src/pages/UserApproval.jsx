@@ -332,14 +332,30 @@ export default function UserApproval() {
                   <option value="">-- Pilih Unit --</option>
                   {availableUnits.map((u) => {
                     const occ = u._occupant || null;
+                    const isPlaceholder = occ && String(occ.email || '').includes('@warga.palmvillage.local');
                     return (
                       <option key={u.id} value={u.id}>
-                        Blok {u.block}/{u.unit_number} (Lt.{u.floor}, {u.size}m2)
-                        {occ ? ` - ${occ.full_name}` : ' - Kosong'}
+                        Blok {u.block}/{u.unit_number} (Lt.{u.floor || '-'}, {u.size || 0}m2)
+                        {occ ? (isPlaceholder ? ` - ${occ.full_name} (Akun Sementara)` : ` - ${occ.full_name}`) : ' - Kosong'}
                       </option>
                     );
                   })}
                 </select>
+                {(() => {
+                  const selectedU = availableUnits.find((u) => u.id === Number(unitId));
+                  const occ = selectedU?._occupant;
+                  if (occ && String(occ.email || '').includes('@warga.palmvillage.local')) {
+                    return (
+                      <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+                        <p className="font-semibold">💡 Klaim & Penggantian Akun Sementara</p>
+                        <p className="mt-1">
+                          Rumah ini sebelumnya terisi data sementara atas nama <strong>{occ.full_name}</strong>. Menyetujui pendaftaran ini akan mengaitkan akun Google resmi <strong>{selectedUser?.full_name}</strong> ke unit ini.
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               {/* Status Hunian */}

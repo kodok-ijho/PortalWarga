@@ -239,7 +239,7 @@ export default function Residents() {
       .map((r) => {
         // Support header dalam berbagai format
         const name = r.Nama || r.full_name || r.nama || Object.values(r)[0];
-        const email = r.Email || r.email || '';
+        let email = (r.Email || r.email || '').toString().trim().toLowerCase();
         const phone = r.Telepon || r.phone || r.telepon || '';
         const block = (r.Blok || r.block || '').toString().toUpperCase();
         const unitNumber = (r.Unit || r.unit_number || '').toString();
@@ -250,6 +250,11 @@ export default function Residents() {
         // Cari unit_id
         const unit = block && unitNumber ? findUnit(block, unitNumber) : null;
         const unit_id = unit?.id || null;
+
+        if (!email) {
+          const cleanUnit = unit ? `unit_${unit.block.toLowerCase()}_${unit.unit_number.toLowerCase()}` : `unassigned_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+          email = `${cleanUnit}@warga.palmvillage.local`;
+        }
 
         return {
           full_name: name,
@@ -403,7 +408,14 @@ export default function Residents() {
                            </span>
                            <div className="min-w-0">
                              <p className="font-medium text-forest-900 truncate">{p.full_name}</p>
-                             <p className="text-[11px] text-forest-400 truncate">{p.email}</p>
+                             {p.email && p.email.includes('@warga.palmvillage.local') ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                                Akun Sementara (Belum Login)
+                              </span>
+                            ) : (
+                              <p className="text-[11px] text-forest-400 truncate">{p.email}</p>
+                            )}
                            </div>
                          </div>
                        </td>
@@ -503,7 +515,11 @@ export default function Residents() {
         </span>
         <div>
           <h3 className="font-bold text-forest-900">{profile.full_name}</h3>
-          <p className="text-xs text-forest-500">{profile.email}</p>
+          {profile.email && profile.email.includes('@warga.palmvillage.local') ? (
+            <p className="text-xs font-medium text-amber-600">Akun Sementara (Belum Login Google)</p>
+          ) : (
+            <p className="text-xs text-forest-500">{profile.email}</p>
+          )}
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
             <span className={`pv-badge ${roleColor(profile.role)}`}>{roleLabel(profile.role)}</span>
             {profile.occupancy_status && (
@@ -554,10 +570,16 @@ function ProfileFormModal({ profile, onSave, onClose, isSaving, units }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.full_name.trim()) return;
+    let finalEmail = form.email.trim().toLowerCase();
+    if (!finalEmail) {
+      const unit = units.find((u) => u.id === Number(form.unit_id));
+      const cleanUnit = unit ? `unit_${unit.block.toLowerCase()}_${unit.unit_number.toLowerCase()}` : `unassigned_${Date.now()}`;
+      finalEmail = `${cleanUnit}@warga.palmvillage.local`;
+    }
     onSave({
       ...(profile ? { id: profile.id } : {}),
       full_name: form.full_name.trim(),
-      email: form.email.trim(),
+      email: finalEmail,
       phone: form.phone.trim(),
       unit_id: form.unit_id ? Number(form.unit_id) : null,
       role: form.role,
@@ -580,14 +602,17 @@ function ProfileFormModal({ profile, onSave, onClose, isSaving, units }) {
               placeholder="Nama lengkap"
             />
           </Field>
-          <Field label="Email">
+          <Field label="Email (Opsional)">
             <input
               type="email"
-              value={form.email}
+              value={form.email.includes('@warga.palmvillage.local') ? '' : form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               className="pv-input"
-              placeholder="email@contoh.com"
+              placeholder="email@gmail.com (Boleh dikosongkan)"
             />
+            <p className="mt-1 text-[11px] text-forest-400">
+              Boleh dikosongkan jika warga belum mendaftar. Sistem otomatis membuat akun sementara yang terhubung saat warga login Google nanti.
+            </p>
           </Field>
           <Field label="Telepon">
             <input
