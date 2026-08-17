@@ -45,6 +45,7 @@ import {
   sendEmailReceipt,
 } from '../services/mockData';
 import { compressImage } from '../utils/imageCompressor';
+import { AiOutlineDownload } from 'react-icons/ai';
 
 export default function PaymentMatrix() {
   const { profile, role, session, isReadOnly } = useAuth();
@@ -2128,11 +2129,13 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
 
 // ── Modal Instuksi QRIS ─────────────────────────
 function QrisCheckoutModal({ data, provider, onConfirm, onCancel, onClose }) {
+  const toast = useToast();
   const total = data.total_amount || data.total || 0;
   const redirectUrl = data.redirect_url;
   const qrContent = data.qr_content || data.qrContent || data.raw?.qrContent;
   const providerLabel = getQrisProviderLabel(provider || data.provider);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const handleCancelAction = onCancel || onClose || (() => {});
   const handleConfirmAction = onConfirm || onClose || (() => {});
@@ -2149,6 +2152,138 @@ function QrisCheckoutModal({ data, provider, onConfirm, onCancel, onClose }) {
   const qrImageUrl = qrContent
     ? `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(qrContent)}`
     : null;
+
+  const handleDownloadQris = async () => {
+    if (!qrImageUrl) return;
+    setIsDownloading(true);
+    try {
+      const qrImg = new Image();
+      qrImg.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        qrImg.onload = resolve;
+        qrImg.onerror = reject;
+        qrImg.src = qrImageUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      const width = 600;
+      const height = 820;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+
+      // Background
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, width, height);
+
+      // Header Banner - Forest Green (#1a3d2e)
+      ctx.fillStyle = '#1a3d2e';
+      ctx.fillRect(0, 0, width, 120);
+
+      // Gold Line Accent
+      ctx.fillStyle = '#d4af37';
+      ctx.fillRect(0, 116, width, 4);
+
+      // Title Text
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('PORTAL WARGA PALM VILLAGE', width / 2, 48);
+
+      ctx.fillStyle = '#d4af37';
+      ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText('PEMBAYARAN QRIS RESMI (IPL)', width / 2, 82);
+
+      // Order info box
+      ctx.fillStyle = '#f4f7f4';
+      ctx.fillRect(30, 140, width - 60, 110);
+      ctx.strokeStyle = '#e2ebe2';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(30, 140, width - 60, 110);
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#4a5d4e';
+      ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(`Order ID:`, 45, 172);
+      ctx.fillText(`Total Nominal:`, 45, 202);
+      ctx.fillText(`Tagihan Periode:`, 45, 232);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#1a3d2e';
+      ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(String(data.parent_order_id || '-'), width - 45, 172);
+
+      ctx.fillStyle = '#1a3d2e';
+      ctx.font = 'bold 17px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(formatRupiah(total), width - 45, 202);
+
+      const periodText = (data.bills || [])
+        .map((b) => formatPeriodShort(typeof b === 'object' ? b.period : b))
+        .join(', ') || '-';
+      ctx.fillStyle = '#2d5a3f';
+      ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(periodText, width - 45, 232);
+
+      // Draw QR Code
+      const qrSize = 340;
+      const qrX = (width - qrSize) / 2;
+      const qrY = 270;
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20);
+      ctx.strokeStyle = '#d0ded0';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20);
+
+      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+      // QRIS badge text
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#1a3d2e';
+      ctx.font = 'bold 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText('QRIS STANDAR PEMBAYARAN NASIONAL', width / 2, 655);
+
+      // Footer Instructions box
+      ctx.fillStyle = '#fffdfa';
+      ctx.fillRect(30, 680, width - 60, 95);
+      ctx.strokeStyle = '#faecd8';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(30, 680, width - 60, 95);
+
+      ctx.fillStyle = '#b45309';
+      ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText('💡 Cara Pembayaran dari Galeri HP:', width / 2, 706);
+
+      ctx.fillStyle = '#78350f';
+      ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText('1. Buka aplikasi BCA Mobile, Livin, GoPay, OVO, Dana, atau ShopeePay', width / 2, 730);
+      ctx.fillText('2. Pilih menu "Scan QR" / "QRIS" lalu pilih "Upload QR dari Galeri"', width / 2, 752);
+
+      // Outer border
+      ctx.strokeStyle = '#1a3d2e';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(0, 0, width, height);
+
+      const dataUrl = canvas.toDataURL('image/png');
+      const orderClean = String(data.parent_order_id || 'IPL').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const fileName = `QRIS_IPL_PalmVillage_${orderClean}.png`;
+
+      const link = document.createElement('a');
+      link.download = fileName;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success('Gambar QRIS berhasil diunduh! Silakan buka M-Banking Anda dan upload dari Galeri.');
+    } catch (err) {
+      console.error('Failed to download QRIS image:', err);
+      window.open(qrImageUrl, '_blank');
+      toast.info('QRIS dibuka di tab baru. Anda dapat menyimpannya secara manual.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <Modal open onClose={handleCancelAction} title="Menunggu Pembayaran QRIS" size="md">
@@ -2173,6 +2308,28 @@ function QrisCheckoutModal({ data, provider, onConfirm, onCancel, onClose }) {
             <p className="text-[11px] text-forest-500 mt-2 font-medium">
               Arahkan kamera e-wallet / mobile banking ke QR Code di atas
             </p>
+
+            {/* Tombol Unduh Gambar QRIS */}
+            <div className="mt-3 w-full">
+              <button
+                type="button"
+                onClick={handleDownloadQris}
+                disabled={isDownloading}
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-forest-800 text-gold-400 font-semibold text-xs hover:bg-forest-700 active:scale-[0.99] transition shadow-sm disabled:opacity-50"
+              >
+                <AiOutlineDownload className="text-base" />
+                {isDownloading ? 'Mengunduh QRIS...' : '📥 Unduh Gambar QRIS (Simpan ke HP)'}
+              </button>
+            </div>
+
+            <div className="mt-2.5 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-left text-[11px] text-amber-900 w-full leading-relaxed">
+              <p className="font-semibold text-amber-950 flex items-center gap-1">
+                💡 Ingin Bayar di HP yang Sama?
+              </p>
+              <p className="mt-1">
+                Klik tombol <strong>"Unduh Gambar QRIS"</strong> di atas, lalu buka aplikasi M-Banking / E-Wallet Anda (BCA, Livin, GoPay, Dana, dll.) dan pilih menu <strong>Scan QR → Upload dari Galeri</strong>.
+              </p>
+            </div>
           </div>
         )}
 
