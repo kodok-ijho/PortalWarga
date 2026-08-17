@@ -128,7 +128,7 @@ export default function Residents() {
   // ── Handlers ──────────────────────────────────────────
   const handleSaveProfile = async (data) => {
     if (!canManage) {
-      toast.error('Hanya Admin yang dapat mengubah data penghuni.');
+      toast.error('Hanya Koordinator atau Admin yang dapat mengubah data penghuni.');
       return;
     }
     setIsSaving(true);
@@ -168,7 +168,7 @@ export default function Residents() {
 
   const handleDelete = async (profile) => {
     if (!canManage) {
-      toast.error('Hanya Admin yang dapat menghapus data penghuni.');
+      toast.error('Hanya Koordinator atau Admin yang dapat menghapus data penghuni.');
       return;
     }
     if (!confirm(`Hapus warga "${profile.full_name}"? Tindakan ini tidak dapat dibatalkan.`)) return;
@@ -486,6 +486,7 @@ export default function Residents() {
            onClose={() => setModalAddEdit(null)}
            isSaving={isSaving}
            units={units}
+           currentUserRole={role}
          />
        )}
  
@@ -555,7 +556,7 @@ export default function Residents() {
   );
 }
 
-function ProfileFormModal({ profile, onSave, onClose, isSaving, units }) {
+function ProfileFormModal({ profile, onSave, onClose, isSaving, units, currentUserRole }) {
   const isEdit = !!profile;
   const [form, setForm] = useState({
     full_name: profile?.full_name || '',
@@ -656,10 +657,16 @@ function ProfileFormModal({ profile, onSave, onClose, isSaving, units }) {
                 onChange={(e) => setForm({ ...form, role: e.target.value })}
                 className="pv-input"
               >
-                <option value="warga">Warga</option>
-                <option value="pengurus">Pengurus</option>
-                <option value="bendahara">Bendahara</option>
-                <option value="admin">Admin</option>
+                {(() => {
+                  const allowedRoles = currentUserRole === 'admin'
+                    ? ['warga', 'pengurus', 'bendahara', 'admin']
+                    : currentUserRole === 'bendahara'
+                    ? ['warga', 'bendahara']
+                    : ['warga', 'pengurus'];
+                  return allowedRoles.map((r) => (
+                    <option key={r} value={r}>{roleLabel(r)}</option>
+                  ));
+                })()}
               </select>
             </Field>
             <Field label="Status">
