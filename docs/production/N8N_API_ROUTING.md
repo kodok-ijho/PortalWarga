@@ -87,38 +87,41 @@ Naming rules:
 
 | Workflow | Method | Route | Purpose | Auth |
 | --- | --- | --- | --- | --- |
-| `PV API - Auth Google` | `POST` | `/portal-v1/auth/google` | Exchange Google ID token for pending state or App JWT | Public, validates Google token |
-| `PV API - Payments Midtrans Webhook` | `POST` | `/portal-v1/payments/midtrans/webhook` | Receive Midtrans payment notification | Public, validates Midtrans signature |
+| PV API - Auth Google | POST | /portal-v1/auth/google | Exchange Google ID token for pending state or App JWT | Public, validates Google token |
+| PV API - Payments Midtrans Webhook | POST | /portal-v1/payments/midtrans/webhook | Receive Midtrans payment notification | Public, validates Midtrans signature |
 
 ### 4.2 Protected Auth/Profile Endpoints
 
 | Workflow | Method | Route | Minimum Role | Purpose |
 | --- | --- | --- | --- | --- |
-| `PV API - Auth Me` | `POST` | `/portal-v1/auth/me` | `warga` | Return current approved profile |
-| `PV API - Profile Update` | `POST` | `/portal-v1/profile/update` | `warga` | Update own profile (full_name, phone, avatar_url) |
+| PV API - Auth Me | POST | /portal-v1/auth/me | warga | Return current approved profile |
+| PV API - Profile Update | POST | /portal-v1/profile/update | warga | Update own profile (full_name, phone, avatar_url) |
 
 ### 4.3 User Approval and Management
 
 | Workflow | Method | Route | Minimum Role | Purpose |
 | --- | --- | --- | --- | --- |
-| `PV API - Users Pending` | `POST` | `/portal-v1/users/pending` | `pengurus` | List pending approval users |
-| `PV API - Users Approve` | `POST` | `/portal-v1/users/approve` | `pengurus` | Approve user and assign unit/role |
-| `PV API - Users Reject` | `POST` | `/portal-v1/users/reject` | `pengurus` | Reject pending user |
+| PV API - Users Pending | POST | /portal-v1/users/pending | pengurus | List pending approval users |
+| PV API - Users Approve | POST | /portal-v1/users/approve | pengurus | Approve user, assign unit/role, and reconcile placeholder profile |
+| PV API - Users Reject | POST | /portal-v1/users/reject | pengurus | Reject pending user |
 
 ### 4.4 Units and Residents
 
 | Workflow | Method | Route | Minimum Role | Purpose |
 | --- | --- | --- | --- | --- |
-| `PV API - Units List` | `POST` | `/portal-v1/units/list` | `warga` | List unit metadata with role-based fields |
-| `PV API - Units Upsert` | `POST` | `/portal-v1/units/upsert` | `admin` | Create/update unit metadata |
-| `PV API - Residents List` | `POST` | `/portal-v1/residents/list` | `warga` | List resident directory/management data by role |
+| PV API - Units List | POST | /portal-v1/units/list | warga | List unit metadata with role-based fields |
+| PV API - Units Upsert | POST | /portal-v1/units/upsert | dmin | Create/update unit metadata |
+| PV API - Residents List | POST | /portal-v1/residents/list | warga | List resident directory/management data by role |
+| PV API - Residents Create | POST | /portal-v1/residents/create | pengurus | Create resident profile (email optional; auto-generates .local placeholder) |
+| PV API - Residents Update | POST | /portal-v1/residents/update | pengurus | Update resident profile attributes |
+| PV API - Residents Delete | POST | /portal-v1/residents/delete | dmin | Deactivate/delete resident profile |
 
 ### 4.5 Billing
 
 | Workflow | Method | Route | Minimum Role | Purpose |
 | --- | --- | --- | --- | --- |
-| `PV API - Bills List` | `POST` | `/portal-v1/bills/list` | `warga` | List bills scoped by role and ownership |
-| `PV API - Bills Generate` | `POST` | `/portal-v1/bills/generate` | `bendahara` | Dry-run or commit monthly bills |
+| PV API - Bills List | POST | /portal-v1/bills/list | warga | List bills scoped by role and ownership |
+| PV API - Bills Generate | POST | /portal-v1/bills/generate | endahara | Dry-run or commit monthly bills |
 
 ### 4.6 Manual Payments and Files
 

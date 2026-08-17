@@ -35,7 +35,7 @@ import {
 import { fetchDashboardData, fetchMyEventAccess } from '../services/dataService';
 import pkg from '../../package.json';
 
-const APP_VERSION = `v${pkg.version || '1.4.1'}`;
+const APP_VERSION = `v${pkg.version || '1.4.2'}`;
 
 export default function Header() {
   const { isAuthenticated, profile, role, isReadOnly, signOut, updateProfile, session } = useAuth();

@@ -10,12 +10,21 @@ Kelola data warga, tagihan IPL (Iuran Pemeliharaan Lingkungan), pembayaran QRIS,
 
 ---
 
+## Changelog v1.4.2 — Resident Pre-population & Visual Denah Enhancements
+
+- **Pencatatan Penghuni Tanpa Email (Placeholder Profiles)**: Pengurus dapat mendaftarkan nama warga dan nomor telepon ke unit rumah tanpa memerlukan email warga. Nama warga langsung tampil utuh di Daftar Rumah, Matriks IPL, dan Laporan.
+- **Auto-Claim & Rekonsiliasi Akun Google**: Deteksi cerdas dan klaim akun pada menu Approval User ketika warga mendaftar/login secara mandiri menggunakan akun Google resmi (Gmail).
+- **Denah Visual Palm Village Terkini**: Pembaruan mapsite resolusi tinggi pada halaman Daftar Rumah dilengkapi modal pratinjau interaktif.
+- **Penataan Blok CB1 & Isolasi Unit Demo**: Standardisasi unit Blok CB1 (CB1/1 & CB1/2) serta isolasi unit demo untuk menjaga integritas data riil perumahan.
+
+---
+
 ## Changelog v1.4.1 — DOKU QRIS Production & Transactional Email System
 
 - **Universal QRIS Production**: Integrasi DOKU QRIS Production aktif dan dapat digunakan langsung oleh seluruh warga dan pengurus perumahan.
 - **Resilient Checkout & Cancellation**: Tombol pembatalan transaksi QRIS yang mengembalikan tagihan secara instan tanpa mengganjal atau memblokir pembayaran via metode lain (Transfer Bank atau Tunai).
 - **Automated Transactional Emails**: Integrasi email transaksional otomatis via worker n8n yang mengirimkan kuitansi berstandar resmi ke Warga serta notifikasi pembayaran masuk ke jajaran Admin, Bendahara, dan Pengurus.
-- **Clean UI & Versioning**: Tampilan antarmuka bersih tanpa embel-embel nama vendor gateway, dilengkapi badge versi aplikasi (`v1.4.1`) di Header, Halaman Login, dan Footer.
+- **Clean UI & Versioning**: Tampilan antarmuka bersih tanpa embel-embel nama vendor gateway, dilengkapi badge versi aplikasi (`v1.4.2`) di Header, Halaman Login, dan Footer.
 
 ---
 

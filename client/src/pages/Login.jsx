@@ -13,7 +13,7 @@ import { FcGoogle } from 'react-icons/fc';
 import pkg from '../../package.json';
 
 const GOOGLE_SCRIPT_ID = 'google-identity-services';
-const APP_VERSION = `v${pkg.version || '1.4.1'}`;
+const APP_VERSION = `v${pkg.version || '1.4.2'}`;
 
 export default function Login() {
   const {
