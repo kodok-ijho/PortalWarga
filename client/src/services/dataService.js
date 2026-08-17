@@ -208,7 +208,9 @@ export async function fetchUnits(token) {
       fetchResidents(token).catch(() => [])
     ]);
     
-    const units = resUnitsData?.units || [];
+    const units = (resUnitsData?.units || []).filter(
+      (u) => u.id !== 5 && u.block !== 'Z_DEMO' && !String(u.unit_number || '').includes('DEMO_HIDDEN')
+    );
     
     return units.map((u) => {
       // Find occupant from approved residents
