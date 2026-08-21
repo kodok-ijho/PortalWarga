@@ -41,6 +41,17 @@ export function formatPeriod(period) {
   return `${months[parseInt(m, 10) - 1] || m} ${y}`;
 }
 
+export function formatPeriodShort(period) {
+  if (!period || typeof period !== 'string' || !period.includes('-')) return String(period || '-');
+  const [y, m] = period.split('-');
+  const monthsLong = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+  const monthName = monthsLong[parseInt(m, 10) - 1] || m;
+  return `${monthName} ${y}`;
+}
+
 export function formatDate(dateStr) {
   if (!dateStr) return '-';
   const d = new Date(dateStr);

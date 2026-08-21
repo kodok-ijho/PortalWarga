@@ -1115,6 +1115,47 @@ export async function createQrisPayment(token, { bill_ids, provider } = {}) {
   };
 }
 
+// Create one QRIS checkout for Non-IPL / Donasi / Kegiatan.
+export async function createNonIplQrisPayment(token, { amount, description, category, provider } = {}) {
+  const numericAmount = Number(amount || 0);
+  if (!numericAmount || numericAmount <= 0) {
+    throw new Error('Nominal pembayaran harus lebih dari 0.');
+  }
+  const normalizedProvider = normalizeQrisProvider(provider || 'doku');
+
+  if (IS_DEMO) {
+    return {
+      provider: normalizedProvider,
+      provider_label: getQrisProviderLabel(normalizedProvider),
+      parent_order_id: `DEMO-NONIPL-${Date.now()}`,
+      total_amount: numericAmount,
+      qr_content: `00020101021226550012COM.DOKU.WWW011893600899000010181002061018100303UKE51440014ID.CO.QRIS.WWW0215ID10265631295470303UKE5204864153033605407${numericAmount.toFixed(2)}5802ID5921Palm Village - Social6005BOGOR61051691462440703A015033DEMO-NONIPL-${Date.now()}6304ABCD`,
+      demo: true,
+    };
+  }
+
+  const data = await portalApiPost(qrisRoute(normalizedProvider, 'create'), {
+    token,
+    body: {
+      amount: numericAmount,
+      description: description || category || 'Non-IPL Palm Village',
+      category,
+      provider: normalizedProvider
+    },
+  });
+
+  const resolvedProvider = normalizeQrisProvider(data?.provider || normalizedProvider);
+  return {
+    ...data,
+    provider: resolvedProvider,
+    provider_label: data?.provider_label || getQrisProviderLabel(resolvedProvider),
+    total_amount: Number(data?.total_amount ?? numericAmount),
+    qr_content: data?.qr_content || data?.raw?.qrContent || '',
+    parent_order_id: data?.parent_order_id || data?.order_id || '',
+    doku_reference_no: data?.doku_reference_no || data?.raw?.referenceNo || '',
+  };
+}
+
 // Reconcile the checkout against the active QRIS provider on the server. The
 // frontend never decides that a QRIS payment is completed by itself.
 export async function verifyQrisPayment(token, { parent_order_id, provider } = {}) {
@@ -1581,6 +1622,36 @@ export async function updateNonIplIncome(token, incomeId, { file, ...payload }) 
   return portalApiPost('/incomes/update', {
     token,
     body: { income_id: incomeId, ...payload },
+  });
+}
+
+export async function approveNonIplIncome(token, { income_id, note = '' }) {
+  if (IS_DEMO) {
+    const mock = await getEventMockData();
+    return mock.approveDemoIncome(income_id, { verifiedBy: 'Staff / Pengurus', note });
+  }
+  return portalApiPost('/incomes/update', {
+    token,
+    body: {
+      income_id,
+      status: 'verified',
+      verification_note: note,
+    },
+  });
+}
+
+export async function rejectNonIplIncome(token, { income_id, reason = '' }) {
+  if (IS_DEMO) {
+    const mock = await getEventMockData();
+    return mock.rejectDemoIncome(income_id, { rejectedBy: 'Staff / Pengurus', reason });
+  }
+  return portalApiPost('/incomes/update', {
+    token,
+    body: {
+      income_id,
+      status: 'rejected',
+      rejection_reason: reason,
+    },
   });
 }
 

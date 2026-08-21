@@ -19,8 +19,14 @@ begin
 
   if not exists (select 1 from pg_type where typname = 'event_assignment_role') then
     create type public.event_assignment_role as enum (
-      'coordinator_member', 'event_treasurer'
+      'event_leader', 'event_treasurer', 'coordinator_member'
     );
+  else
+    begin
+      alter type public.event_assignment_role add value if not exists 'event_leader';
+    exception
+      when others then null;
+    end;
   end if;
 end $$;
 
@@ -28,6 +34,7 @@ alter table public.events
   add column if not exists event_code text,
   add column if not exists end_date timestamptz,
   add column if not exists status public.event_status not null default 'active',
+  add column if not exists documentation_url text,
   add column if not exists deleted_at timestamptz,
   add column if not exists deleted_by uuid references public.profiles(id) on delete set null;
 
@@ -52,6 +59,7 @@ create table if not exists public.event_members (
   event_id uuid not null references public.events(id) on delete restrict,
   profile_id uuid not null references public.profiles(id) on delete restrict,
   assignment_role public.event_assignment_role not null,
+  custom_role_title text,
   assigned_by uuid references public.profiles(id) on delete set null,
   assigned_at timestamptz not null default now(),
   revoked_at timestamptz,
@@ -59,6 +67,9 @@ create table if not exists public.event_members (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.event_members
+  add column if not exists custom_role_title text;
 
 create unique index if not exists idx_event_members_active_profile
   on public.event_members(event_id, profile_id)

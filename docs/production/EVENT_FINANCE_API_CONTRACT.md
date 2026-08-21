@@ -99,7 +99,8 @@ Existing routes to extend carefully:
   "event_date": "2026-08-17T00:00:00.000Z",
   "end_date": "2026-08-17T12:00:00.000Z",
   "location": "Club House",
-  "status": "active"
+  "status": "active",
+  "documentation_url": "https://drive.google.com/drive/folders/xyz123"
 }
 ```
 
@@ -109,9 +110,11 @@ Existing routes to extend carefully:
 {
   "event_id": "uuid",
   "profile_id": "uuid",
-  "assignment_role": "event_treasurer"
+  "assignment_role": "event_leader",
+  "custom_role_title": "Ketua Pelaksana"
 }
 ```
+*Note: `assignment_role` supports `event_leader` (Ketua Event - mandatory), `event_treasurer` (Bendahara Event - mandatory), and `coordinator_member` (Sie / Anggota Panitia - optional with custom_role_title).*
 
 `/incomes/create` and `/incomes/update`
 

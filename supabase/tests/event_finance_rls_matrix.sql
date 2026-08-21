@@ -11,6 +11,7 @@ declare
   v_admin uuid := gen_random_uuid();
   v_bendahara uuid := gen_random_uuid();
   v_treasurer_a uuid := gen_random_uuid();
+  v_leader_a uuid := gen_random_uuid();
   v_coord_a uuid := gen_random_uuid();
   v_warga uuid := gen_random_uuid();
   v_event_a uuid := gen_random_uuid();
@@ -23,18 +24,20 @@ begin
     (v_admin, 'evt-admin', 'evt-admin@example.invalid', 'Event Admin', 'admin', 'approved', true),
     (v_bendahara, 'evt-bendahara', 'evt-bendahara@example.invalid', 'Event Bendahara', 'bendahara', 'approved', true),
     (v_treasurer_a, 'evt-treasurer-a', 'evt-treasurer-a@example.invalid', 'Event Treasurer A', 'warga', 'approved', true),
+    (v_leader_a, 'evt-leader-a', 'evt-leader-a@example.invalid', 'Event Leader A', 'warga', 'approved', true),
     (v_coord_a, 'evt-coord-a', 'evt-coord-a@example.invalid', 'Event Coordinator A', 'warga', 'approved', true),
     (v_warga, 'evt-warga', 'evt-warga@example.invalid', 'Event Warga', 'warga', 'approved', true);
 
-  insert into public.events (id, title, event_code, event_date, status)
+  insert into public.events (id, title, event_code, event_date, status, documentation_url)
   values
-    (v_event_a, 'Event A', 'EVT-RLS-A', now(), 'active'),
-    (v_event_b, 'Event B', 'EVT-RLS-B', now(), 'active');
+    (v_event_a, 'Event A', 'EVT-RLS-A', now(), 'active', 'https://drive.google.com/drive/folders/example-a'),
+    (v_event_b, 'Event B', 'EVT-RLS-B', now(), 'active', null);
 
-  insert into public.event_members (event_id, profile_id, assignment_role, assigned_by)
+  insert into public.event_members (event_id, profile_id, assignment_role, custom_role_title, assigned_by)
   values
-    (v_event_a, v_treasurer_a, 'event_treasurer', v_admin),
-    (v_event_a, v_coord_a, 'coordinator_member', v_admin);
+    (v_event_a, v_treasurer_a, 'event_treasurer', 'Bendahara Utama', v_admin),
+    (v_event_a, v_leader_a, 'event_leader', 'Ketua Pelaksana', v_admin),
+    (v_event_a, v_coord_a, 'coordinator_member', 'Sie Konsumsi', v_admin);
 
   perform set_config('request.jwt.claim.sub', v_treasurer_a::text, true);
 
@@ -52,6 +55,16 @@ begin
 
   if public.can_create_event_finance(v_event_b) then
     raise exception 'event treasurer must not create finance for unassigned event';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_leader_a::text, true);
+
+  if not public.can_view_event_finance(v_event_a) then
+    raise exception 'event leader should view assigned event';
+  end if;
+
+  if public.can_create_event_finance(v_event_a) then
+    raise exception 'event leader must not create event finance (read-only)';
   end if;
 
   perform set_config('request.jwt.claim.sub', v_coord_a::text, true);

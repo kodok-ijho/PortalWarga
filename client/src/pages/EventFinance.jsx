@@ -2,7 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
-import { fetchEventDetail, fetchEventFinanceReport, fetchMyEventAccess, createNonIplIncome, createExpense } from '../services/dataService';
+import {
+  fetchEventDetail,
+  fetchEventFinanceReport,
+  fetchMyEventAccess,
+  fetchEventMembers,
+  createNonIplIncome,
+  createExpense,
+} from '../services/dataService';
 import { formatDate, formatRupiah } from '../services/dataHelpers';
 
 export default function EventFinance() {
@@ -12,6 +19,7 @@ export default function EventFinance() {
   const [event, setEvent] = useState(null);
   const [report, setReport] = useState(null);
   const [access, setAccess] = useState(null);
+  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [dateFrom, setDateFrom] = useState('');
@@ -26,14 +34,16 @@ export default function EventFinance() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [eventData, reportData, accessData] = await Promise.all([
+      const [eventData, reportData, accessData, membersData] = await Promise.all([
         fetchEventDetail(session?.access_token, eventId),
         fetchEventFinanceReport(session?.access_token, { eventId }),
         fetchMyEventAccess(session?.access_token, { role, profileId: profile?.id }),
+        fetchEventMembers(session?.access_token, eventId).catch(() => []),
       ]);
       setEvent(eventData);
       setReport(reportData);
       setAccess(accessData);
+      setMembers(Array.isArray(membersData) ? membersData.filter(m => !m.revoked_at) : []);
     } catch (error) {
       toast.error(error.message || 'Gagal mengambil laporan keuangan event.');
     } finally {
@@ -47,6 +57,9 @@ export default function EventFinance() {
   const canView = role === 'admin' || role === 'bendahara' || role === 'admin_viewer'
     || Boolean(access?.global?.can_view_all_events) || Boolean(assignment?.can_view);
   const canManageFinance = role === 'admin' || role === 'bendahara' || Boolean(access?.global?.can_manage_finance) || Boolean(assignment?.can_manage_finance);
+
+  const leader = members.find(m => m.assignment_role === 'event_leader');
+  const treasurer = members.find(m => m.assignment_role === 'event_treasurer');
 
   const submitIncome = async (e) => {
     e.preventDefault();
@@ -120,11 +133,37 @@ export default function EventFinance() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link className="text-sm text-forest-500 hover:text-forest-800" to="/events">← Kembali ke Event</Link>
-          <h1 className="mt-2 text-2xl font-bold text-forest-900">{event.title}</h1>
-          <p className="text-sm text-forest-500">{formatDate(event.event_date)}{event.location ? ` · ${event.location}` : ''}</p>
+          <Link className="text-sm text-forest-500 hover:text-forest-800" to="/events">← Kembali ke Daftar Event</Link>
+          <div className="mt-2 flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-forest-900">{event.title}</h1>
+            <span className="rounded-full bg-forest-100 px-3 py-1 text-xs font-semibold text-forest-700">{event.status}</span>
+          </div>
+          <p className="mt-1 text-sm text-forest-500">
+            📅 {formatDate(event.event_date)}{event.location ? ` · 📍 ${event.location}` : ''}
+          </p>
+
+          {/* Committee badges in detail header */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1 text-amber-800 font-medium">
+              👑 Ketua Event: {leader ? (leader.profile_name || 'Terdaftar') : 'Belum di-assign'}
+            </span>
+            <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-emerald-800 font-medium">
+              💰 Bendahara Event: {treasurer ? (treasurer.profile_name || 'Terdaftar') : 'Belum di-assign'}
+            </span>
+          </div>
         </div>
-        <span className="rounded-full bg-forest-100 px-3 py-1 text-xs font-semibold text-forest-700">{event.status}</span>
+
+        {/* Documentation Link Button */}
+        {event.documentation_url && (
+          <a
+            href={event.documentation_url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition-colors"
+          >
+            <span>📁</span> Buka Folder Dokumentasi Kegiatan
+          </a>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-xl shadow-sm border border-forest-100">
@@ -136,7 +175,7 @@ export default function EventFinance() {
         </div>
       </div>
 
-      {!canManageFinance && <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm">Mode Read-Only: Anda login sebagai Anggota Koordinator atau Viewer.</div>}
+      {!canManageFinance && <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm">Mode Read-Only: Anda login sebagai Ketua Event / Anggota Panitia / Viewer (Hanya memantau).</div>}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="pv-card p-4"><p className="text-xs text-forest-500">Total Pemasukan</p><p className="mt-1 text-xl font-bold text-emerald-700">{formatRupiah(filteredTotalIncome)}</p></div>
@@ -157,7 +196,10 @@ export default function EventFinance() {
             <input className="pv-input" placeholder="Sumber/Pembayar" value={incomeForm.source_name} onChange={e => setIncomeForm({...incomeForm, source_name: e.target.value})} required/>
             <input className="pv-input" type="number" placeholder="Nominal" value={incomeForm.amount} onChange={e => setIncomeForm({...incomeForm, amount: e.target.value})} required/>
             <select className="pv-input md:col-span-2" value={incomeForm.payment_method} onChange={e => setIncomeForm({...incomeForm, payment_method: e.target.value})}>
-              <option value="cash">Cash</option><option value="bank_transfer">Transfer Bank</option><option value="other">Lainnya</option>
+              <option value="cash">💵 Tunai / Cash</option>
+              <option value="bank_transfer">🏦 Transfer Bank</option>
+              <option value="qris">📱 QRIS</option>
+              <option value="other">Lainnya</option>
             </select>
             <textarea className="pv-input md:col-span-2" rows="2" placeholder="Deskripsi" value={incomeForm.description} onChange={e => setIncomeForm({...incomeForm, description: e.target.value})}/>
             <button type="submit" className="pv-btn-primary md:col-span-2">Simpan Pemasukan</button>
@@ -165,7 +207,7 @@ export default function EventFinance() {
         )}
 
         {incomes.length === 0 ? <p className="p-5 text-sm text-forest-500">Belum ada pemasukan event.</p> : (
-          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-forest-50 text-xs uppercase text-forest-500"><tr><th className="px-5 py-3">Tanggal</th><th className="px-5 py-3">Kategori / Sumber</th><th className="px-5 py-3">Metode</th><th className="px-5 py-3 text-right">Nominal</th></tr></thead><tbody className="divide-y divide-forest-100">{incomes.map((income) => <tr key={income.id}><td className="px-5 py-3">{formatDate(income.income_date)}</td><td className="px-5 py-3"><div className="font-semibold text-forest-900">{income.category}</div><div className="text-xs text-forest-500">{income.source_name}</div></td><td className="px-5 py-3 text-xs text-forest-500">{income.payment_method || '-'}</td><td className="px-5 py-3 text-right font-semibold text-emerald-700">{formatRupiah(income.amount)}</td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-forest-50 text-xs uppercase text-forest-500"><tr><th className="px-5 py-3">Tanggal</th><th className="px-5 py-3">Kategori / Sumber</th><th className="px-5 py-3">Metode</th><th className="px-5 py-3 text-right">Nominal</th></tr></thead><tbody className="divide-y divide-forest-100">{incomes.map((income) => <tr key={income.id}><td className="px-5 py-3">{formatDate(income.income_date)}</td><td className="px-5 py-3"><div className="font-semibold text-forest-900">{income.category}</div><div className="text-xs text-forest-500">{income.source_name}</div></td><td className="px-5 py-3 text-xs font-medium text-forest-700">{income.payment_method === 'bank_transfer' ? '🏦 Transfer Bank' : income.payment_method === 'qris' ? '📱 QRIS' : income.payment_method === 'cash' ? '💵 Tunai' : (income.payment_method || '-')}</td><td className="px-5 py-3 text-right font-semibold text-emerald-700">{formatRupiah(income.amount)}</td></tr>)}</tbody></table></div>
         )}
       </div>
 

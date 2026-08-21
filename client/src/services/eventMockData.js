@@ -12,6 +12,7 @@ const events = [
     end_date: '2026-08-09T12:00:00+07:00',
     location: 'Lapangan Palm Village',
     status: 'active',
+    documentation_url: 'https://drive.google.com/drive/folders/demo-kerja-bakti',
     deleted_at: null,
   },
   {
@@ -23,6 +24,7 @@ const events = [
     end_date: null,
     location: 'Balai Warga',
     status: 'draft',
+    documentation_url: '',
     deleted_at: null,
   },
 ];
@@ -34,6 +36,7 @@ const members = [
     profile_id: 'demo-admin',
     profile_name: 'Pak Hendra (Admin)',
     assignment_role: 'event_treasurer',
+    custom_role_title: 'Bendahara Event',
     revoked_at: null,
   },
   {
@@ -41,12 +44,86 @@ const members = [
     event_id: 'demo-event-a',
     profile_id: 'demo-pengurus',
     profile_name: 'Ibu Ratna (Koordinator Palm Village)',
+    assignment_role: 'event_leader',
+    custom_role_title: 'Ketua Pelaksana',
+    revoked_at: null,
+  },
+  {
+    id: 'demo-member-a3',
+    event_id: 'demo-event-a',
+    profile_id: 'demo-warga',
+    profile_name: 'Pak Budi (Warga)',
     assignment_role: 'coordinator_member',
+    custom_role_title: 'Sie Konsumsi & Kebersihan',
     revoked_at: null,
   },
 ];
 
-const incomes = [];
+const incomes = [
+  {
+    id: 'demo-income-1',
+    income_date: '2026-08-10',
+    scope: 'general',
+    event_id: null,
+    category: 'Donasi Kebersihan',
+    source_name: 'Pak Hendra (Warga Blok A-01)',
+    amount: 150000,
+    payment_method: 'bank_transfer',
+    reference_number: 'TRX-DON-881',
+    description: 'Donasi sukarela pengadaan tempat sampah taman.',
+    receipt_file_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=800',
+    receipt_file_name: 'bukti_transfer_donasi_taman.jpg',
+    status: 'verified',
+    verified_by: 'demo-admin',
+    verified_at: '2026-08-10T10:30:00.000Z',
+    rejection_reason: null,
+    created_at: '2026-08-10T09:00:00.000Z',
+    updated_at: '2026-08-10T10:30:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'demo-income-2',
+    income_date: '2026-08-12',
+    scope: 'event',
+    event_id: 'demo-event-a',
+    category: 'Pendaftaran Lomba',
+    source_name: 'Ibu Ratna (Warga Blok B-03)',
+    amount: 50000,
+    payment_method: 'bank_transfer',
+    reference_number: 'TRX-LOMBA-17A',
+    description: 'Pendaftaran lomba mewarnai anak HUT RI.',
+    receipt_file_url: 'https://images.unsplash.com/photo-1554224154-26032ffc0d07?auto=format&fit=crop&q=80&w=800',
+    receipt_file_name: 'bukti_transfer_lomba_anak.png',
+    status: 'pending_verification',
+    verified_by: null,
+    verified_at: null,
+    rejection_reason: null,
+    created_at: '2026-08-12T14:20:00.000Z',
+    updated_at: '2026-08-12T14:20:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'demo-income-3',
+    income_date: '2026-08-14',
+    scope: 'event',
+    event_id: 'demo-event-a',
+    category: 'Iuran Kegiatan',
+    source_name: 'Pak Budi Santoso',
+    amount: 100000,
+    payment_method: 'qris',
+    reference_number: 'NMD-982104921',
+    description: 'Partisipasi konsumsi kerja bakti.',
+    receipt_file_url: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&q=80&w=800',
+    receipt_file_name: 'qris_receipt_kerja_bakti.jpg',
+    status: 'pending_verification',
+    verified_by: null,
+    verified_at: null,
+    rejection_reason: null,
+    created_at: '2026-08-14T11:00:00.000Z',
+    updated_at: '2026-08-14T11:00:00.000Z',
+    deleted_at: null,
+  },
+];
 const expenses = [];
 
 function activeEvent(event) {
@@ -93,31 +170,67 @@ export function getDemoAccess({ role, profileId } = {}) {
   };
 }
 
-export function listDemoIncomes({ eventId, scope } = {}) {
+export function listDemoIncomes({ eventId, scope, status } = {}) {
   return incomes
     .filter((income) => !income.deleted_at)
     .filter((income) => !scope || income.scope === scope)
     .filter((income) => !eventId || income.event_id === eventId)
+    .filter((income) => !status || income.status === status)
     .map((income) => ({ ...income }));
 }
 
 export function createDemoIncome(payload) {
+  const isWarga = payload.is_warga === true || payload.role === 'warga';
+  const defaultStatus = isWarga ? 'pending_verification' : (payload.status || 'verified');
   const income = {
     id: `demo-income-${Date.now()}`,
     ...payload,
     amount: Number(payload.amount),
+    status: defaultStatus,
+    verified_by: defaultStatus === 'verified' ? (payload.recorded_by || 'demo-admin') : null,
+    verified_at: defaultStatus === 'verified' ? new Date().toISOString() : null,
+    rejection_reason: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     deleted_at: null,
   };
-  incomes.push(income);
+  incomes.unshift(income);
   return { ...income };
 }
 
 export function updateDemoIncome(id, payload) {
   const index = incomes.findIndex((income) => income.id === id && !income.deleted_at);
   if (index < 0) return null;
-  incomes[index] = { ...incomes[index], ...payload, amount: Number(payload.amount), updated_at: new Date().toISOString() };
+  incomes[index] = { ...incomes[index], ...payload, amount: Number(payload.amount !== undefined ? payload.amount : incomes[index].amount), updated_at: new Date().toISOString() };
+  return { ...incomes[index] };
+}
+
+export function approveDemoIncome(id, { verifiedBy = 'Demo Admin', note = '' } = {}) {
+  const index = incomes.findIndex((income) => income.id === id && !income.deleted_at);
+  if (index < 0) return null;
+  incomes[index] = {
+    ...incomes[index],
+    status: 'verified',
+    verified_by: verifiedBy,
+    verified_at: new Date().toISOString(),
+    rejection_reason: null,
+    verification_note: note,
+    updated_at: new Date().toISOString(),
+  };
+  return { ...incomes[index] };
+}
+
+export function rejectDemoIncome(id, { rejectedBy = 'Demo Admin', reason = '' } = {}) {
+  const index = incomes.findIndex((income) => income.id === id && !income.deleted_at);
+  if (index < 0) return null;
+  incomes[index] = {
+    ...incomes[index],
+    status: 'rejected',
+    verified_by: rejectedBy,
+    verified_at: new Date().toISOString(),
+    rejection_reason: reason,
+    updated_at: new Date().toISOString(),
+  };
   return { ...incomes[index] };
 }
 
