@@ -3,6 +3,31 @@ import { createPortal } from 'react-dom';
 import { useTour } from '../context/TourContext';
 import { AiOutlineClose, AiOutlineArrowRight, AiOutlineArrowLeft } from 'react-icons/ai';
 
+/**
+ * Helper to find the first actually visible element matching selectors.
+ */
+function findVisibleElement(targetSelector, fallbackSelector) {
+  const trySelector = (sel) => {
+    if (!sel) return null;
+    try {
+      const elements = document.querySelectorAll(sel);
+      for (const el of elements) {
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        // Element is visible if it has non-zero dimensions and is not hidden
+        if (rect.width > 10 && rect.height > 10 && el.offsetParent !== null) {
+          return { el, rect };
+        }
+      }
+    } catch (e) {
+      console.warn('Tour selector error:', e);
+    }
+    return null;
+  };
+
+  return trySelector(targetSelector) || trySelector(fallbackSelector) || null;
+}
+
 export default function WalkthroughTour() {
   const {
     isOpen,
@@ -15,75 +40,152 @@ export default function WalkthroughTour() {
   } = useTour();
 
   const [rect, setRect] = useState(null);
-  const [cardPos, setCardPos] = useState({ top: 0, left: 0, placement: 'bottom' });
+  const [cardStyle, setCardStyle] = useState({});
+  const [isMobileView, setIsMobileView] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const cardRef = useRef(null);
 
+  // Update spotlight rect and card position based on current DOM state
   const updatePosition = useCallback(() => {
     if (!isOpen || !currentStep) return;
 
-    const targetEl =
-      document.querySelector(currentStep.targetSelector) ||
-      (currentStep.fallbackSelector ? document.querySelector(currentStep.fallbackSelector) : null);
+    const isMobile = window.innerWidth < 768;
+    setIsMobileView(isMobile);
 
-    if (!targetEl) {
+    const found = findVisibleElement(currentStep.targetSelector, currentStep.fallbackSelector);
+
+    if (!found) {
       setRect(null);
+      // Even if no specific target is found, show the card safely on screen
+      if (isMobile) {
+        setCardStyle({
+          position: 'fixed',
+          bottom: '16px',
+          left: '12px',
+          right: '12px',
+          width: 'auto',
+          maxWidth: '100%',
+        });
+      } else {
+        setCardStyle({
+          position: 'fixed',
+          top: '90px',
+          right: '24px',
+          width: '360px',
+        });
+      }
       return;
     }
 
-    const b = targetEl.getBoundingClientRect();
-    const padding = 8;
+    const b = found.el.getBoundingClientRect();
+    const padding = isMobile ? 6 : 8;
+
+    // Spotlight clamped within viewport
+    const clampedTop = Math.max(6, b.top - padding);
+    const clampedLeft = Math.max(6, b.left - padding);
+    const clampedRight = Math.min(window.innerWidth - 6, b.right + padding);
+    const clampedBottom = Math.min(window.innerHeight - 6, b.bottom + padding);
+
     const targetRect = {
-      top: Math.max(0, b.top - padding),
-      left: Math.max(0, b.left - padding),
-      width: b.width + padding * 2,
-      height: b.height + padding * 2,
-      bottom: b.bottom + padding,
-      right: b.right + padding,
+      top: clampedTop,
+      left: clampedLeft,
+      width: Math.max(20, clampedRight - clampedLeft),
+      height: Math.max(20, clampedBottom - clampedTop),
+      bottom: clampedBottom,
+      right: clampedRight,
     };
 
     setRect(targetRect);
 
     // Hitung posisi Tooltip Card
-    const cardWidth = Math.min(360, window.innerWidth - 32);
-    const cardHeight = 200; // estimasi tinggi card
-    const margin = 14;
+    if (isMobile) {
+      // Pada Mobile / PWA:
+      // Jika elemen target berada di bagian bawah layar (center > 55% height),
+      // posisikan kartu di ATAS agar tidak menutupi elemen.
+      // Jika elemen target berada di atas layar, posisikan kartu di BAWAH.
+      const targetCenterY = (b.top + b.bottom) / 2;
+      const isTargetInLowerHalf = targetCenterY > window.innerHeight * 0.52;
 
-    let placement = currentStep.placement || 'bottom';
-    let top = 0;
-    let left = targetRect.left + targetRect.width / 2 - cardWidth / 2;
-
-    // Boundary check horizontal
-    if (left < 16) left = 16;
-    if (left + cardWidth > window.innerWidth - 16) {
-      left = window.innerWidth - 16 - cardWidth;
-    }
-
-    // Boundary check vertical
-    const spaceBelow = window.innerHeight - targetRect.bottom;
-    const spaceAbove = targetRect.top;
-
-    if (placement === 'bottom' && spaceBelow < cardHeight + margin && spaceAbove > spaceBelow) {
-      placement = 'top';
-    } else if (placement === 'top' && spaceAbove < cardHeight + margin && spaceBelow > spaceAbove) {
-      placement = 'bottom';
-    }
-
-    if (placement === 'bottom') {
-      top = targetRect.bottom + margin;
+      if (isTargetInLowerHalf) {
+        setCardStyle({
+          position: 'fixed',
+          top: '16px',
+          left: '12px',
+          right: '12px',
+          width: 'auto',
+        });
+      } else {
+        setCardStyle({
+          position: 'fixed',
+          bottom: '16px',
+          left: '12px',
+          right: '12px',
+          width: 'auto',
+        });
+      }
     } else {
-      top = Math.max(16, targetRect.top - cardHeight - margin);
-    }
+      // Pada Desktop (>= 768px):
+      // Tooltip Card mengambang (floating) di atas / bawah elemen dengan boundary checks
+      const cardWidth = 360;
+      const cardHeight = 210;
+      const margin = 14;
 
-    setCardPos({ top, left, placement });
+      let left = targetRect.left + targetRect.width / 2 - cardWidth / 2;
+      if (left < 16) left = 16;
+      if (left + cardWidth > window.innerWidth - 16) {
+        left = window.innerWidth - 16 - cardWidth;
+      }
 
-    // Smooth scroll into view jika elemen berada di luar viewport
-    if (b.top < 80 || b.bottom > window.innerHeight - 80) {
-      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const spaceBelow = window.innerHeight - targetRect.bottom;
+      const spaceAbove = targetRect.top;
+
+      let top = 0;
+      if (spaceBelow >= cardHeight + margin || spaceBelow >= spaceAbove) {
+        top = Math.min(window.innerHeight - cardHeight - 16, targetRect.bottom + margin);
+      } else {
+        top = Math.max(16, targetRect.top - cardHeight - margin);
+      }
+
+      setCardStyle({
+        position: 'fixed',
+        top: `${top}px`,
+        left: `${left}px`,
+        width: `${cardWidth}px`,
+      });
     }
   }, [isOpen, currentStep]);
 
-  // Pantau perubahan step, resize window, dan scroll
+  // One-time smooth scroll saat step berganti
+  useEffect(() => {
+    if (!isOpen || !currentStep) return;
+
+    let isMounted = true;
+    const isMobile = window.innerWidth < 768;
+
+    const performInitialScroll = () => {
+      if (!isMounted) return;
+      const found = findVisibleElement(currentStep.targetSelector, currentStep.fallbackSelector);
+      if (found) {
+        const b = found.el.getBoundingClientRect();
+        const absoluteTop = window.scrollY + b.top;
+        const offset = isMobile ? 80 : 120;
+        window.scrollTo({
+          top: Math.max(0, absoluteTop - offset),
+          behavior: 'smooth',
+        });
+      }
+    };
+
+    // Lakukan scroll sekali dengan delay sedikit untuk memastikan rendering komponen
+    const scrollTimer = setTimeout(performInitialScroll, 120);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(scrollTimer);
+    };
+  }, [isOpen, currentStepIndex, currentStep]);
+
+  // Listeners untuk update koordinat saat scroll / resize (TANPA re-trigger scrollIntoView)
   useEffect(() => {
     if (!isOpen) {
       setIsVisible(false);
@@ -92,26 +194,28 @@ export default function WalkthroughTour() {
     }
 
     setIsVisible(true);
-
-    // Initial update dan coba retry beberapa kali untuk render async
     updatePosition();
-    const t1 = setTimeout(updatePosition, 150);
-    const t2 = setTimeout(updatePosition, 450);
-    const t3 = setTimeout(updatePosition, 850);
 
-    const handleResizeOrScroll = () => {
+    // Retries untuk transisi halaman yang async
+    const t1 = setTimeout(updatePosition, 100);
+    const t2 = setTimeout(updatePosition, 300);
+    const t3 = setTimeout(updatePosition, 600);
+    const t4 = setTimeout(updatePosition, 1000);
+
+    const handleUpdate = () => {
       requestAnimationFrame(updatePosition);
     };
 
-    window.addEventListener('resize', handleResizeOrScroll, { passive: true });
-    window.addEventListener('scroll', handleResizeOrScroll, { passive: true });
+    window.addEventListener('resize', handleUpdate, { passive: true });
+    window.addEventListener('scroll', handleUpdate, { passive: true });
 
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
-      window.removeEventListener('resize', handleResizeOrScroll);
-      window.removeEventListener('scroll', handleResizeOrScroll);
+      clearTimeout(t4);
+      window.removeEventListener('resize', handleUpdate);
+      window.removeEventListener('scroll', handleUpdate);
     };
   }, [isOpen, currentStepIndex, updatePosition]);
 
@@ -125,7 +229,7 @@ export default function WalkthroughTour() {
       {/* ── Spotlight Cutout & Dark Scrim ── */}
       {rect ? (
         <div
-          className="fixed transition-all duration-300 ease-out rounded-xl border-2 border-gold-400/90 pointer-events-none"
+          className="fixed transition-all duration-300 ease-out rounded-2xl border-2 border-gold-400 pointer-events-none"
           style={{
             top: rect.top,
             left: rect.left,
@@ -141,22 +245,19 @@ export default function WalkthroughTour() {
           </span>
         </div>
       ) : (
-        /* Fallback dark overlay full screen saat elemen sedang dicari */
-        <div className="fixed inset-0 bg-[#081a11]/80 backdrop-blur-xs transition-opacity duration-300" />
+        /* Fallback dark overlay full screen saat elemen sedang dimuat */
+        <div className="fixed inset-0 bg-[#081a11]/85 backdrop-blur-xs transition-opacity duration-300" />
       )}
 
-      {/* ── Floating Tooltip Popover Card ── */}
+      {/* ── Responsive Tooltip Popover Card ── */}
       <div
         ref={cardRef}
-        className="fixed z-[1000000] w-[360px] max-w-[calc(100vw-32px)] rounded-2xl bg-[#1e293b] border border-slate-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.6)] text-white p-5 transition-all duration-300 ease-out"
-        style={{
-          top: cardPos.top,
-          left: cardPos.left,
-        }}
+        style={cardStyle}
+        className="z-[1000000] rounded-2xl bg-[#0f172a]/95 backdrop-blur-md border border-slate-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.7)] text-white p-4 sm:p-5 transition-all duration-300 ease-out"
       >
         {/* Header Card */}
-        <div className="flex items-center justify-between gap-3 mb-2.5">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/30 px-3 py-0.5 text-[11px] font-bold text-emerald-400">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 px-3 py-0.5 text-[11px] font-bold text-emerald-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             Langkah {currentStepIndex + 1} dari {totalSteps}
           </span>
@@ -166,26 +267,26 @@ export default function WalkthroughTour() {
             className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
             title="Tutup Panduan"
           >
-            <AiOutlineClose className="text-sm" />
+            <AiOutlineClose className="text-base" />
           </button>
         </div>
 
         {/* Content */}
         <div className="space-y-1.5">
-          <h4 className="text-base font-bold text-white tracking-tight leading-snug">
+          <h4 className="text-sm sm:text-base font-bold text-white tracking-tight leading-snug">
             {currentStep.title}
           </h4>
-          <p className="text-xs text-slate-300 leading-relaxed">
+          <p className="text-xs sm:text-[13px] text-slate-300 leading-relaxed">
             {currentStep.description}
           </p>
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between gap-2 pt-4 mt-3 border-t border-slate-700/70">
+        <div className="flex items-center justify-between gap-2 pt-3.5 mt-2.5 border-t border-slate-700/70">
           <button
             type="button"
             onClick={skipTour}
-            className="text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors underline-offset-4 hover:underline"
+            className="text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors underline-offset-4 hover:underline py-1.5"
           >
             Lewati Panduan
           </button>
@@ -195,7 +296,7 @@ export default function WalkthroughTour() {
               <button
                 type="button"
                 onClick={prevStep}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-600/60 transition-all shadow-sm"
+                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-600/60 transition-all shadow-sm active:scale-95"
               >
                 <AiOutlineArrowLeft className="text-xs" /> Kembali
               </button>
@@ -204,7 +305,7 @@ export default function WalkthroughTour() {
             <button
               type="button"
               onClick={nextStep}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-900/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-900/40 transition-all hover:scale-[1.02] active:scale-95"
             >
               <span>{isLastStep ? 'Selesai & Mulai 🚀' : 'Lanjut'}</span>
               {!isLastStep && <AiOutlineArrowRight className="text-xs" />}

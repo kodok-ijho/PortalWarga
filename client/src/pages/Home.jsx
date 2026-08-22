@@ -123,7 +123,7 @@ export default function Home() {
               Portal layanan informasi dan transaksi untuk warga kompleks Perumahan Palm Village.
             </p>
             {profile?.full_name && (
-              <p className="mt-4 inline-flex items-center gap-2 bg-forest-900/40 backdrop-blur rounded-full px-4 py-1.5 text-sm text-gold-300 border border-gold-500/20">
+              <p data-tour="profile-badge" className="mt-4 inline-flex items-center gap-2 bg-forest-900/40 backdrop-blur rounded-full px-4 py-1.5 text-sm text-gold-300 border border-gold-500/20">
                 🌴 Halo, {profile.full_name}
                 {role && (
                   <span className={`pv-badge ml-1 ${roleColor(role)}`}>
@@ -238,6 +238,7 @@ export default function Home() {
           <Link
             key={to}
             to={to}
+            data-tour={to === '/payment-matrix' ? 'feature-payment-matrix' : to === '/houses' ? 'feature-houses' : to === '/residents' ? 'feature-residents' : undefined}
             className="pv-card p-5 group hover:border-gold-400/50 hover:shadow-elevated transition-all duration-200 relative"
           >
             <div className="flex items-center justify-between">
