@@ -691,8 +691,8 @@ export default function PaymentMatrix() {
         </div>
       </div>
 
-      {/* Legenda */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-forest-600">
+      {/* Legenda & Panduan */}
+      <div data-tour="matrix-pay-guide" className="flex flex-wrap items-center gap-4 text-xs text-forest-600 bg-white/70 p-3 rounded-xl border border-forest-100/80">
         <span className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded bg-emerald-100 border border-emerald-300"></span> Lunas (nominal + tgl)
         </span>
@@ -714,7 +714,7 @@ export default function PaymentMatrix() {
       </div>
 
       {/* Matriks */}
-      <div className="pv-card relative z-0 overflow-hidden">
+      <div data-tour="matrix-grid" className="pv-card relative z-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs table-fixed min-w-[960px] border-collapse">
             <thead>
@@ -1166,6 +1166,8 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
   const MAX_SIZE = 2 * 1024 * 1024;
   const ACCEPTED = ['image/jpeg', 'image/jpg', 'image/png'];
   const isMulti = bills.length > 1;
+  const qrisFee = Math.ceil(total * 0.007);
+  const totalWithQrisFee = total + qrisFee;
 
   const handleFile = async (e) => {
     setUploadError('');
@@ -1216,8 +1218,8 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
     <Modal open onClose={onClose} title="Konfirmasi Pembayaran IPL" size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Ringkasan tagihan */}
-        <div className="rounded-lg bg-forest-50 p-3 text-sm">
-          <p className="text-forest-600">
+        <div className="rounded-lg bg-forest-50 p-3 text-sm border border-forest-100 space-y-1">
+          <p className="text-forest-600 text-xs">
             {isMulti ? `${bills.length} tagihan IPL:` : 'Tagihan IPL:'}
           </p>
           <div className="mt-1 space-y-1 max-h-28 overflow-y-auto">
@@ -1228,9 +1230,27 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
               </div>
             ))}
           </div>
-          <div className="mt-2 pt-2 border-t border-forest-200 flex justify-between">
-            <span className="text-sm font-medium text-forest-700">Total</span>
-            <span className="text-lg font-bold text-forest-900">{formatRupiah(total)}</span>
+
+          {method === 'qris' && (
+            <div className="pt-2 border-t border-forest-200 space-y-1 text-xs">
+              <div className="flex justify-between text-forest-600">
+                <span>Subtotal IPL:</span>
+                <span>{formatRupiah(total)}</span>
+              </div>
+              <div className="flex justify-between text-amber-800 font-medium">
+                <span>Biaya Layanan QRIS (0,7%):</span>
+                <span>+ {formatRupiah(qrisFee)}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-2 pt-2 border-t border-forest-200 flex justify-between items-center">
+            <span className="text-sm font-semibold text-forest-800">
+              {method === 'qris' ? 'Total Pembayaran QRIS' : 'Total Tagihan'}
+            </span>
+            <span className="text-lg font-bold text-forest-900">
+              {formatRupiah(method === 'qris' ? totalWithQrisFee : total)}
+            </span>
           </div>
         </div>
 
@@ -1248,7 +1268,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
                     : 'bg-white text-forest-600 border-forest-200 hover:bg-forest-50'
                 }`}
               >
-                💳 QRIS
+                💳 QRIS (+0,7%)
               </button>
             )}
             <button
@@ -1298,8 +1318,13 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
         )}
 
         {method === 'qris' && (
-          <div className="rounded-lg border border-gold-200 bg-gold-50 p-3 text-xs text-gold-800">
-            QRIS akan dibuka otomatis. Setelah pembayaran terkonfirmasi, status tagihan diperbarui otomatis dan kuitansi dikirim ke email.
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+            <p className="font-semibold text-amber-950 flex items-center gap-1.5">
+              <span>ℹ️</span> Biaya Layanan Administrasi QRIS (0,7%)
+            </p>
+            <p className="text-[11px] leading-relaxed text-amber-800">
+              Sesuai ketentuan Bank Indonesia (MDR QRIS), transaksi QRIS dikenakan biaya layanan administrasi <strong>0,7% ({formatRupiah(qrisFee)})</strong> yang dibebankan kepada warga / pembayar.
+            </p>
           </div>
         )}
 
@@ -1353,6 +1378,8 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
     (sum, bill) => sum + Number(bill.amount || 0) + Number(bill.late_fee || 0),
     0
   );
+  const qrisFee = Math.ceil(total * 0.007);
+  const totalWithQrisFee = total + qrisFee;
   const unitLabel = unit ? `${unit.block} no ${unit.unit_number}` : '';
   const isMulti = bills.length > 1;
   const needsReceipt = method !== 'qris';
@@ -1429,11 +1456,11 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
   return (
     <Modal open onClose={onClose} title="Catat Pembayaran Bendahara" size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="rounded-lg bg-forest-50 p-3 text-sm">
+        <div className="rounded-lg bg-forest-50 p-3 text-sm border border-forest-100 space-y-1">
           {unitLabel && (
             <p className="text-[11px] text-forest-500 mb-0.5">{unitLabel}</p>
           )}
-          <p className="text-forest-600">
+          <p className="text-forest-600 text-xs">
             {isMulti ? `${bills.length} tagihan IPL:` : 'Tagihan IPL:'}
           </p>
           {/* Daftar periode terpilih (lintas tahun) */}
@@ -1447,21 +1474,50 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
               </div>
             ))}
           </div>
-          <div className="mt-2 pt-2 border-t border-forest-200 flex justify-between">
-            <span className="text-sm font-medium text-forest-700">Total</span>
-            <span className="text-lg font-bold text-forest-900">{formatRupiah(total)}</span>
+
+          {method === 'qris' && (
+            <div className="pt-2 border-t border-forest-200 space-y-1 text-xs">
+              <div className="flex justify-between text-forest-600">
+                <span>Subtotal IPL:</span>
+                <span>{formatRupiah(total)}</span>
+              </div>
+              <div className="flex justify-between text-amber-800 font-medium">
+                <span>Biaya Layanan QRIS (0,7%):</span>
+                <span>+ {formatRupiah(qrisFee)}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-2 pt-2 border-t border-forest-200 flex justify-between items-center">
+            <span className="text-sm font-semibold text-forest-800">
+              {method === 'qris' ? 'Total Pembayaran QRIS' : 'Total Tagihan'}
+            </span>
+            <span className="text-lg font-bold text-forest-900">
+              {formatRupiah(method === 'qris' ? totalWithQrisFee : total)}
+            </span>
           </div>
         </div>
 
-        {/* Metode: Tunai / Transfer */}
+        {/* Metode: Tunai / Transfer / QRIS */}
         <div>
           <label className="block text-sm font-medium text-forest-700 mb-1">Metode Pembayaran</label>
           <div className={`grid ${methodCount >= 3 ? 'grid-cols-3' : methodCount === 2 ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
             {canRecordCash && methodBtn('cash', '💵 Tunai')}
             {canRecordTransfer && methodBtn('bank_transfer', '🏦 Transfer')}
-            {canUseQris && methodBtn('qris', 'QRIS')}
+            {canUseQris && methodBtn('qris', '💳 QRIS (+0,7%)')}
           </div>
         </div>
+
+        {method === 'qris' && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+            <p className="font-semibold text-amber-950 flex items-center gap-1.5">
+              <span>ℹ️</span> Biaya Layanan Administrasi QRIS (0,7%)
+            </p>
+            <p className="text-[11px] leading-relaxed text-amber-800">
+              Sesuai ketentuan Bank Indonesia (MDR QRIS), transaksi QRIS dikenakan biaya layanan administrasi <strong>0,7% ({formatRupiah(qrisFee)})</strong> yang dibebankan kepada warga / pembayar.
+            </p>
+          </div>
+        )}
 
         {method !== 'qris' && (
           <div>

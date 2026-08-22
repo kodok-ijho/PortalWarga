@@ -18,9 +18,11 @@ import {
   AiOutlineClose,
   AiOutlineEdit,
   AiOutlineCalendar,
+  AiOutlineBulb,
 } from 'react-icons/ai';
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { useTour } from '../context/TourContext';
 import {
   isStaffRole,
   isBendaharaOrAbove,
@@ -39,6 +41,7 @@ const APP_VERSION = `v${pkg.version || '1.4.2'}`;
 
 export default function Header() {
   const { isAuthenticated, profile, role, isReadOnly, signOut, updateProfile, session } = useAuth();
+  const { startTour } = useTour();
   const canWrite = canModifyData(role) && !isReadOnly;
   const location = useLocation();
   const toast = useToast();
@@ -295,6 +298,7 @@ export default function Header() {
                 <div key={group.key} className="relative h-full flex items-center">
                   <button
                     type="button"
+                    data-tour={group.key === 'keuangan' ? 'nav-payment-matrix' : undefined}
                     onClick={() => handleDropdownToggle(group.key)}
                     className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all outline-none ${
                       isGroupActive || isOpen
@@ -330,6 +334,7 @@ export default function Header() {
                             <NavLink
                               key={item.to}
                               to={item.to}
+                              data-tour={item.to === '/payment-matrix' ? 'nav-payment-matrix' : undefined}
                               className={`flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-forest-800 ${
                                 isItemActive
                                   ? 'bg-forest-800 text-gold-400 border-l-2 border-gold-500'
@@ -368,6 +373,17 @@ export default function Header() {
         <div className="hidden md:flex items-center gap-3">
           {isAuthenticated ? (
             <>
+              {/* Tombol Panduan Aplikasi */}
+              <button
+                type="button"
+                onClick={() => startTour()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold-500/10 hover:bg-gold-500/20 text-gold-300 text-xs font-bold border border-gold-500/30 transition-all hover:scale-105"
+                title="Panduan Interaktif Portal Warga"
+              >
+                <AiOutlineBulb className="text-base text-gold-400" />
+                <span className="hidden lg:inline">Panduan</span>
+              </button>
+
               {/* Shortcut 17 Agustus */}
               <a
                 href="https://drive.google.com/drive/folders/1-CIioJe6MkyBUeepB9I9yBSjsiR1h5HY"
@@ -384,19 +400,27 @@ export default function Header() {
 
               {profile?.full_name && (
                 <button
+                  type="button"
+                  data-tour="user-profile-button"
                   onClick={openProfileModal}
                   disabled={!canWrite}
-                  className="text-right flex items-center gap-2 hover:bg-forest-700/40 p-1.5 rounded-lg transition-colors group text-left"
+                  className="text-right flex items-center gap-2 hover:bg-forest-700/40 p-1.5 rounded-lg transition-colors group text-left border border-transparent hover:border-gold-500/30"
                   title={canWrite ? 'Klik untuk Edit Profil / No. HP' : 'Akun read-only'}
                 >
-                  <div>
-                    <p className="text-xs font-semibold text-white leading-tight group-hover:text-gold-400 transition-colors">{profile.full_name}</p>
-                    <p className="text-[10px] text-gold-400 font-medium uppercase tracking-wider">{roleLabel(role)}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-forest-700 border border-gold-400/50 flex items-center justify-center text-xs font-bold text-gold-300">
+                      {profile.full_name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-white leading-tight group-hover:text-gold-400 transition-colors">{profile.full_name}</p>
+                      <p className="text-[10px] text-gold-400 font-medium uppercase tracking-wider">{roleLabel(role)}</p>
+                    </div>
                   </div>
-                  <AiOutlineEdit className="text-forest-300 group-hover:text-gold-400 transition-colors text-sm" />
+                  <AiOutlineEdit className="text-forest-300 group-hover:text-gold-400 transition-colors text-sm ml-1" />
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => signOut()}
                 className="inline-flex items-center justify-center p-2 rounded-lg text-forest-300 hover:text-white hover:bg-forest-700/40 transition-colors"
                 title="Keluar"
@@ -411,6 +435,15 @@ export default function Header() {
         {isAuthenticated && (
           <div className="flex md:hidden items-center gap-2">
             <button
+              type="button"
+              onClick={() => startTour()}
+              className="p-2 rounded-lg text-gold-400 hover:bg-forest-750 transition-colors"
+              title="Panduan Aplikasi"
+            >
+              <AiOutlineBulb className="text-xl" />
+            </button>
+            <button
+              type="button"
               onClick={() => setMobileMenuOpen(true)}
               className="p-2 rounded-lg text-forest-200 hover:text-white hover:bg-forest-750 transition-colors relative"
             >
@@ -446,13 +479,22 @@ export default function Header() {
 
             {/* Profil Mobile + Tombol Edit */}
             {profile && (
-              <div className="p-4 bg-[#082315] border-b border-forest-800 shrink-0 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-bold text-white">{profile.full_name}</p>
-                  <p className="text-xs text-gold-400 mt-0.5">{roleLabel(role)}</p>
-                  {profile.phone && <p className="text-[11px] text-forest-300 mt-0.5">📞 {profile.phone}</p>}
+              <div
+                data-tour="user-profile-button"
+                className="p-4 bg-[#082315] border-b border-forest-800 shrink-0 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-forest-800 border border-gold-400/50 flex items-center justify-center text-sm font-bold text-gold-300">
+                    {profile.full_name?.charAt(0).toUpperCase() || 'W'}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white">{profile.full_name}</p>
+                    <p className="text-xs text-gold-400 mt-0.5">{roleLabel(role)}</p>
+                    {profile.phone && <p className="text-[11px] text-forest-300 mt-0.5">📞 {profile.phone}</p>}
+                  </div>
                 </div>
                 <button
+                  type="button"
                   onClick={openProfileModal}
                   disabled={!canWrite}
                   className="flex items-center gap-1.5 bg-forest-800 hover:bg-forest-700 text-gold-400 px-3 py-1.5 rounded-xl text-xs font-semibold border border-forest-700 transition-colors shadow disabled:opacity-50"
@@ -461,6 +503,20 @@ export default function Header() {
                 </button>
               </div>
             )}
+
+            {/* Tombol Panduan Aplikasi Mobile */}
+            <div className="px-3 pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  startTour();
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-xl bg-gold-500/10 text-gold-300 border border-gold-500/30 hover:bg-gold-500/20 transition-all shadow-xs"
+              >
+                <AiOutlineBulb className="text-base text-gold-400" /> Mulai Panduan Aplikasi (Tour)
+              </button>
+            </div>
 
             {/* Shortcut 17 Agustus Mobile */}
             <div className="p-3 mx-3 mt-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 border border-red-400/50 shadow-sm flex items-center justify-between gap-2">
@@ -559,21 +615,43 @@ export default function Header() {
           document.body
         )}
 
-      {/* Modal Edit Profil & No. Telp via createPortal */}
+      {/* Modal Edit Detail Profil Warga via createPortal */}
       {profileModalOpen &&
         createPortal(
-          <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-forest-900 border border-forest-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl text-white">
+          <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-[#0b2819] border border-forest-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl text-white">
               <div className="flex items-center justify-between border-b border-forest-800 pb-3 mb-4">
-                <h3 className="text-lg font-bold text-gold-400 flex items-center gap-2">
-                  <AiOutlineEdit /> Ubah Profil Saya
-                </h3>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-forest-800 border border-gold-400/50 flex items-center justify-center text-sm font-bold text-gold-300">
+                    {profile?.full_name?.charAt(0).toUpperCase() || 'W'}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-gold-400">Profil User Warga</h3>
+                    <p className="text-[11px] text-forest-300">Detail akun & data kontak terdaftar</p>
+                  </div>
+                </div>
                 <button
                   onClick={() => setProfileModalOpen(false)}
                   className="text-forest-400 hover:text-white p-1 rounded-lg hover:bg-forest-800 transition-colors"
                 >
                   <AiOutlineClose className="text-lg" />
                 </button>
+              </div>
+
+              {/* Status & Identitas Rumah Terdaftar */}
+              <div className="mb-4 p-3 rounded-xl bg-forest-900/80 border border-forest-700/60 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-[10px] font-semibold text-forest-400 uppercase tracking-wider block">Role Akun</span>
+                  <span className="font-bold text-gold-300 inline-flex items-center gap-1 mt-0.5">
+                    🏛️ {roleLabel(role)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-semibold text-forest-400 uppercase tracking-wider block">Status Warga</span>
+                  <span className="font-semibold text-emerald-300 inline-flex items-center gap-1 mt-0.5">
+                    ✅ Terdaftar Aktif
+                  </span>
+                </div>
               </div>
 
               <form onSubmit={handleProfileSubmit} className="space-y-4">
@@ -585,22 +663,22 @@ export default function Header() {
                     type="email"
                     disabled
                     value={profile?.email || ''}
-                    className="w-full rounded-xl bg-forest-950 border border-forest-800 px-3 py-2 text-sm text-forest-400 cursor-not-allowed"
+                    className="w-full rounded-xl bg-forest-950 border border-forest-800 px-3 py-2 text-xs text-forest-400 cursor-not-allowed"
                   />
                   <p className="text-[10px] text-forest-400 mt-1">
-                    🔒 Email terikat pada verifikasi Google Account / JWT Supabase.
+                    🔒 Email terikat secara permanen pada autentikasi Google.
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-forest-200 mb-1 uppercase tracking-wider">
-                    Nama Lengkap
+                    Nama Lengkap Warga
                   </label>
                   <input
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Nama Lengkap Anda"
+                    placeholder="Nama Lengkap Sesuai KTP"
                     required
                     className="w-full rounded-xl bg-forest-800 border border-forest-700 px-3.5 py-2 text-sm text-white placeholder-forest-400 focus:border-gold-500 focus:outline-none"
                   />
@@ -608,7 +686,7 @@ export default function Header() {
 
                 <div>
                   <label className="block text-xs font-semibold text-forest-200 mb-1 uppercase tracking-wider">
-                    Nomor Telepon / WhatsApp
+                    Nomor WhatsApp / HP
                   </label>
                   <input
                     type="text"
@@ -618,7 +696,7 @@ export default function Header() {
                     className="w-full rounded-xl bg-forest-800 border border-forest-700 px-3.5 py-2 text-sm text-white placeholder-forest-400 focus:border-gold-500 focus:outline-none"
                   />
                   <p className="text-[11px] text-forest-400 mt-1">
-                    💡 Gunakan nomor WhatsApp aktif untuk kemudahan koordinasi IPL.
+                    💡 Digunakan oleh pengurus & bendahara untuk notifikasi tagihan IPL.
                   </p>
                 </div>
 
@@ -626,15 +704,15 @@ export default function Header() {
                   <button
                     type="button"
                     onClick={() => setProfileModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-sm font-semibold text-forest-300 hover:text-white hover:bg-forest-800 transition-colors"
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-forest-300 hover:text-white hover:bg-forest-800 transition-colors"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl text-sm font-bold bg-gold-500 text-forest-950 hover:bg-gold-400 shadow-lg shadow-gold-500/20 transition-all"
+                    className="px-5 py-2 rounded-xl text-xs font-bold bg-gold-500 text-forest-950 hover:bg-gold-400 shadow-lg shadow-gold-500/20 transition-all"
                   >
-                    Simpan Perubahan
+                    Simpan Profil
                   </button>
                 </div>
               </form>

@@ -1094,6 +1094,9 @@ export async function createQrisPayment(token, { bill_ids, provider } = {}) {
       provider: normalizedProvider,
       provider_label: getQrisProviderLabel(normalizedProvider),
       parent_order_id: `DEMO-QRIS-${Date.now()}`,
+      base_amount: 0,
+      qris_fee_amount: 0,
+      qris_fee_rate: 0.007,
       total_amount: 0,
       bills: bill_ids.map((id) => ({ id })),
       demo: true,
@@ -1106,28 +1109,40 @@ export async function createQrisPayment(token, { bill_ids, provider } = {}) {
   });
 
   const resolvedProvider = normalizeQrisProvider(data?.provider || normalizedProvider);
+  const totalAmount = Number(data?.total_amount ?? data?.total ?? 0);
+  const baseAmount = Number(data?.base_amount ?? (data?.qris_fee_amount ? totalAmount - Number(data?.qris_fee_amount) : Math.round(totalAmount / 1.007)));
+  const feeAmount = Number(data?.qris_fee_amount ?? (totalAmount - baseAmount));
+
   return {
     ...data,
     provider: resolvedProvider,
     provider_label: data?.provider_label || getQrisProviderLabel(resolvedProvider),
-    total_amount: Number(data?.total_amount ?? data?.total ?? 0),
+    base_amount: baseAmount,
+    qris_fee_amount: feeAmount,
+    qris_fee_rate: 0.007,
+    total_amount: totalAmount,
     bills: Array.isArray(data?.bills) ? data.bills : [],
   };
 }
 
 // Create one QRIS checkout for Non-IPL / Donasi / Kegiatan.
-export async function createNonIplQrisPayment(token, { amount, description, category, provider } = {}) {
+export async function createNonIplQrisPayment(token, { amount, base_amount, qris_fee_amount, description, category, provider } = {}) {
   const numericAmount = Number(amount || 0);
   if (!numericAmount || numericAmount <= 0) {
     throw new Error('Nominal pembayaran harus lebih dari 0.');
   }
   const normalizedProvider = normalizeQrisProvider(provider || 'doku');
+  const base = Number(base_amount || (qris_fee_amount ? numericAmount - Number(qris_fee_amount) : Math.round(numericAmount / 1.007)));
+  const fee = Number(qris_fee_amount || (numericAmount - base) || Math.ceil(base * 0.007));
 
   if (IS_DEMO) {
     return {
       provider: normalizedProvider,
       provider_label: getQrisProviderLabel(normalizedProvider),
       parent_order_id: `DEMO-NONIPL-${Date.now()}`,
+      base_amount: base,
+      qris_fee_amount: fee,
+      qris_fee_rate: 0.007,
       total_amount: numericAmount,
       qr_content: `00020101021226550012COM.DOKU.WWW011893600899000010181002061018100303UKE51440014ID.CO.QRIS.WWW0215ID10265631295470303UKE5204864153033605407${numericAmount.toFixed(2)}5802ID5921Palm Village - Social6005BOGOR61051691462440703A015033DEMO-NONIPL-${Date.now()}6304ABCD`,
       demo: true,
@@ -1138,6 +1153,8 @@ export async function createNonIplQrisPayment(token, { amount, description, cate
     token,
     body: {
       amount: numericAmount,
+      base_amount: base,
+      qris_fee_amount: fee,
       description: description || category || 'Non-IPL Palm Village',
       category,
       provider: normalizedProvider
@@ -1145,11 +1162,18 @@ export async function createNonIplQrisPayment(token, { amount, description, cate
   });
 
   const resolvedProvider = normalizeQrisProvider(data?.provider || normalizedProvider);
+  const totalAmount = Number(data?.total_amount ?? numericAmount);
+  const resolvedBase = Number(data?.base_amount ?? base);
+  const resolvedFee = Number(data?.qris_fee_amount ?? fee);
+
   return {
     ...data,
     provider: resolvedProvider,
     provider_label: data?.provider_label || getQrisProviderLabel(resolvedProvider),
-    total_amount: Number(data?.total_amount ?? numericAmount),
+    base_amount: resolvedBase,
+    qris_fee_amount: resolvedFee,
+    qris_fee_rate: 0.007,
+    total_amount: totalAmount,
     qr_content: data?.qr_content || data?.raw?.qrContent || '',
     parent_order_id: data?.parent_order_id || data?.order_id || '',
     doku_reference_no: data?.doku_reference_no || data?.raw?.referenceNo || '',

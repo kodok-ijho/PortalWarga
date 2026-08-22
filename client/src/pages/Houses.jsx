@@ -275,7 +275,7 @@ export default function Houses() {
       </div>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <div className="pv-card overflow-hidden">
+        <div data-tour="houses-mapsite" className="pv-card overflow-hidden">
           <div className="border-b border-forest-100 bg-forest-800 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <div>

@@ -110,7 +110,7 @@ export default function Home() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="pv-card overflow-hidden">
+      <section data-tour="dashboard-hero" className="pv-card overflow-hidden">
         <div className="relative bg-gradient-to-br from-forest-800 via-forest-700 to-forest-900 px-6 sm:px-10 py-8 sm:py-12">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold-500 via-gold-400 to-gold-600" />
           <div className="relative max-w-2xl">
@@ -233,7 +233,7 @@ export default function Home() {
       </section>
 
       {/* Feature cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div data-tour="dashboard-features" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {features.map(({ to, icon: Icon, title, desc, badge }) => (
           <Link
             key={to}

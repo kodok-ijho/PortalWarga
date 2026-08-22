@@ -359,7 +359,7 @@ export default function Residents() {
       </div>
 
       {/* Tabel */}
-      <div className="pv-card overflow-hidden">
+      <div data-tour="residents-list" className="pv-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

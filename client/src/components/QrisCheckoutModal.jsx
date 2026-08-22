@@ -14,7 +14,16 @@ export default function QrisCheckoutModal({
   onClose,
 }) {
   const toast = useToast();
-  const total = data.total_amount || data.total || data.amount || 0;
+  const rawTotal = Number(data.total_amount || data.total || data.amount || 0);
+  const baseAmount = Number(
+    data.base_amount ??
+    (data.qris_fee_amount ? rawTotal - Number(data.qris_fee_amount) : Math.round(rawTotal / 1.007))
+  );
+  const feeAmount = Number(
+    data.qris_fee_amount ??
+    (rawTotal > baseAmount ? rawTotal - baseAmount : Math.ceil(baseAmount * 0.007))
+  );
+  const total = Number(data.total_amount ?? (baseAmount + feeAmount));
   const orderId = data.parent_order_id || data.order_id || data.id || `TRX-QRIS-${Date.now()}`;
   const redirectUrl = data.redirect_url;
   
@@ -54,7 +63,7 @@ export default function QrisCheckoutModal({
 
       const canvas = document.createElement('canvas');
       const width = 600;
-      const height = 820;
+      const height = 870;
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
@@ -83,26 +92,36 @@ export default function QrisCheckoutModal({
 
       // Order info box
       ctx.fillStyle = '#f4f7f4';
-      ctx.fillRect(30, 140, width - 60, 110);
+      ctx.fillRect(30, 135, width - 60, 140);
       ctx.strokeStyle = '#e2ebe2';
       ctx.lineWidth = 1;
-      ctx.strokeRect(30, 140, width - 60, 110);
+      ctx.strokeRect(30, 135, width - 60, 140);
 
       ctx.textAlign = 'left';
       ctx.fillStyle = '#4a5d4e';
-      ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.fillText(`Order ID:`, 45, 172);
-      ctx.fillText(`Total Nominal:`, 45, 202);
-      ctx.fillText(`Keterangan:`, 45, 232);
+      ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(`Order ID:`, 45, 162);
+      ctx.fillText(`Nominal Pokok:`, 45, 188);
+      ctx.fillText(`Biaya QRIS (0,7%):`, 45, 214);
+      ctx.fillText(`Total Tagihan:`, 45, 242);
+      ctx.fillText(`Keterangan:`, 45, 266);
 
       ctx.textAlign = 'right';
       ctx.fillStyle = '#1a3d2e';
-      ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.fillText(String(orderId), width - 45, 172);
+      ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(String(orderId), width - 45, 162);
+
+      ctx.fillStyle = '#374151';
+      ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(formatRupiah(baseAmount), width - 45, 188);
+
+      ctx.fillStyle = '#b45309';
+      ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(`+ ${formatRupiah(feeAmount)}`, width - 45, 214);
 
       ctx.fillStyle = '#1a3d2e';
-      ctx.font = 'bold 17px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.fillText(formatRupiah(total), width - 45, 202);
+      ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(formatRupiah(total), width - 45, 242);
 
       let detailText = data.description || data.category || '-';
       if (data.bills?.length > 0) {
@@ -111,13 +130,13 @@ export default function QrisCheckoutModal({
           .join(', ');
       }
       ctx.fillStyle = '#2d5a3f';
-      ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.fillText(detailText.slice(0, 35), width - 45, 232);
+      ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(detailText.slice(0, 35), width - 45, 266);
 
       // Draw QR Code
-      const qrSize = 340;
+      const qrSize = 330;
       const qrX = (width - qrSize) / 2;
-      const qrY = 270;
+      const qrY = 295;
 
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20);
@@ -130,24 +149,28 @@ export default function QrisCheckoutModal({
       // QRIS badge text
       ctx.textAlign = 'center';
       ctx.fillStyle = '#1a3d2e';
-      ctx.font = 'bold 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.fillText('QRIS STANDAR PEMBAYARAN NASIONAL', width / 2, 655);
+      ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText('QRIS STANDAR PEMBAYARAN NASIONAL', width / 2, 665);
 
       // Footer Instructions box
       ctx.fillStyle = '#fffdfa';
-      ctx.fillRect(30, 680, width - 60, 95);
+      ctx.fillRect(30, 690, width - 60, 140);
       ctx.strokeStyle = '#faecd8';
       ctx.lineWidth = 1;
-      ctx.strokeRect(30, 680, width - 60, 95);
+      ctx.strokeRect(30, 690, width - 60, 140);
 
       ctx.fillStyle = '#b45309';
       ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.fillText('💡 Cara Pembayaran dari Galeri HP:', width / 2, 706);
+      ctx.fillText('💡 Cara Pembayaran dari Galeri HP:', width / 2, 715);
 
       ctx.fillStyle = '#78350f';
       ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.fillText('1. Buka aplikasi BCA Mobile, Livin, GoPay, OVO, Dana, atau ShopeePay', width / 2, 730);
-      ctx.fillText('2. Pilih menu "Scan QR" / "QRIS" lalu pilih "Upload QR dari Galeri"', width / 2, 752);
+      ctx.fillText('1. Buka aplikasi BCA Mobile, Livin, GoPay, OVO, Dana, atau ShopeePay', width / 2, 738);
+      ctx.fillText('2. Pilih menu "Scan QR" / "QRIS" lalu pilih "Upload QR dari Galeri"', width / 2, 758);
+
+      ctx.fillStyle = '#9a3412';
+      ctx.font = 'italic 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText('* Total nominal sudah termasuk biaya layanan administrasi QRIS 0,7%', width / 2, 785);
 
       // Outer border
       ctx.strokeStyle = '#1a3d2e';
@@ -223,29 +246,38 @@ export default function QrisCheckoutModal({
           </div>
         )}
 
-        <div className="rounded-lg bg-forest-50 p-3 text-left text-xs space-y-1">
+        {/* Ringkasan Nominal & Biaya QRIS */}
+        <div className="rounded-lg bg-forest-50 p-3 text-left text-xs space-y-1.5 border border-forest-100">
           <div className="flex justify-between">
             <span className="text-forest-500">Order ID:</span>
             <span className="font-semibold text-forest-800">{orderId}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-forest-500">Total Nominal:</span>
-            <span className="font-bold text-forest-900">{formatRupiah(total)}</span>
+            <span className="text-forest-500">Nominal Tagihan Pokok:</span>
+            <span className="font-medium text-forest-800">{formatRupiah(baseAmount)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-forest-500">Biaya Layanan QRIS (0,7%):</span>
+            <span className="font-semibold text-amber-700">+ {formatRupiah(feeAmount)}</span>
+          </div>
+          <div className="flex justify-between pt-1.5 border-t border-forest-200">
+            <span className="font-bold text-forest-900">Total Pembayaran QRIS:</span>
+            <span className="font-bold text-base text-emerald-800">{formatRupiah(total)}</span>
           </div>
           {data.category && (
-            <div className="flex justify-between">
+            <div className="flex justify-between pt-1 text-[11px]">
               <span className="text-forest-500">Kategori / Tujuan:</span>
               <span className="font-semibold text-forest-800">{data.category}</span>
             </div>
           )}
           {data.bills?.length > 0 && (
             <div className="pt-1.5 border-t border-forest-200">
-              <p className="text-forest-500 font-medium mb-1">Tagihan Periode:</p>
+              <p className="text-forest-500 font-medium mb-1 text-[11px]">Tagihan Periode:</p>
               <div className="flex flex-wrap gap-1">
                 {data.bills.map((b, idx) => {
                   const period = typeof b === 'object' ? b.period : b;
                   return (
-                    <span key={typeof b === 'object' ? (b.id || idx) : idx} className="px-2 py-0.5 rounded bg-forest-100 text-forest-800 font-medium">
+                    <span key={typeof b === 'object' ? (b.id || idx) : idx} className="px-2 py-0.5 rounded bg-forest-100 text-forest-800 font-medium text-[11px]">
                       {formatPeriodShort(period)}
                     </span>
                   );
@@ -253,6 +285,16 @@ export default function QrisCheckoutModal({
               </div>
             </div>
           )}
+        </div>
+
+        {/* Disclaimer Biaya QRIS */}
+        <div className="rounded-lg border border-amber-300 bg-amber-50/90 p-3 text-xs text-left text-amber-900 space-y-1">
+          <p className="font-bold flex items-center gap-1.5 text-amber-950">
+            <span>ℹ️</span> Disclaimer Biaya Administrasi QRIS (0,7%)
+          </p>
+          <p className="text-[11px] leading-relaxed text-amber-800">
+            Sesuai regulasi Bank Indonesia (MDR QRIS) dan ketentuan payment gateway, transaksi QRIS dikenakan biaya administrasi <strong>0,7% ({formatRupiah(feeAmount)})</strong> yang dibebankan kepada pembayar.
+          </p>
         </div>
 
         <div className="rounded-lg border border-gold-200 bg-gold-50 p-3.5 text-xs text-left text-gold-800">
