@@ -294,14 +294,37 @@ export function occupancyStatusColor(status) {
 }
 
 // ── IPL SCHEMA HELPERS ───────────────────────────────────────────
+export const DEFAULT_IPL_SCHEMAS = [
+  {
+    id: 'schema-komplit',
+    name: 'IPL Komplit (Rumah Ditempati)',
+    description: 'Wajib dibayar untuk seluruh rumah yang ditempati oleh pemilik atau penyewa.',
+    components: [
+      { name: 'Keamanan', amount: 80000 },
+      { name: 'Kebersihan', amount: 30000 },
+      { name: 'DDC (Dana Duka Cita)', amount: 7000 },
+      { name: 'Kas', amount: 23000 },
+    ],
+  },
+  {
+    id: 'schema-basic',
+    name: 'IPL Basic (Rumah Kosong)',
+    description: 'Dibebankan kepada pemilik untuk rumah yang tidak dihuni / kosong.',
+    components: [
+      { name: 'Keamanan', amount: 80000 },
+      { name: 'Kebersihan', amount: 30000 },
+    ],
+  },
+];
+
 export function computeSchemaAmount(schema) {
   if (!schema || !schema.components) return 0;
   return schema.components.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
 }
 
 export function getSchemaById(schemas, schemaId) {
-  if (!schemas || !schemas.length) return null;
-  return schemas.find((s) => s.id === schemaId) || schemas[0];
+  const list = (schemas && schemas.length > 0) ? schemas : DEFAULT_IPL_SCHEMAS;
+  return list.find((s) => s.id === schemaId) || list[0];
 }
 
 // ── MONTH CONSTANTS ──────────────────────────────────────────────

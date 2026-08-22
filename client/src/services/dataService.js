@@ -33,7 +33,12 @@ async function getEventMockData() {
 import { PortalApiError, portalApiPost, portalApiUpload } from './apiClient';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
-import { getQrisProviderLabel, isPendingVerificationStatus, normalizePaymentStatus } from './dataHelpers';
+import {
+  DEFAULT_IPL_SCHEMAS,
+  getQrisProviderLabel,
+  isPendingVerificationStatus,
+  normalizePaymentStatus,
+} from './dataHelpers';
 
 // =====================================================================
 // USER APPROVAL
@@ -364,20 +369,30 @@ export async function fetchSettings(token) {
     const mock = await getMockData();
     return mock.mockSettings;
   }
-  const data = await portalApiPost('/settings/get', { token });
   try {
-    const qris = await portalApiPost('/settings/qris/get', { token });
-    return {
-      ...data,
-      qris_enabled: qris?.qris_enabled ?? qris?.enabled ?? data?.qris_enabled ?? true,
-      qris_provider: String(qris?.qris_provider || qris?.provider || data?.qris_provider || 'midtrans').toLowerCase(),
-    };
+    const data = await portalApiPost('/settings/get', { token });
+    try {
+      const qris = await portalApiPost('/settings/qris/get', { token });
+      return {
+        ...data,
+        ipl_schemas: Array.isArray(data?.ipl_schemas) && data.ipl_schemas.length > 0 ? data.ipl_schemas : DEFAULT_IPL_SCHEMAS,
+        qris_enabled: qris?.qris_enabled ?? qris?.enabled ?? data?.qris_enabled ?? true,
+        qris_provider: String(qris?.qris_provider || qris?.provider || data?.qris_provider || 'doku').toLowerCase(),
+      };
+    } catch {
+      return {
+        ...data,
+        ipl_schemas: Array.isArray(data?.ipl_schemas) && data.ipl_schemas.length > 0 ? data.ipl_schemas : DEFAULT_IPL_SCHEMAS,
+        qris_enabled: data?.qris_enabled ?? true,
+        qris_provider: String(data?.qris_provider || 'doku').toLowerCase(),
+      };
+    }
   } catch (error) {
-    console.warn('Failed to load QRIS settings; using safe Midtrans default.', error);
+    console.warn('Failed to load settings (user may be warga/read-only); using safe defaults.', error);
     return {
-      ...data,
-      qris_enabled: data?.qris_enabled ?? true,
-      qris_provider: String(data?.qris_provider || 'midtrans').toLowerCase(),
+      ipl_schemas: DEFAULT_IPL_SCHEMAS,
+      qris_enabled: true,
+      qris_provider: 'doku',
     };
   }
 }
@@ -387,8 +402,15 @@ export async function fetchIPLSchemas(token) {
     const mock = await getMockData();
     return mock.getIPLSchemas();
   }
-  const settings = await fetchSettings(token);
-  return settings?.ipl_schemas || [];
+  try {
+    const settings = await fetchSettings(token);
+    if (Array.isArray(settings?.ipl_schemas) && settings.ipl_schemas.length > 0) {
+      return settings.ipl_schemas;
+    }
+  } catch (error) {
+    console.warn('Failed to load IPL schemas from settings; using default schemas.', error);
+  }
+  return DEFAULT_IPL_SCHEMAS;
 }
 
 export async function updateSettings(token, settingsData) {

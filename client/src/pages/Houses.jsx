@@ -26,6 +26,7 @@ import {
   computeSchemaAmount,
   getSchemaById,
   canManageHouses,
+  DEFAULT_IPL_SCHEMAS,
 } from '../services/dataHelpers';
 
 const EMPTY_FORM = {
@@ -52,7 +53,7 @@ export default function Houses() {
   // Data states
   const [units, setUnits] = useState([]);
   const [profiles, setProfiles] = useState([]);
-  const [iplSchemas, setIplSchemas] = useState([]);
+  const [iplSchemas, setIplSchemas] = useState(DEFAULT_IPL_SCHEMAS);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -67,13 +68,22 @@ export default function Houses() {
     setIsLoading(true);
     try {
       const [resUnits, resProfiles, resSchemas] = await Promise.all([
-        fetchUnits(token),
-        fetchResidents(token),
-        fetchIPLSchemas(token),
+        fetchUnits(token).catch((err) => {
+          console.error('Failed to fetch units:', err);
+          return [];
+        }),
+        fetchResidents(token).catch((err) => {
+          console.error('Failed to fetch residents:', err);
+          return [];
+        }),
+        fetchIPLSchemas(token).catch((err) => {
+          console.warn('Failed to fetch IPL schemas; using defaults:', err);
+          return DEFAULT_IPL_SCHEMAS;
+        }),
       ]);
-      setUnits(resUnits);
-      setProfiles(resProfiles);
-      setIplSchemas(resSchemas);
+      setUnits(resUnits || []);
+      setProfiles(resProfiles || []);
+      setIplSchemas(resSchemas && resSchemas.length > 0 ? resSchemas : DEFAULT_IPL_SCHEMAS);
     } catch (err) {
       toast.error('Gagal memuat data master rumah/unit.');
       console.error(err);
