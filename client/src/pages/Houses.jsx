@@ -295,7 +295,7 @@ export default function Houses() {
           </div>
           <div className="bg-white p-3">
             <img
-              src="/Mapsite%20Palm%20Village.jpeg"
+              src="/Mapsite%20Palm%20Village.png"
               alt="Mapsite Palm Village"
               className="h-auto w-full rounded-lg border border-forest-100 object-contain"
             />
@@ -316,7 +316,7 @@ export default function Houses() {
             Preview peta perumahan untuk referensi blok dan posisi rumah.
           </p>
           <img
-            src="/Mapsite%20Palm%20Village.jpeg"
+            src="/Mapsite%20Palm%20Village.png"
             alt="Mapsite Palm Village versi besar"
             className="max-h-[75vh] w-full rounded-lg border border-forest-100 object-contain"
           />

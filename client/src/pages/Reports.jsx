@@ -5,7 +5,16 @@ import {
   PieChart, Pie, Cell as PieCell, Legend,
   AreaChart, Area
 } from 'recharts';
-import { AiOutlinePaperClip, AiOutlinePrinter, AiOutlineDownload, AiOutlineReload } from 'react-icons/ai';
+import {
+  AiOutlinePaperClip,
+  AiOutlinePrinter,
+  AiOutlineDownload,
+  AiOutlineReload,
+  AiOutlineSearch,
+  AiOutlineFilter,
+  AiOutlineEye,
+  AiOutlineClose,
+} from 'react-icons/ai';
 import Papa from 'papaparse';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -13,13 +22,17 @@ import {
   MONTHS_LONG,
   formatRupiah,
   formatDate,
+  formatPeriodShort,
   billStatusLabel,
   canViewFinancialReports,
 } from '../services/dataHelpers';
 import {
   fetchRunningBalance,
-  fetchMonthlyFinance
+  fetchMonthlyFinance,
+  fetchNonIplIncomes,
+  fetchEvents,
 } from '../services/dataService';
+import Modal from '../components/Modal';
 
 const PIE_COLORS = ['#1a3d2e', '#d4af37', '#e2c462'];
 const FISCAL_YEAR_START = 2026;
@@ -152,7 +165,7 @@ export default function Reports() {
   }, []);
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [reportType, setReportType] = useState('monthly'); // 'monthly' | 'yearly'
+  const [reportType, setReportType] = useState('monthly'); // 'monthly' | 'yearly' | 'non_ipl'
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
@@ -160,7 +173,15 @@ export default function Reports() {
   const [report, setReport] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [cashPayments, setCashPayments] = useState([]);
+  const [nonIplIncomes, setNonIplIncomes] = useState([]);
+  const [events, setEvents] = useState([]);
   const [runningChain, setRunningChain] = useState([]);
+
+  // Non-IPL filter states
+  const [nonIplScopeFilter, setNonIplScopeFilter] = useState('all'); // 'all' | 'general' | 'event'
+  const [nonIplCategoryFilter, setNonIplCategoryFilter] = useState('all');
+  const [nonIplSearch, setNonIplSearch] = useState('');
+  const [previewImage, setPreviewImage] = useState(null);
 
   const period = `${year}-${String(month).padStart(2, '0')}`;
 
@@ -168,12 +189,21 @@ export default function Reports() {
     setIsLoading(true);
     setLoadError('');
     try {
-      if (reportType === 'monthly') {
-        const finRes = await fetchMonthlyFinance(session?.access_token, { year, month });
+      if (reportType === 'monthly' || reportType === 'non_ipl') {
+        const [finRes, nonIplRes, eventsRes] = await Promise.all([
+          fetchMonthlyFinance(session?.access_token, { year, month }),
+          fetchNonIplIncomes(session?.access_token, {
+            from: `${year}-${String(month).padStart(2, '0')}-01`,
+            to: `${year}-${String(month).padStart(2, '0')}-31`,
+          }).catch(() => []),
+          fetchEvents(session?.access_token).catch(() => []),
+        ]);
         const finData = normalizeMonthlyFinance(finRes);
         setReport(finData.report);
         setExpenses(finData.expenses);
         setCashPayments(finData.cashPayments);
+        setNonIplIncomes(Array.isArray(nonIplRes) && nonIplRes.length > 0 ? nonIplRes : (finData.nonIplIncomes || []));
+        setEvents(Array.isArray(eventsRes) ? eventsRes : []);
 
         try {
           const balRes = await fetchRunningBalance(session?.access_token, { year, month });
@@ -192,9 +222,19 @@ export default function Reports() {
           month: m
         }));
 
-        const results = await mapWithConcurrency(periods, YEARLY_REQUEST_CONCURRENCY, ({ year: y, month: m }) => {
-          return fetchMonthlyFinance(session?.access_token, { year: y, month: m });
-        });
+        const [results, nonIplYearlyRes, eventsRes] = await Promise.all([
+          mapWithConcurrency(periods, YEARLY_REQUEST_CONCURRENCY, ({ year: y, month: m }) => {
+            return fetchMonthlyFinance(session?.access_token, { year: y, month: m });
+          }),
+          fetchNonIplIncomes(session?.access_token, {
+            from: `${year}-07-01`,
+            to: `${year + 1}-06-30`,
+          }).catch(() => []),
+          fetchEvents(session?.access_token).catch(() => []),
+        ]);
+
+        setNonIplIncomes(Array.isArray(nonIplYearlyRes) ? nonIplYearlyRes : []);
+        setEvents(Array.isArray(eventsRes) ? eventsRes : []);
 
         // Aggregate 12 months data
         let totalBilled = 0;
@@ -338,15 +378,82 @@ export default function Reports() {
   }, [loadData, role]);
 
   const periodLabel = useMemo(() => {
-    if (reportType === 'monthly') {
+    if (reportType === 'monthly' || reportType === 'non_ipl') {
       return `${MONTHS_LONG[month - 1]} ${year}`;
     }
     return `Juli ${year} - Juni ${year + 1}`;
   }, [reportType, year, month]);
 
+  const eventNameMap = useMemo(() => {
+    const map = {};
+    (events || []).forEach((ev) => {
+      if (ev && ev.id) map[ev.id] = ev.name || ev.title || 'Event';
+    });
+    return map;
+  }, [events]);
+
+  const nonIplCategories = useMemo(() => {
+    const cats = new Set();
+    (nonIplIncomes || []).forEach((i) => {
+      if (i && i.category) cats.add(i.category);
+    });
+    return Array.from(cats);
+  }, [nonIplIncomes]);
+
+  const filteredNonIplIncomes = useMemo(() => {
+    return (nonIplIncomes || []).filter((item) => {
+      if (nonIplScopeFilter !== 'all' && item.scope !== nonIplScopeFilter) return false;
+      if (nonIplCategoryFilter !== 'all' && item.category !== nonIplCategoryFilter) return false;
+      if (nonIplSearch.trim()) {
+        const q = nonIplSearch.toLowerCase();
+        const matchSource = String(item.source_name || '').toLowerCase().includes(q);
+        const matchDesc = String(item.description || '').toLowerCase().includes(q);
+        const matchCat = String(item.category || '').toLowerCase().includes(q);
+        const matchEvent = item.event_id && String(eventNameMap[item.event_id] || '').toLowerCase().includes(q);
+        if (!matchSource && !matchDesc && !matchCat && !matchEvent) return false;
+      }
+      return true;
+    });
+  }, [nonIplIncomes, nonIplScopeFilter, nonIplCategoryFilter, nonIplSearch, eventNameMap]);
+
+  const nonIplSummary = useMemo(() => {
+    const list = nonIplIncomes || [];
+    const total = list.reduce((s, i) => s + Number(i.amount || 0), 0);
+    const generalTotal = list.filter((i) => i.scope !== 'event').reduce((s, i) => s + Number(i.amount || 0), 0);
+    const eventTotal = list.filter((i) => i.scope === 'event').reduce((s, i) => s + Number(i.amount || 0), 0);
+    const qrisTotal = list.filter((i) => i.payment_method === 'qris').reduce((s, i) => s + Number(i.amount || 0), 0);
+    const transferTotal = list.filter((i) => i.payment_method === 'bank_transfer').reduce((s, i) => s + Number(i.amount || 0), 0);
+    const cashTotal = list.filter((i) => i.payment_method === 'cash').reduce((s, i) => s + Number(i.amount || 0), 0);
+
+    const categoryMap = {};
+    list.forEach((i) => {
+      const cat = i.category || 'Lainnya';
+      categoryMap[cat] = (categoryMap[cat] || 0) + Number(i.amount || 0);
+    });
+    const categoryChartData = Object.entries(categoryMap).map(([name, value]) => ({ name, value }));
+
+    const methodPieData = [
+      { name: 'QRIS', value: qrisTotal, color: '#10b981' },
+      { name: 'Transfer', value: transferTotal, color: '#3b82f6' },
+      { name: 'Tunai', value: cashTotal, color: '#d4af37' },
+    ].filter((p) => p.value > 0);
+
+    return {
+      total,
+      generalTotal,
+      eventTotal,
+      qrisTotal,
+      transferTotal,
+      cashTotal,
+      count: list.length,
+      categoryChartData,
+      methodPieData,
+    };
+  }, [nonIplIncomes]);
+
   // Running Balance dan Rincian untuk periode terpilih
   const activeBalance = useMemo(() => {
-    if (reportType === 'monthly') {
+    if (reportType === 'monthly' || reportType === 'non_ipl') {
       const periodStr = `${year}-${String(month).padStart(2, '0')}`;
       const matched = runningChain.find(item => item.period === periodStr);
       return matched || {
@@ -467,6 +574,10 @@ export default function Reports() {
   }
 
   const handleExportCSV = () => {
+    if (reportType === 'non_ipl') {
+      handleExportNonIplCSV();
+      return;
+    }
     if (!report) return;
     const isYearly = reportType === 'yearly';
     const header = isYearly 
@@ -513,7 +624,48 @@ export default function Reports() {
     a.download = `laporan_ipl_${period}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Laporan CSV berhasil di-export.');
+    toast.success('Laporan CSV IPL berhasil di-export.');
+  };
+
+  const handleExportNonIplCSV = () => {
+    if (!filteredNonIplIncomes.length) {
+      toast.info('Tidak ada data pemasukan non-IPL untuk diekspor.');
+      return;
+    }
+    const header = ['Tanggal', 'Lingkup', 'Event', 'Kategori', 'Sumber / Pembayar', 'Keterangan', 'Metode', 'Status', 'Jumlah (Rp)'];
+    const rows = filteredNonIplIncomes.map((i) => [
+      formatDate(i.income_date || i.date),
+      i.scope === 'event' ? 'Kegiatan Event' : 'Kas Umum',
+      i.event_id ? (eventNameMap[i.event_id] || i.event_id) : '-',
+      i.category || '-',
+      i.source_name || '-',
+      i.description || '-',
+      methodLabel(i.payment_method),
+      i.status === 'verified' ? 'Terverifikasi' : i.status === 'rejected' ? 'Ditolak' : 'Menunggu Verifikasi',
+      Number(i.amount || 0)
+    ]);
+    const csv = Papa.unparse({
+      fields: header,
+      data: [
+        ...rows,
+        [],
+        ['Ringkasan', '', '', '', '', '', '', '', ''],
+        ['Total Pemasukan Non-IPL', '', '', '', '', '', '', '', nonIplSummary.total],
+        ['Kas Umum', '', '', '', '', '', '', '', nonIplSummary.generalTotal],
+        ['Pemasukan Event', '', '', '', '', '', '', '', nonIplSummary.eventTotal],
+        ['Metode QRIS', '', '', '', '', '', '', '', nonIplSummary.qrisTotal],
+        ['Metode Transfer', '', '', '', '', '', '', '', nonIplSummary.transferTotal],
+        ['Metode Tunai', '', '', '', '', '', '', '', nonIplSummary.cashTotal],
+      ],
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `laporan_pemasukan_non_ipl_${period}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Laporan CSV Pemasukan Non-IPL berhasil di-export.');
   };
 
   const handlePrint = () => {
@@ -541,7 +693,7 @@ export default function Reports() {
     );
   }
 
-  if (!report) {
+  if (!report && reportType !== 'non_ipl') {
     return (
       <div className="pv-card p-8 text-center text-forest-500 text-sm">
         Tidak ada data laporan keuangan untuk periode ini.
@@ -552,7 +704,7 @@ export default function Reports() {
   return (
     <div className="space-y-5">
       {/* Tab Selector */}
-      <div className="no-print flex border-b border-forest-100 mb-4">
+      <div className="no-print flex flex-wrap border-b border-forest-100 mb-4 gap-1">
         <button
           onClick={() => setReportType('monthly')}
           className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
@@ -561,7 +713,17 @@ export default function Reports() {
               : 'border-transparent text-forest-400 hover:text-forest-600'
           }`}
         >
-          📅 Laporan Bulanan
+          📊 Laporan Kas & IPL
+        </button>
+        <button
+          onClick={() => setReportType('non_ipl')}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
+            reportType === 'non_ipl'
+              ? 'border-forest-800 text-forest-800'
+              : 'border-transparent text-forest-400 hover:text-forest-600'
+          }`}
+        >
+          🏷️ Laporan Pemasukan Non-IPL & Donasi
         </button>
         <button
           onClick={() => setReportType('yearly')}
@@ -578,13 +740,19 @@ export default function Reports() {
       {/* Header & filter */}
       <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-forest-900">Laporan Keuangan IPL</h2>
+          <h2 className="text-lg font-bold text-forest-900">
+            {reportType === 'non_ipl'
+              ? 'Laporan Pemasukan Non-IPL & Donasi'
+              : reportType === 'yearly'
+              ? 'Laporan Keuangan Tahunan'
+              : 'Laporan Keuangan Kas & IPL'}
+          </h2>
           <p className="text-sm text-forest-500">
             Periode: {periodLabel}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {reportType === 'monthly' && (
+          {reportType !== 'yearly' && (
             <select
               value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
@@ -609,255 +777,285 @@ export default function Reports() {
           <button onClick={handlePrint} className="pv-btn-ghost text-xs">
             <AiOutlinePrinter /> PDF
           </button>
-          <button onClick={handleExportCSV} className="pv-btn-ghost text-xs">
-            <AiOutlineDownload /> CSV
+          <button
+            onClick={reportType === 'non_ipl' ? handleExportNonIplCSV : handleExportCSV}
+            className="pv-btn-ghost text-xs"
+          >
+            <AiOutlineDownload /> CSV {reportType === 'non_ipl' ? 'Non-IPL' : ''}
           </button>
         </div>
       </div>
 
-      {report.billCount === 0 ? (
-        <div className="pv-card p-10 text-center text-forest-400 text-sm">
-          Tidak ada data tagihan untuk periode {periodLabel}.
-        </div>
-      ) : (
-        <>
-          {/* Section A: Alur Kas (Running Balance) */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* TAMPILAN KHUSUS: LAPORAN PEMASUKAN NON-IPL & DONASI           */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {reportType === 'non_ipl' ? (
+        <div className="space-y-5">
+          {/* Summary Cards Non-IPL */}
           <div>
-            <h3 className="text-xs font-bold text-forest-600 uppercase tracking-wider mb-2">Alur Kas (Running Balance)</h3>
+            <h3 className="text-xs font-bold text-forest-600 uppercase tracking-wider mb-2">
+              Ringkasan Pemasukan Non-IPL ({periodLabel})
+            </h3>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <SummaryCard label="Saldo Awal Kas" value={formatRupiah(openingBalance)} icon="🏦" color="bg-gold-50 text-gold-700 border border-gold-200" />
-              <SummaryCard label="Pemasukan IPL" value={`+ ${formatRupiah(totalCashIn)}`} icon="💰" color="bg-emerald-50 text-emerald-700 border border-emerald-200" />
-              <SummaryCard label="Pengeluaran Kas" value={`- ${formatRupiah(totalExpenses)}`} icon="💸" color="bg-red-50 text-red-700 border border-red-200" />
-              <SummaryCard label="Saldo Akhir Kas" value={formatRupiah(closingBalance)} icon="📈" color="bg-forest-800 text-gold-400" />
+              <SummaryCard
+                label="Total Pemasukan Non-IPL"
+                value={formatRupiah(nonIplSummary.total)}
+                icon="💰"
+                color="bg-forest-800 text-gold-400 font-bold"
+              />
+              <SummaryCard
+                label="Kas Umum (General)"
+                value={formatRupiah(nonIplSummary.generalTotal)}
+                icon="🏛️"
+                color="bg-blue-50 text-blue-800 border border-blue-200"
+              />
+              <SummaryCard
+                label="Kegiatan / Event"
+                value={formatRupiah(nonIplSummary.eventTotal)}
+                icon="🎪"
+                color="bg-purple-50 text-purple-800 border border-purple-200"
+              />
+              <SummaryCard
+                label="Total Transaksi"
+                value={`${nonIplSummary.count} Transaksi`}
+                icon="🧾"
+                color="bg-emerald-50 text-emerald-800 border border-emerald-200"
+              />
             </div>
           </div>
 
-          {hasFinanceBreakdown && (
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <SummaryCard label="Pemasukan IPL" value={formatRupiah(iplIncome)} icon="IPL" color="bg-emerald-50 text-emerald-700 border border-emerald-200" />
-              <SummaryCard label="Non-IPL Umum" value={formatRupiah(nonIplGeneralIncome)} icon="UM" color="bg-blue-50 text-blue-700 border border-blue-200" />
-              <SummaryCard label="Pemasukan Event" value={formatRupiah(eventIncome)} icon="EV" color="bg-purple-50 text-purple-700 border border-purple-200" />
-              <SummaryCard label="Pengeluaran Event" value={formatRupiah(eventExpense)} icon="EX" color="bg-red-50 text-red-700 border border-red-200" />
+          {/* Breakdown Metode Pembayaran */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="pv-card p-4 flex items-center justify-between bg-emerald-50/50 border border-emerald-100">
+              <div>
+                <p className="text-xs text-forest-600 font-medium">💳 QRIS (DOKU Production)</p>
+                <p className="text-base font-bold text-emerald-700 mt-1">{formatRupiah(nonIplSummary.qrisTotal)}</p>
+              </div>
+              <span className="pv-badge bg-emerald-100 text-emerald-800 text-xs">QRIS</span>
+            </div>
+            <div className="pv-card p-4 flex items-center justify-between bg-blue-50/50 border border-blue-100">
+              <div>
+                <p className="text-xs text-forest-600 font-medium">🏦 Transfer Bank</p>
+                <p className="text-base font-bold text-blue-700 mt-1">{formatRupiah(nonIplSummary.transferTotal)}</p>
+              </div>
+              <span className="pv-badge bg-blue-100 text-blue-800 text-xs">Transfer</span>
+            </div>
+            <div className="pv-card p-4 flex items-center justify-between bg-amber-50/50 border border-amber-100">
+              <div>
+                <p className="text-xs text-forest-600 font-medium">💵 Tunai / Kasir</p>
+                <p className="text-base font-bold text-amber-700 mt-1">{formatRupiah(nonIplSummary.cashTotal)}</p>
+              </div>
+              <span className="pv-badge bg-amber-100 text-amber-800 text-xs">Tunai</span>
+            </div>
+          </div>
+
+          {/* Visual Charts Non-IPL */}
+          {nonIplSummary.count > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="pv-card p-5 lg:col-span-2">
+                <h3 className="text-sm font-semibold text-forest-800 mb-4">
+                  Pemasukan per Kategori
+                </h3>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={nonIplSummary.categoryChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#dde9e2" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#3d6e51' }} />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: '#3d6e51' }}
+                      tickFormatter={(v) => (v >= 1000000 ? `${(v / 1000000).toFixed(1)}jt` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)}
+                    />
+                    <Tooltip
+                      formatter={(v) => formatRupiah(v)}
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #dde9e2' }}
+                    />
+                    <Bar dataKey="value" name="Nominal (Rp)" fill="#1a3d2e" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="pv-card p-5">
+                <h3 className="text-sm font-semibold text-forest-800 mb-4">
+                  Distribusi Metode Bayar
+                </h3>
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={nonIplSummary.methodPieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {nonIplSummary.methodPieData.map((entry, i) => (
+                        <PieCell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v) => formatRupiah(v)}
+                      contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           )}
 
-          {/* Section B: Kinerja Tagihan IPL (Koleksi) */}
-          <div>
-            <h3 className="text-xs font-bold text-forest-600 uppercase tracking-wider mb-2">Koleksi Tagihan Bulanan</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <SummaryCard label="Total Tagihan" value={formatRupiah(report.totalBilled)} icon="📋" color="bg-forest-100 text-forest-800 border border-forest-200" />
-              <SummaryCard label="Terkumpul" value={formatRupiah(report.totalCollected)} icon="✅" color="bg-emerald-50 text-emerald-700 border border-emerald-200" />
-              <SummaryCard label="Tunggakan" value={formatRupiah(report.totalOutstanding)} icon="⏳" color="bg-amber-50 text-amber-700 border border-amber-200" />
-              <SummaryCard label="% Koleksi" value={`${report.collectionRate.toFixed(1)}%`} icon="📊" color="bg-blue-50 text-blue-700 border border-blue-200" />
+          {/* Filter & Search Bar */}
+          <div className="pv-card p-4 no-print flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-lg border border-forest-200 overflow-hidden text-xs">
+                <button
+                  onClick={() => setNonIplScopeFilter('all')}
+                  className={`px-3 py-1.5 font-medium transition-colors ${
+                    nonIplScopeFilter === 'all' ? 'bg-forest-800 text-white' : 'bg-white text-forest-700 hover:bg-forest-50'
+                  }`}
+                >
+                  Semua Lingkup
+                </button>
+                <button
+                  onClick={() => setNonIplScopeFilter('general')}
+                  className={`px-3 py-1.5 font-medium transition-colors border-l border-forest-200 ${
+                    nonIplScopeFilter === 'general' ? 'bg-forest-800 text-white' : 'bg-white text-forest-700 hover:bg-forest-50'
+                  }`}
+                >
+                  🏛️ Kas Umum
+                </button>
+                <button
+                  onClick={() => setNonIplScopeFilter('event')}
+                  className={`px-3 py-1.5 font-medium transition-colors border-l border-forest-200 ${
+                    nonIplScopeFilter === 'event' ? 'bg-forest-800 text-white' : 'bg-white text-forest-700 hover:bg-forest-50'
+                  }`}
+                >
+                  🎪 Event / Kegiatan
+                </button>
+              </div>
+
+              {nonIplCategories.length > 0 && (
+                <select
+                  value={nonIplCategoryFilter}
+                  onChange={(e) => setNonIplCategoryFilter(e.target.value)}
+                  className="pv-input w-auto text-xs py-1.5"
+                >
+                  <option value="all">Semua Kategori</option>
+                  {nonIplCategories.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="relative">
+              <AiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-forest-400 text-sm" />
+              <input
+                type="text"
+                placeholder="Cari pembayar / keterangan / event..."
+                value={nonIplSearch}
+                onChange={(e) => setNonIplSearch(e.target.value)}
+                className="pv-input text-xs pl-8 py-1.5 w-full md:w-64"
+              />
             </div>
           </div>
 
-          {/* Grafik Tren Running Balance */}
-          <div className="pv-card p-5">
-            <h3 className="text-sm font-semibold text-forest-800 mb-4">
-              Tren Arus Kas & Saldo Kumulatif (Sejak Jul 2026)
-            </h3>
-            <ResponsiveContainer width="100%" height={320}>
-              <AreaChart data={trenData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#d4af37" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#d4af37" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#dde9e2" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#3d6e51' }} />
-                <YAxis 
-                  tick={{ fontSize: 10, fill: '#3d6e51' }} 
-                  tickFormatter={(v) => (v >= 1000000 ? `${(v / 1000000).toFixed(1)}jt` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)}
-                />
-                <Tooltip 
-                  formatter={(v) => formatRupiah(v)}
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #dde9e2' }}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Area type="monotone" dataKey="Pemasukan" stroke="#10b981" fillOpacity={1} fill="url(#colorIncome)" />
-                <Area type="monotone" dataKey="Pengeluaran" stroke="#ef4444" fillOpacity={1} fill="url(#colorExpense)" />
-                <Area type="monotone" dataKey="Saldo" stroke="#d4af37" fillOpacity={1} fill="url(#colorBalance)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Grafik Kinerja Lainnya */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Bar chart per blok */}
-            <div className="pv-card p-5 lg:col-span-2">
-              <h3 className="text-sm font-semibold text-forest-800 mb-4">
-                Koleksi Tagihan per Blok
-              </h3>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={blockData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#dde9e2" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#3d6e51' }} />
-                  <YAxis
-                    tick={{ fontSize: 10, fill: '#3d6e51' }}
-                    tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)}
-                  />
-                  <Tooltip
-                    formatter={(v) => formatRupiah(v)}
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #dde9e2' }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="Terkumpul" fill="#1a3d2e" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Tunggakan" fill="#d4af37" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Pie chart lunas/belum */}
-            <div className="pv-card p-5">
-              <h3 className="text-sm font-semibold text-forest-800 mb-4">
-                Status Pembayaran Tagihan
-              </h3>
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={90}
-                    label={({ value }) => value}
-                    labelLine={false}
-                  >
-                    {pieData.map((entry, i) => (
-                      <PieCell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(v, n) => [`${v} tagihan`, n]}
-                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Tabel Histori Running Balance Kumulatif */}
+          {/* Tabel Rincian Non-IPL */}
           <div className="pv-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-forest-100 bg-forest-50">
-              <h3 className="text-sm font-semibold text-forest-800">
-                Histori Running Balance (Sejak Juli 2026)
-              </h3>
-              <p className="text-[11px] text-forest-500 mt-0.5">
-                Perkembangan saldo kas dari bulan ke bulan secara runut. Saldo Akhir otomatis bergulir menjadi Saldo Awal bulan berikutnya.
-              </p>
+            <div className="px-5 py-3 border-b border-forest-100 bg-forest-50 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-forest-800">
+                  Rincian Transaksi Pemasukan Non-IPL & Donasi — {periodLabel}
+                </h3>
+                <p className="text-[11px] text-forest-500 mt-0.5">
+                  Daftar transaksi penerimaan di luar tagihan iuran IPL warga.
+                </p>
+              </div>
+              <span className="text-xs text-forest-600 font-medium">
+                {filteredNonIplIncomes.length} Transaksi
+              </span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-forest-100 bg-white">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Periode</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Saldo Awal</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Pemasukan (+)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Pengeluaran (-)</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Saldo Akhir</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-forest-100">
-                  {runningChain.map((item) => {
-                    const isSelectedMonth = item.year === year && item.month === month;
-                    return (
-                      <tr 
-                        key={item.period} 
-                        className={`hover:bg-forest-50 transition-colors ${isSelectedMonth ? 'bg-gold-50/50 font-semibold' : ''}`}
-                      >
-                        <td className="px-4 py-2.5 text-forest-700 whitespace-nowrap">
-                          {formatPeriodLabel(item.period)}
-                          {isSelectedMonth && (
-                            <span className="ml-2 pv-badge bg-gold-500 text-forest-900 text-[9px]">Bulan Ini</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-forest-600 whitespace-nowrap">
-                          {formatRupiah(item.openingBalance)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-emerald-600 whitespace-nowrap">
-                          + {formatRupiah(item.totalIncome)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-red-600 whitespace-nowrap">
-                          - {formatRupiah(item.totalExpense)}
-                        </td>
-                        <td className={`px-4 py-2.5 text-right whitespace-nowrap ${item.closingBalance >= 0 ? 'text-forest-900' : 'text-red-700 font-bold'}`}>
-                          {formatRupiah(item.closingBalance)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
 
-          {/* ── Laporan B: Kas Masuk IPL (basis tanggal pembayaran) ── */}
-          <div className="pv-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-forest-100 bg-forest-50">
-              <h3 className="text-sm font-semibold text-forest-800">
-                Rincian Kas Masuk IPL — {periodLabel}
-              </h3>
-              <p className="text-[11px] text-forest-500 mt-0.5">
-                Berdasarkan tanggal pembayaran, tanpa memandang periode tagihan IPL yang dilunasi.
-              </p>
-            </div>
-            {cashPayments.length === 0 ? (
+            {filteredNonIplIncomes.length === 0 ? (
               <div className="p-10 text-center text-forest-400 text-sm">
-                Belum ada pembayaran yang tercatat pada {periodLabel}.
+                Belum ada transaksi pemasukan non-IPL yang sesuai dengan kriteria filter pada {periodLabel}.
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-forest-100 bg-white">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Tgl Bayar</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Unit</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Penghuni</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Periode IPL</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Jumlah</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Tgl Masuk</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Lingkup / Event</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Kategori</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Sumber / Pembayar</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Keterangan</th>
                       <th className="px-4 py-3 text-center text-xs font-semibold text-forest-600 uppercase">Metode</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-forest-600 uppercase">Bukti</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Jumlah</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-forest-100">
-                    {cashPayments.map((p) => (
-                      <tr key={p.paymentId} className="hover:bg-forest-50">
-                        <td className="px-4 py-2.5 text-forest-600 text-xs whitespace-nowrap">
-                          {formatDate(p.paidAt)}
-                        </td>
-                        <td className="px-4 py-2.5 font-medium text-forest-900 whitespace-nowrap">
-                          {p.block}/{p.unitNumber}
-                        </td>
-                        <td className="px-4 py-2.5 text-forest-700">{p.residentName}</td>
-                        <td className="px-4 py-2.5 text-forest-600">{formatPeriodLabel(p.period)}</td>
-                        <td className="px-4 py-2.5 text-right text-forest-700 whitespace-nowrap">
-                          {formatRupiah(p.amount)}
-                        </td>
-                        <td className="px-4 py-2.5 text-center">
-                          <span className={`pv-badge ${methodBadgeColor(p.method)}`}>
-                            {methodLabel(p.method)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredNonIplIncomes.map((item) => {
+                      const attachmentUrl = getIncomeAttachmentUrl(item);
+                      return (
+                        <tr key={item.id} className="hover:bg-forest-50">
+                          <td className="px-4 py-2.5 text-forest-600 text-xs whitespace-nowrap">
+                            {formatDate(item.income_date || item.date)}
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap">
+                            {item.scope === 'event' ? (
+                              <span className="pv-badge bg-purple-50 text-purple-700 border border-purple-200">
+                                🎪 {item.event_id ? (eventNameMap[item.event_id] || 'Event') : 'Event'}
+                              </span>
+                            ) : (
+                              <span className="pv-badge bg-blue-50 text-blue-700 border border-blue-200">
+                                🏛️ Kas Umum
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-forest-800 font-medium">
+                            {item.category || '-'}
+                          </td>
+                          <td className="px-4 py-2.5 text-forest-700 font-medium">
+                            {item.source_name || '-'}
+                          </td>
+                          <td className="px-4 py-2.5 text-forest-600 text-xs max-w-xs truncate">
+                            {item.description || '-'}
+                          </td>
+                          <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                            <span className={`pv-badge ${methodBadgeColor(item.payment_method)}`}>
+                              {methodLabel(item.payment_method)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            {attachmentUrl ? (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewImage(attachmentUrl)}
+                                className="inline-flex items-center gap-1 text-xs text-forest-700 hover:text-gold-600 font-medium underline"
+                                title="Lihat Bukti Transfer"
+                              >
+                                <AiOutlinePaperClip /> Foto
+                              </button>
+                            ) : (
+                              <span className="text-forest-300 text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-bold text-emerald-700 whitespace-nowrap">
+                            + {formatRupiah(item.amount)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-forest-200 bg-forest-50 font-semibold">
-                      <td colSpan={4} className="px-4 py-3 text-forest-800">TOTAL KAS MASUK</td>
-                      <td className="px-4 py-3 text-right text-forest-900">{formatRupiah(totalCashIn)}</td>
-                      <td className="px-4 py-3 text-center text-forest-400 text-[11px] font-normal">
-                        {cashPayments.length} transaksi
+                      <td colSpan={7} className="px-4 py-3 text-forest-800">
+                        TOTAL PEMASUKAN NON-IPL TAMPIL
+                      </td>
+                      <td className="px-4 py-3 text-right text-emerald-800 font-bold text-base whitespace-nowrap">
+                        {formatRupiah(filteredNonIplIncomes.reduce((s, i) => s + Number(i.amount || 0), 0))}
                       </td>
                     </tr>
                   </tfoot>
@@ -865,92 +1063,476 @@ export default function Reports() {
               </div>
             )}
           </div>
+        </div>
+      ) : (
+        /* ─────────────────────────────────────────────────────────── */
+        /* TAMPILAN STANDARD: LAPORAN KAS & IPL (BULANAN / TAHUNAN)    */
+        /* ─────────────────────────────────────────────────────────── */
+        <>
+          {report.billCount === 0 ? (
+            <div className="pv-card p-10 text-center text-forest-400 text-sm">
+              Tidak ada data tagihan untuk periode {periodLabel}.
+            </div>
+          ) : (
+            <>
+              {/* Section A: Alur Kas (Running Balance) */}
+              <div>
+                <h3 className="text-xs font-bold text-forest-600 uppercase tracking-wider mb-2">Alur Kas (Running Balance)</h3>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <SummaryCard label="Saldo Awal Kas" value={formatRupiah(openingBalance)} icon="🏦" color="bg-gold-50 text-gold-700 border border-gold-200" />
+                  <SummaryCard label="Pemasukan Kas (Total)" value={`+ ${formatRupiah(totalCashIn)}`} icon="💰" color="bg-emerald-50 text-emerald-700 border border-emerald-200" />
+                  <SummaryCard label="Pengeluaran Kas" value={`- ${formatRupiah(totalExpenses)}`} icon="💸" color="bg-red-50 text-red-700 border border-red-200" />
+                  <SummaryCard label="Saldo Akhir Kas" value={formatRupiah(closingBalance)} icon="📈" color="bg-forest-800 text-gold-400 font-bold" />
+                </div>
+              </div>
 
-          {/* ── Section Pengeluaran ── */}
-          <div className="pv-card p-5">
-            <h3 className="text-sm font-semibold text-forest-800 mb-4">
-              Rincian Pengeluaran Kas — {periodLabel}
-            </h3>
-            {expenses.length === 0 ? (
-              <p className="text-sm text-forest-400 text-center py-6">
-                Tidak ada pengeluaran tercatat pada periode ini.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {expenses.map((exp) => {
-                  const attachmentUrl = getExpenseAttachmentUrl(exp);
-                  return (
-                  <div
-                    key={exp.id}
-                    className="flex items-start justify-between gap-3 py-2 border-b border-forest-50 last:border-0"
+              {hasFinanceBreakdown && (
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <SummaryCard label="Pemasukan IPL" value={formatRupiah(iplIncome)} icon="IPL" color="bg-emerald-50 text-emerald-700 border border-emerald-200" />
+                  <SummaryCard label="Non-IPL Umum" value={formatRupiah(nonIplGeneralIncome)} icon="UM" color="bg-blue-50 text-blue-700 border border-blue-200" />
+                  <SummaryCard label="Pemasukan Event" value={formatRupiah(eventIncome)} icon="EV" color="bg-purple-50 text-purple-700 border border-purple-200" />
+                  <SummaryCard label="Pengeluaran Event" value={formatRupiah(eventExpense)} icon="EX" color="bg-red-50 text-red-700 border border-red-200" />
+                </div>
+              )}
+
+              {/* Section B: Kinerja Tagihan IPL (Koleksi) */}
+              <div>
+                <h3 className="text-xs font-bold text-forest-600 uppercase tracking-wider mb-2">Koleksi Tagihan IPL</h3>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <SummaryCard label="Total Tagihan" value={formatRupiah(report.totalBilled)} icon="📋" color="bg-forest-100 text-forest-800 border border-forest-200" />
+                  <SummaryCard label="Terkumpul" value={formatRupiah(report.totalCollected)} icon="✅" color="bg-emerald-50 text-emerald-700 border border-emerald-200" />
+                  <SummaryCard label="Tunggakan" value={formatRupiah(report.totalOutstanding)} icon="⏳" color="bg-amber-50 text-amber-700 border border-amber-200" />
+                  <SummaryCard label="% Koleksi" value={`${report.collectionRate.toFixed(1)}%`} icon="📊" color="bg-blue-50 text-blue-700 border border-blue-200" />
+                </div>
+              </div>
+
+              {/* Grafik Tren Running Balance */}
+              <div className="pv-card p-5">
+                <h3 className="text-sm font-semibold text-forest-800 mb-4">
+                  Tren Arus Kas & Saldo Kumulatif (Sejak Jul 2026)
+                </h3>
+                <ResponsiveContainer width="100%" height={320}>
+                  <AreaChart data={trenData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#d4af37" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#d4af37" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#dde9e2" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#3d6e51' }} />
+                    <YAxis 
+                      tick={{ fontSize: 10, fill: '#3d6e51' }} 
+                      tickFormatter={(v) => (v >= 1000000 ? `${(v / 1000000).toFixed(1)}jt` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)}
+                    />
+                    <Tooltip 
+                      formatter={(v) => formatRupiah(v)}
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #dde9e2' }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Area type="monotone" dataKey="Pemasukan" stroke="#10b981" fillOpacity={1} fill="url(#colorIncome)" />
+                    <Area type="monotone" dataKey="Pengeluaran" stroke="#ef4444" fillOpacity={1} fill="url(#colorExpense)" />
+                    <Area type="monotone" dataKey="Saldo" stroke="#d4af37" fillOpacity={1} fill="url(#colorBalance)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Grafik Kinerja Lainnya */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Bar chart per blok */}
+                <div className="pv-card p-5 lg:col-span-2">
+                  <h3 className="text-sm font-semibold text-forest-800 mb-4">
+                    Koleksi Tagihan per Blok
+                  </h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={blockData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#dde9e2" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#3d6e51' }} />
+                      <YAxis
+                        tick={{ fontSize: 10, fill: '#3d6e51' }}
+                        tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)}
+                      />
+                      <Tooltip
+                        formatter={(v) => formatRupiah(v)}
+                        contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #dde9e2' }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Bar dataKey="Terkumpul" fill="#1a3d2e" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Tunggakan" fill="#d4af37" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Pie chart lunas/belum */}
+                <div className="pv-card p-5">
+                  <h3 className="text-sm font-semibold text-forest-800 mb-4">
+                    Status Pembayaran Tagihan IPL
+                  </h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={90}
+                        label={({ value }) => value}
+                        labelLine={false}
+                      >
+                        {pieData.map((entry, i) => (
+                          <PieCell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v, n) => [`${v} tagihan`, n]}
+                        contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Tabel Histori Running Balance Kumulatif */}
+              <div className="pv-card overflow-hidden">
+                <div className="px-5 py-3 border-b border-forest-100 bg-forest-50">
+                  <h3 className="text-sm font-semibold text-forest-800">
+                    Histori Running Balance (Sejak Juli 2026)
+                  </h3>
+                  <p className="text-[11px] text-forest-500 mt-0.5">
+                    Perkembangan saldo kas dari bulan ke bulan secara runut. Saldo Akhir otomatis bergulir menjadi Saldo Awal bulan berikutnya.
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-forest-100 bg-white">
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Periode</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Saldo Awal</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Pemasukan (+)</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Pengeluaran (-)</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Saldo Akhir</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-forest-100">
+                      {runningChain.map((item) => {
+                        const isSelectedMonth = item.year === year && item.month === month;
+                        return (
+                          <tr 
+                            key={item.period} 
+                            className={`hover:bg-forest-50 transition-colors ${isSelectedMonth ? 'bg-gold-50/50 font-semibold' : ''}`}
+                          >
+                            <td className="px-4 py-2.5 text-forest-700 whitespace-nowrap">
+                              {formatPeriodLabel(item.period)}
+                              {isSelectedMonth && (
+                                <span className="ml-2 pv-badge bg-gold-500 text-forest-900 text-[9px]">Bulan Ini</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-forest-600 whitespace-nowrap">
+                              {formatRupiah(item.openingBalance)}
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-emerald-600 whitespace-nowrap">
+                              + {formatRupiah(item.totalIncome)}
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-red-600 whitespace-nowrap">
+                              - {formatRupiah(item.totalExpense)}
+                            </td>
+                            <td className={`px-4 py-2.5 text-right whitespace-nowrap ${item.closingBalance >= 0 ? 'text-forest-900' : 'text-red-700 font-bold'}`}>
+                              {formatRupiah(item.closingBalance)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ── Laporan B: Kas Masuk IPL (basis tanggal pembayaran) ── */}
+              <div className="pv-card overflow-hidden">
+                <div className="px-5 py-3 border-b border-forest-100 bg-forest-50">
+                  <h3 className="text-sm font-semibold text-forest-800">
+                    Rincian Kas Masuk IPL — {periodLabel}
+                  </h3>
+                  <p className="text-[11px] text-forest-500 mt-0.5">
+                    Berdasarkan tanggal pembayaran, tanpa memandang periode tagihan IPL yang dilunasi.
+                  </p>
+                </div>
+                {cashPayments.length === 0 ? (
+                  <div className="p-10 text-center text-forest-400 text-sm">
+                    Belum ada pembayaran IPL yang tercatat pada {periodLabel}.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-forest-100 bg-white">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Tgl Bayar</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Unit</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Penghuni</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Periode IPL</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Jumlah</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-forest-600 uppercase">Metode</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-forest-100">
+                        {cashPayments.map((p) => (
+                          <tr key={p.paymentId} className="hover:bg-forest-50">
+                            <td className="px-4 py-2.5 text-forest-600 text-xs whitespace-nowrap">
+                              {formatDate(p.paidAt)}
+                            </td>
+                            <td className="px-4 py-2.5 font-medium text-forest-900 whitespace-nowrap">
+                              {p.block}/{p.unitNumber}
+                            </td>
+                            <td className="px-4 py-2.5 text-forest-700">{p.residentName}</td>
+                            <td className="px-4 py-2.5 text-forest-600">{formatPeriodLabel(p.period)}</td>
+                            <td className="px-4 py-2.5 text-right text-forest-700 whitespace-nowrap">
+                              {formatRupiah(p.amount)}
+                            </td>
+                            <td className="px-4 py-2.5 text-center">
+                              <span className={`pv-badge ${methodBadgeColor(p.method)}`}>
+                                {methodLabel(p.method)}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 border-forest-200 bg-forest-50 font-semibold">
+                          <td colSpan={4} className="px-4 py-3 text-forest-800">TOTAL KAS MASUK IPL</td>
+                          <td className="px-4 py-3 text-right text-forest-900">
+                            {formatRupiah(cashPayments.reduce((s, p) => s + Number(p.amount || 0), 0))}
+                          </td>
+                          <td className="px-4 py-3 text-center text-forest-400 text-[11px] font-normal">
+                            {cashPayments.length} transaksi
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Laporan C: Pemasukan Non-IPL (Donasi, Sewa, Kegiatan) ── */}
+              <div className="pv-card overflow-hidden">
+                <div className="px-5 py-3 border-b border-forest-100 bg-forest-50 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-forest-800">
+                      Rincian Pemasukan Non-IPL & Donasi — {periodLabel}
+                    </h3>
+                    <p className="text-[11px] text-forest-500 mt-0.5">
+                      Penerimaan kas umum dan kegiatan event di luar iuran bulanan warga.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setReportType('non_ipl')}
+                    className="no-print text-xs font-semibold text-forest-700 hover:text-gold-600 underline"
                   >
-                    <div className="flex min-w-0 items-start gap-3">
-                      <AttachmentThumbnail url={attachmentUrl} />
-                      <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="pv-badge bg-forest-50 text-forest-600">{exp.category}</span>
-                        <span className="text-[11px] text-forest-400">{formatDate(exp.date)}</span>
+                    Buka Laporan Penuh Non-IPL →
+                  </button>
+                </div>
+                {nonIplIncomes.length === 0 ? (
+                  <div className="p-8 text-center text-forest-400 text-sm">
+                    Belum ada pemasukan non-IPL yang tercatat pada {periodLabel}.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-forest-100 bg-white">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Tgl Masuk</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Lingkup</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Kategori</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Sumber / Pembayar</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-forest-600 uppercase">Metode</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Jumlah</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-forest-100">
+                        {nonIplIncomes.slice(0, 10).map((i) => (
+                          <tr key={i.id} className="hover:bg-forest-50">
+                            <td className="px-4 py-2.5 text-forest-600 text-xs whitespace-nowrap">
+                              {formatDate(i.income_date || i.date)}
+                            </td>
+                            <td className="px-4 py-2.5 text-xs whitespace-nowrap">
+                              {i.scope === 'event' ? (
+                                <span className="pv-badge bg-purple-50 text-purple-700 border border-purple-200">
+                                  🎪 {i.event_id ? (eventNameMap[i.event_id] || 'Event') : 'Event'}
+                                </span>
+                              ) : (
+                                <span className="pv-badge bg-blue-50 text-blue-700 border border-blue-200">
+                                  🏛️ Kas Umum
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-forest-800 font-medium">
+                              {i.category || '-'}
+                            </td>
+                            <td className="px-4 py-2.5 text-forest-700">
+                              {i.source_name || '-'}
+                            </td>
+                            <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                              <span className={`pv-badge ${methodBadgeColor(i.payment_method)}`}>
+                                {methodLabel(i.payment_method)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-semibold text-emerald-700 whitespace-nowrap">
+                              + {formatRupiah(i.amount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 border-forest-200 bg-forest-50 font-semibold">
+                          <td colSpan={5} className="px-4 py-3 text-forest-800">
+                            TOTAL PEMASUKAN NON-IPL
+                          </td>
+                          <td className="px-4 py-3 text-right text-emerald-800 font-bold">
+                            {formatRupiah(nonIplIncomes.reduce((s, i) => s + Number(i.amount || 0), 0))}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Section Pengeluaran ── */}
+              <div className="pv-card p-5">
+                <h3 className="text-sm font-semibold text-forest-800 mb-4">
+                  Rincian Pengeluaran Kas — {periodLabel}
+                </h3>
+                {expenses.length === 0 ? (
+                  <p className="text-sm text-forest-400 text-center py-6">
+                    Tidak ada pengeluaran tercatat pada periode ini.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {expenses.map((exp) => {
+                      const attachmentUrl = getExpenseAttachmentUrl(exp);
+                      return (
+                      <div
+                        key={exp.id}
+                        className="flex items-start justify-between gap-3 py-2 border-b border-forest-50 last:border-0"
+                      >
+                        <div className="flex min-w-0 items-start gap-3">
+                          <AttachmentThumbnail url={attachmentUrl} />
+                          <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="pv-badge bg-forest-50 text-forest-600">{exp.category}</span>
+                            <span className="text-[11px] text-forest-400">{formatDate(exp.date)}</span>
+                          </div>
+                            <p className="text-xs text-forest-600 mt-1 line-clamp-2">{exp.description}</p>
+                          </div>
+                        </div>
+                        <span className="font-medium text-red-600 text-sm shrink-0">
+                          − {formatRupiah(exp.amount)}
+                        </span>
                       </div>
-                        <p className="text-xs text-forest-600 mt-1 line-clamp-2">{exp.description}</p>
-                      </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Neraca: Pemasukan vs Pengeluaran ── */}
+              <div className="pv-card overflow-hidden">
+                <div className="px-5 py-3 border-b border-forest-100 bg-forest-800">
+                  <h3 className="text-sm font-semibold text-gold-400">
+                    Neraca Arus Kas — {periodLabel}
+                  </h3>
+                </div>
+                <div className="p-5 space-y-3 text-sm">
+                  <div className="flex justify-between items-center py-2 border-b border-forest-50">
+                    <span className="text-forest-600 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-amber-400"></span>
+                      Saldo Awal Periode (Carry-forward)
+                    </span>
+                    <span className="font-semibold text-forest-800">{formatRupiah(openingBalance)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-forest-50">
+                    <span className="text-forest-600 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                      Pemasukan IPL Periode Ini
+                    </span>
+                    <span className="font-semibold text-emerald-600">+ {formatRupiah(cashPayments.reduce((s, p) => s + Number(p.amount || 0), 0) || iplIncome)}</span>
+                  </div>
+                  {nonIplIncomes.length > 0 && (
+                    <div className="flex justify-between items-center py-2 border-b border-forest-50">
+                      <span className="text-forest-600 flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                        Pemasukan Non-IPL & Donasi
+                      </span>
+                      <span className="font-semibold text-blue-600">+ {formatRupiah(nonIplIncomes.reduce((s, i) => s + Number(i.amount || 0), 0))}</span>
                     </div>
-                    <span className="font-medium text-red-600 text-sm shrink-0">
-                      − {formatRupiah(exp.amount)}
+                  )}
+                  <div className="flex justify-between items-center py-2 border-b border-forest-50">
+                    <span className="text-forest-600 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                      Pengeluaran Kas Periode Ini
+                    </span>
+                    <span className="font-semibold text-red-600">− {formatRupiah(totalExpenses)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-3 mt-2 bg-forest-50 rounded-lg px-3">
+                    <span className="font-semibold text-forest-800">Saldo Akhir Periode</span>
+                    <span className={`font-bold text-base ${closingBalance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                      {formatRupiah(closingBalance)}
                     </span>
                   </div>
-                  );
-                })}
+                  <p className="text-[11px] text-forest-400 pt-1">
+                    Laporan ini dihitung menggunakan basis kas masuk running balance (kumulatif), dimulai dari Juli 2026.
+                  </p>
+                </div>
               </div>
-            )}
-          </div>
-
-          {/* ── Neraca: Pemasukan vs Pengeluaran ── */}
-          <div className="pv-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-forest-100 bg-forest-800">
-              <h3 className="text-sm font-semibold text-gold-400">
-                Neraca Arus Kas — {periodLabel}
-              </h3>
-            </div>
-            <div className="p-5 space-y-3 text-sm">
-              <div className="flex justify-between items-center py-2 border-b border-forest-50">
-                <span className="text-forest-600 flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-amber-400"></span>
-                  Saldo Awal Periode (Carry-forward)
-                </span>
-                <span className="font-semibold text-forest-800">{formatRupiah(openingBalance)}</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-forest-50">
-                <span className="text-forest-600 flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                  Pemasukan IPL Periode Ini
-                </span>
-                <span className="font-semibold text-emerald-600">+ {formatRupiah(totalCashIn)}</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-forest-50">
-                <span className="text-forest-600 flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-red-500"></span>
-                  Pengeluaran Kas Periode Ini
-                </span>
-                <span className="font-semibold text-red-600">− {formatRupiah(totalExpenses)}</span>
-              </div>
-              <div className="flex justify-between items-center py-3 mt-2 bg-forest-50 rounded-lg px-3">
-                <span className="font-semibold text-forest-800">Saldo Akhir Periode</span>
-                <span className={`font-bold text-base ${closingBalance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                  {formatRupiah(closingBalance)}
-                </span>
-              </div>
-              <p className="text-[11px] text-forest-400 pt-1">
-                Laporan ini dihitung menggunakan basis kas masuk running balance (kumulatif), dimulai dari Juli 2026.
-              </p>
-            </div>
-          </div>
+            </>
+          )}
         </>
       )}
+
+      {/* Modal Preview Gambar Bukti */}
+      <Modal
+        isOpen={Boolean(previewImage)}
+        onClose={() => setPreviewImage(null)}
+        title="Bukti Pembayaran"
+      >
+        <div className="flex flex-col items-center justify-center p-2 space-y-4">
+          <img
+            src={previewImage}
+            alt="Bukti pembayaran"
+            className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain border border-forest-100"
+          />
+          <div className="flex gap-2">
+            <a
+              href={previewImage}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pv-btn-primary text-xs"
+            >
+              Buka Ukuran Penuh ↗
+            </a>
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="pv-btn-ghost text-xs"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
 
-// ── Helpers untuk Laporan B (Kas Masuk IPL) ──────────────────────
+// ── Helpers untuk Laporan B (Kas Masuk IPL & Non-IPL) ────────────
 
 /** Format "2026-01" → "Januari 2026" untuk kolom Periode IPL. */
 function formatPeriodLabel(period) {
@@ -977,14 +1559,25 @@ function methodLabel(method) {
 function methodBadgeColor(method) {
   switch (method) {
     case 'qris':
-      return 'bg-forest-50 text-forest-700';
+      return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
     case 'cash':
-      return 'bg-gold-50 text-gold-700';
+      return 'bg-gold-50 text-gold-700 border border-gold-200';
     case 'bank_transfer':
-      return 'bg-blue-50 text-blue-700';
+      return 'bg-blue-50 text-blue-700 border border-blue-200';
     default:
       return 'bg-gray-100 text-gray-600';
   }
+}
+
+function getIncomeAttachmentUrl(income) {
+  return (
+    income?.receipt_file_url ||
+    income?.receipt_url ||
+    income?.file_url ||
+    income?.attachment_url ||
+    income?.receipt_file ||
+    ''
+  );
 }
 
 function AttachmentThumbnail({ url }) {
