@@ -15,7 +15,7 @@ Kelola data warga, tagihan IPL (Iuran Pemeliharaan Lingkungan), pembayaran QRIS,
 - **Pencatatan Penghuni Tanpa Email (Placeholder Profiles)**: Pengurus dapat mendaftarkan nama warga dan nomor telepon ke unit rumah tanpa memerlukan email warga. Nama warga langsung tampil utuh di Daftar Rumah, Matriks IPL, dan Laporan.
 - **Auto-Claim & Rekonsiliasi Akun Google**: Deteksi cerdas dan klaim akun pada menu Approval User ketika warga mendaftar/login secara mandiri menggunakan akun Google resmi (Gmail).
 - **Denah Visual Palm Village Terkini**: Pembaruan mapsite resolusi tinggi pada halaman Daftar Rumah dilengkapi modal pratinjau interaktif.
-- **Penataan Blok CB1 & Isolasi Unit Demo**: Standardisasi unit Blok CB1 (CB1/1 & CB1/2) serta isolasi unit demo untuk menjaga integritas data riil perumahan.
+- **Penataan Blok CB1 & Isolasi Unit Demo**: Standardisasi unit Blok CB1 (CB1/1A & CB1/1B) serta isolasi unit demo untuk menjaga integritas data riil perumahan.
 
 ---
 
