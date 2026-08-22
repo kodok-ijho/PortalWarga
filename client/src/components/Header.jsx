@@ -52,6 +52,19 @@ export default function Header() {
   const [editPhone, setEditPhone] = useState('');
   const dropdownRef = useRef(null);
 
+  const handleStartCurrentPageTour = () => {
+    const path = location.pathname;
+    if (path.startsWith('/payment-matrix')) {
+      startTour('payment_matrix');
+    } else if (path.startsWith('/houses')) {
+      startTour('houses');
+    } else if (path.startsWith('/residents')) {
+      startTour('residents');
+    } else {
+      startTour('dashboard');
+    }
+  };
+
   const openProfileModal = () => {
     if (!canWrite) {
       toast.info('Akun read-only tidak dapat mengubah profil.');
@@ -376,9 +389,9 @@ export default function Header() {
               {/* Tombol Panduan Aplikasi */}
               <button
                 type="button"
-                onClick={() => startTour()}
+                onClick={() => handleStartCurrentPageTour()}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold-500/10 hover:bg-gold-500/20 text-gold-300 text-xs font-bold border border-gold-500/30 transition-all hover:scale-105"
-                title="Panduan Interaktif Portal Warga"
+                title="Panduan Interaktif Halaman Ini"
               >
                 <AiOutlineBulb className="text-base text-gold-400" />
                 <span className="hidden lg:inline">Panduan</span>
@@ -436,9 +449,9 @@ export default function Header() {
           <div className="flex md:hidden items-center gap-2">
             <button
               type="button"
-              onClick={() => startTour()}
+              onClick={() => handleStartCurrentPageTour()}
               className="p-2 rounded-lg text-gold-400 hover:bg-forest-750 transition-colors"
-              title="Panduan Aplikasi"
+              title="Panduan Halaman Ini"
             >
               <AiOutlineBulb className="text-xl" />
             </button>
@@ -510,11 +523,11 @@ export default function Header() {
                 type="button"
                 onClick={() => {
                   setMobileMenuOpen(false);
-                  startTour();
+                  handleStartCurrentPageTour();
                 }}
                 className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-xl bg-gold-500/10 text-gold-300 border border-gold-500/30 hover:bg-gold-500/20 transition-all shadow-xs"
               >
-                <AiOutlineBulb className="text-base text-gold-400" /> Mulai Panduan Aplikasi (Tour)
+                <AiOutlineBulb className="text-base text-gold-400" /> Panduan Halaman Ini
               </button>
             </div>
 

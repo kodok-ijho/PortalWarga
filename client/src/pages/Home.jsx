@@ -13,6 +13,7 @@ import {
   AiOutlineCheckCircle,
 } from 'react-icons/ai';
 import { useAuth } from '../hooks/useAuth';
+import { useTour } from '../context/TourContext';
 import {
   formatRupiah,
   MONTHS_LONG,
@@ -26,6 +27,7 @@ import { fetchDashboardData, IS_DEMO } from '../services/dataService';
 
 export default function Home() {
   const { profile, role, session } = useAuth();
+  const { triggerTour } = useTour();
   const isStaff = isStaffRole(role);
   const isBendahara = isBendaharaOrAbove(role);
 
@@ -50,7 +52,8 @@ export default function Home() {
 
   useEffect(() => {
     loadDashboard();
-  }, [loadDashboard]);
+    triggerTour('dashboard');
+  }, [loadDashboard, triggerTour]);
 
   const pendingRegCount = dashData?.pendingRegistrationCount || 0;
   const pendingPayCount = dashData?.pendingPaymentCount || 0;

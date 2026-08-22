@@ -259,7 +259,7 @@ export default function WalkthroughTour() {
         <div className="flex items-center justify-between gap-3 mb-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 px-3 py-0.5 text-[11px] font-bold text-emerald-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Langkah {currentStepIndex + 1} dari {totalSteps}
+            {totalSteps > 1 ? `Langkah ${currentStepIndex + 1} dari ${totalSteps}` : 'Info Panduan'}
           </span>
           <button
             type="button"
@@ -288,7 +288,7 @@ export default function WalkthroughTour() {
             onClick={skipTour}
             className="text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors underline-offset-4 hover:underline py-1.5"
           >
-            Lewati Panduan
+            Tutup
           </button>
 
           <div className="flex items-center gap-2">
@@ -307,7 +307,7 @@ export default function WalkthroughTour() {
               onClick={nextStep}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-900/40 transition-all hover:scale-[1.02] active:scale-95"
             >
-              <span>{isLastStep ? 'Selesai & Mulai 🚀' : 'Lanjut'}</span>
+              <span>{isLastStep ? (totalSteps === 1 ? 'Paham 👍' : 'Selesai 👍') : 'Lanjut'}</span>
               {!isLastStep && <AiOutlineArrowRight className="text-xs" />}
             </button>
           </div>

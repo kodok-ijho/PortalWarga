@@ -10,6 +10,7 @@ import {
 } from 'react-icons/ai';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { useTour } from '../context/TourContext';
 import Modal from '../components/Modal';
 import {
   fetchUnits,
@@ -40,6 +41,7 @@ const EMPTY_FORM = {
 
 export default function Houses() {
   const { role, session, isReadOnly } = useAuth();
+  const { triggerTour } = useTour();
   const token = session?.access_token;
   const toast = useToast();
   const isStaff = isStaffRole(role);
@@ -82,7 +84,8 @@ export default function Houses() {
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    triggerTour('houses');
+  }, [loadData, triggerTour]);
 
   const getUnitOwner = useCallback((unitId) => {
     if (!unitId) return null;
@@ -302,7 +305,7 @@ export default function Houses() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+        <div data-tour="houses-stats" className="grid grid-cols-2 gap-3 lg:grid-cols-1">
           <StatCard label="Total Rumah" value={stats.total} tone="forest" />
           <StatCard label="Terhuni (Skema Komplit)" value={stats.occupied} tone="green" />
           <StatCard label="Kosong (Skema Basic)" value={stats.vacant} tone="amber" />

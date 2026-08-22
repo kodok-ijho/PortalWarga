@@ -1,171 +1,226 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
 const TourContext = createContext(null);
 
-export const TOUR_STORAGE_KEY = 'pv_onboarding_tour_completed';
-
 /**
- * Daftar langkah panduan Shadow Point khusus alur Warga.
+ * Konfigurasi panduan terpisah per-halaman & per-aksi.
  */
-export const WARGA_TOUR_STEPS = [
-  {
-    id: 'dashboard-welcome',
-    route: '/',
-    targetSelector: '[data-tour="dashboard-hero"]',
-    fallbackSelector: 'main',
-    title: 'Selamat Datang di Portal Warga! 👋',
-    description: 'Portal resmi warga Palm Village untuk melihat informasi lingkungan, mengecek status tagihan IPL, dan melakukan pembayaran secara mudah & transparan.',
-    placement: 'bottom',
+export const TOURS_CONFIG = {
+  dashboard: {
+    key: 'pv_tour_dashboard',
+    title: 'Panduan Dashboard',
+    steps: [
+      {
+        id: 'dashboard-welcome',
+        targetSelector: '[data-tour="dashboard-hero"]',
+        fallbackSelector: 'main',
+        title: 'Selamat Datang di Portal Warga! 👋',
+        description: 'Pusat layanan informasi resmi warga perumahan Palm Village untuk melihat ringkasan lingkungan dan mengakses fitur utama.',
+      },
+      {
+        id: 'profile-detail',
+        targetSelector: '[data-tour="profile-badge"], [data-tour="user-profile-button"]',
+        fallbackSelector: '[data-tour="dashboard-hero"]',
+        title: 'Identitas & Profil Warga 👤',
+        description: 'Di sini Anda dapat melihat identitas Anda. Klik profil di atas untuk melengkapi nomor WhatsApp aktif agar menerima notifikasi tagihan IPL.',
+      },
+      {
+        id: 'dashboard-features',
+        targetSelector: '[data-tour="dashboard-features"]',
+        fallbackSelector: 'main',
+        title: 'Menu Fitur Cepat 📱',
+        description: 'Gunakan shortcut ini untuk langsung membuka Matriks IPL, Denah Rumah & Mapsite, Direktori Warga, dan Dokumentasi Kegiatan.',
+      },
+    ],
   },
-  {
-    id: 'profile-detail',
-    route: '/',
-    targetSelector: '[data-tour="profile-badge"], [data-tour="user-profile-button"]',
-    fallbackSelector: '[data-tour="dashboard-hero"]',
-    title: 'Edit & Lengkapi Profil Warga 👤',
-    description: 'Klik identitas profil Anda di atas untuk memperbarui nama lengkap, nomor WhatsApp aktif untuk notifikasi tagihan, serta mengecek nomor unit rumah terdaftar Anda.',
-    placement: 'bottom',
+
+  payment_matrix: {
+    key: 'pv_tour_payment_matrix',
+    title: 'Panduan Matriks IPL',
+    steps: [
+      {
+        id: 'matrix-legend',
+        targetSelector: '[data-tour="matrix-pay-guide"]',
+        fallbackSelector: '[data-tour="matrix-grid"]',
+        title: 'Status Warna Iuran IPL 📅',
+        description: 'Tabel ini menampilkan status iuran 12 bulan (Juli - Juni). Hijau = Lunas, Oranye = Menunggu Verifikasi, dan Kuning = Belum Bayar.',
+      },
+      {
+        id: 'my-unit-row',
+        targetSelector: '[data-tour="my-unit-row"]',
+        fallbackSelector: '[data-tour="matrix-grid"]',
+        title: 'Baris Rumah / Unit Anda 🏠',
+        description: 'Ini adalah baris tagihan rumah Anda yang disorot. Klik kotak bulan yang belum lunas untuk memilih periode tagihan yang ingin dibayar.',
+      },
+      {
+        id: 'matrix-action',
+        targetSelector: '[data-tour="matrix-grid"]',
+        fallbackSelector: 'main',
+        title: 'Pilih & Mulai Pembayaran 💳',
+        description: 'Setelah memilih bulan yang ingin dibayar, tombol pembayaran akan muncul di bawah. Anda dapat membayar via QRIS DOKU atau Transfer Bank.',
+      },
+    ],
   },
-  {
-    id: 'matrix-menu',
-    route: '/',
-    targetSelector: '[data-tour="feature-payment-matrix"], [data-tour="nav-payment-matrix"]',
-    fallbackSelector: '[data-tour="dashboard-features"]',
-    title: 'Buka Matriks Pembayaran IPL 💳',
-    description: 'Menu ini menampilkan seluruh riwayat dan status tagihan iuran IPL rumah Anda sepanjang tahun (12 bulan berjalan).',
-    placement: 'bottom',
-    nextRoute: '/payment-matrix',
+
+  pay_transfer: {
+    key: 'pv_tour_pay_transfer',
+    title: 'Panduan Transfer Bank',
+    steps: [
+      {
+        id: 'pay-transfer-guide',
+        targetSelector: '[data-tour="pay-transfer-guide"]',
+        fallbackSelector: 'form',
+        title: 'Metode Transfer Bank 🏦',
+        description: 'Silakan transfer ke nomor rekening pengurus, lalu unggah foto/screenshot bukti transfer. Pembayaran akan diverifikasi oleh Bendahara.',
+      },
+    ],
   },
-  {
-    id: 'matrix-grid',
-    route: '/payment-matrix',
-    targetSelector: '[data-tour="matrix-grid"]',
-    fallbackSelector: 'main',
-    title: 'Tabel Matriks IPL Unit Anda 📅',
-    description: 'Pantau iuran per bulan (Juli - Juni). Hijau = Lunas, Kuning = Menunggu Verifikasi Bendahara, dan Merah = Belum Bayar.',
-    placement: 'top',
+
+  pay_qris: {
+    key: 'pv_tour_pay_qris',
+    title: 'Panduan Bayar QRIS',
+    steps: [
+      {
+        id: 'pay-qris-guide',
+        targetSelector: '[data-tour="pay-qris-guide"]',
+        fallbackSelector: 'form',
+        title: 'Pembayaran Instan QRIS 📱',
+        description: 'Scan kode QR langsung dari M-Banking/E-Wallet atau unduh gambar QRIS ke galeri HP. Sesuai regulasi Bank Indonesia, ada biaya layanan administrasi 0,7% yang dibebankan kepada pembayar.',
+      },
+    ],
   },
-  {
-    id: 'matrix-pay-method',
-    route: '/payment-matrix',
-    targetSelector: '[data-tour="matrix-pay-guide"]',
-    fallbackSelector: '[data-tour="matrix-grid"]',
-    title: 'Pembayaran QRIS & Transfer Bank 📲',
-    description: 'Pilih bulan yang ingin dibayar, lalu bayar instan via scan QRIS resmi DOKU (langsung terkonfirmasi) atau Transfer Bank manual dengan upload bukti transfer.',
-    placement: 'bottom',
-    nextRoute: '/houses',
+
+  houses: {
+    key: 'pv_tour_houses',
+    title: 'Panduan Denah & Rumah',
+    steps: [
+      {
+        id: 'houses-mapsite',
+        targetSelector: '[data-tour="houses-mapsite"]',
+        fallbackSelector: 'main',
+        title: 'Peta Denah Mapsite Palm Village 🗺️',
+        description: 'Peta resolusi tinggi posisi blok CB1, CB2, CB3, dan CB4. Anda dapat memperbesar peta untuk melihat denah perumahan dengan jelas.',
+      },
+      {
+        id: 'houses-stats',
+        targetSelector: '[data-tour="houses-stats"]',
+        fallbackSelector: '[data-tour="houses-mapsite"]',
+        title: 'Statistik & Status Rumah 🏡',
+        description: 'Pantau jumlah unit terhuni (skema komplit) dan rumah kosong (skema basic) di seluruh blok komplek Palm Village.',
+      },
+    ],
   },
-  {
-    id: 'houses-mapsite',
-    route: '/houses',
-    targetSelector: '[data-tour="houses-mapsite"]',
-    fallbackSelector: 'main',
-    title: 'Denah Rumah & Mapsite 🗺️',
-    description: 'Lihat peta denah resmi Palm Village (Blok CB1, CB2, CB3, CB4) beserta data dan status rumah di perumahan.',
-    placement: 'bottom',
-    nextRoute: '/residents',
+
+  residents: {
+    key: 'pv_tour_residents',
+    title: 'Panduan Direktori Warga',
+    steps: [
+      {
+        id: 'residents-filters',
+        targetSelector: '[data-tour="residents-filters"]',
+        fallbackSelector: 'main',
+        title: 'Pencarian & Filter Penghuni 🔍',
+        description: 'Cari tetangga berdasarkan nama, nomor telepon, atau filter berdasarkan Blok (CB1 - CB4) dan status hunian.',
+      },
+      {
+        id: 'residents-list',
+        targetSelector: '[data-tour="residents-list"]',
+        fallbackSelector: 'main',
+        title: 'Buku Kontak Penghuni 👥',
+        description: 'Daftar nomor kontak warga komplek Palm Village untuk mempermudah komunikasi dan koordinasi lingkungan antar-tetangga.',
+      },
+    ],
   },
-  {
-    id: 'residents-list',
-    route: '/residents',
-    targetSelector: '[data-tour="residents-list"]',
-    fallbackSelector: 'main',
-    title: 'Buku Direktori Warga 👥',
-    description: 'Daftar kontak sesama warga penghuni Palm Village untuk koordinasi lingkungan dan nomor darurat.',
-    placement: 'bottom',
-  },
-];
+};
 
 export function TourProvider({ children }) {
   const { isAuthenticated } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
 
-  const [isOpen, setIsOpen] = useState(false);
+  const [activeTourKey, setActiveTourKey] = useState(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
-  const steps = WARGA_TOUR_STEPS;
+  const activeTour = activeTourKey ? TOURS_CONFIG[activeTourKey] : null;
+  const steps = activeTour ? activeTour.steps : [];
   const currentStep = steps[currentStepIndex] || null;
+  const isOpen = Boolean(activeTour && currentStep);
 
-  // Cek apakah user pertama kali login dan belum pernah menyelesaikan tur
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setIsOpen(false);
-      return;
-    }
+  // Mulai tur secara eksplisit (misal user klik tombol 💡 Panduan)
+  const startTour = useCallback((tourKey = 'dashboard') => {
+    if (!TOURS_CONFIG[tourKey]) return;
+    setActiveTourKey(tourKey);
+    setCurrentStepIndex(0);
+  }, []);
 
-    const isCompleted = localStorage.getItem(TOUR_STORAGE_KEY);
-    if (!isCompleted) {
-      // Beri sedikit delay agar halaman awal ter-render sempurna
+  // Pemicu otomatis per-halaman (hanya jalan jika belum pernah dilihat)
+  const triggerTour = useCallback((tourKey, force = false) => {
+    if (!TOURS_CONFIG[tourKey]) return;
+    const storageKey = TOURS_CONFIG[tourKey].key;
+    const isCompleted = localStorage.getItem(storageKey);
+
+    if (!isCompleted || force) {
+      // Beri sedikit delay agar DOM halaman ter-render sempurna
       const timer = setTimeout(() => {
-        setIsOpen(true);
+        setActiveTourKey(tourKey);
         setCurrentStepIndex(0);
-      }, 1000);
+      }, 700);
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated]);
-
-  const startTour = useCallback(() => {
-    setCurrentStepIndex(0);
-    setIsOpen(true);
-    if (location.pathname !== '/') {
-      navigate('/');
-    }
-  }, [location.pathname, navigate]);
+  }, []);
 
   const skipTour = useCallback(() => {
-    setIsOpen(false);
-    localStorage.setItem(TOUR_STORAGE_KEY, 'true');
-  }, []);
+    if (activeTourKey && TOURS_CONFIG[activeTourKey]) {
+      localStorage.setItem(TOURS_CONFIG[activeTourKey].key, 'true');
+    }
+    setActiveTourKey(null);
+    setCurrentStepIndex(0);
+  }, [activeTourKey]);
 
   const nextStep = useCallback(() => {
     if (currentStepIndex < steps.length - 1) {
-      const nextIndex = currentStepIndex + 1;
-      const nextStepConfig = steps[nextIndex];
-
-      setCurrentStepIndex(nextIndex);
-
-      if (nextStepConfig.route && location.pathname !== nextStepConfig.route) {
-        navigate(nextStepConfig.route);
-      }
+      setCurrentStepIndex((prev) => prev + 1);
     } else {
-      // Selesai
+      // Selesai tur ini
       skipTour();
     }
-  }, [currentStepIndex, steps, location.pathname, navigate, skipTour]);
+  }, [currentStepIndex, steps.length, skipTour]);
 
   const prevStep = useCallback(() => {
     if (currentStepIndex > 0) {
-      const prevIndex = currentStepIndex - 1;
-      const prevStepConfig = steps[prevIndex];
-
-      setCurrentStepIndex(prevIndex);
-
-      if (prevStepConfig.route && location.pathname !== prevStepConfig.route) {
-        navigate(prevStepConfig.route);
-      }
+      setCurrentStepIndex((prev) => prev - 1);
     }
-  }, [currentStepIndex, steps, location.pathname, navigate]);
+  }, [currentStepIndex]);
 
-  const resetTour = useCallback(() => {
-    localStorage.removeItem(TOUR_STORAGE_KEY);
-    startTour();
+  const resetAllTours = useCallback(() => {
+    Object.values(TOURS_CONFIG).forEach((config) => {
+      localStorage.removeItem(config.key);
+    });
+    startTour('dashboard');
   }, [startTour]);
+
+  // Tutup tur jika logout
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setActiveTourKey(null);
+      setCurrentStepIndex(0);
+    }
+  }, [isAuthenticated]);
 
   return (
     <TourContext.Provider
       value={{
         isOpen,
+        activeTourKey,
+        activeTour,
         currentStepIndex,
         totalSteps: steps.length,
         currentStep,
         startTour,
+        triggerTour,
         skipTour,
         nextStep,
         prevStep,
-        resetTour,
+        resetAllTours,
       }}
     >
       {children}

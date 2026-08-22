@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { useTour } from '../context/TourContext';
 import Modal from '../components/Modal';
 import Placeholder from '../components/Placeholder';
 import QrisCheckoutModal from '../components/QrisCheckoutModal';
@@ -50,6 +51,7 @@ import { AiOutlineDownload } from 'react-icons/ai';
 
 export default function PaymentMatrix() {
   const { profile, role, session, isReadOnly } = useAuth();
+  const { triggerTour } = useTour();
   const toast = useToast();
   const years = [2026, 2027, 2028];
   const [year, setYear] = useState(2026); // Default to billing start year 2026
@@ -177,7 +179,8 @@ export default function PaymentMatrix() {
 
   useEffect(() => {
     loadMatrix();
-  }, [loadMatrix, refreshKey]);
+    triggerTour('payment_matrix');
+  }, [loadMatrix, refreshKey, triggerTour]);
 
   useEffect(() => {
     if (!qrisCheckoutData || IS_DEMO) return undefined;
@@ -774,6 +777,7 @@ export default function PaymentMatrix() {
                   return (
                     <tr
                       key={row.unit.id}
+                      data-tour={isMyUnit ? 'my-unit-row' : undefined}
                       className={rowBg}
                     >
                       <td className={`sticky left-0 z-10 ${stickyBg} px-3 py-2 border-r border-forest-100`}>
@@ -1157,6 +1161,7 @@ function Cell({ cell, unitId, isSelected, isStaff, canInteract, isLockedOtherUni
 
 // ── Modal pembayaran warga: Transfer Bank (dengan bukti) ────
 function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
+  const { triggerTour } = useTour();
   const [method, setMethod] = useState('bank_transfer');
   const [receiptFile, setReceiptFile] = useState(null);
   const [uploadError, setUploadError] = useState('');
@@ -1168,6 +1173,14 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
   const isMulti = bills.length > 1;
   const qrisFee = Math.ceil(total * 0.007);
   const totalWithQrisFee = total + qrisFee;
+
+  useEffect(() => {
+    if (method === 'bank_transfer') {
+      triggerTour('pay_transfer');
+    } else if (method === 'qris') {
+      triggerTour('pay_qris');
+    }
+  }, [method, triggerTour]);
 
   const handleFile = async (e) => {
     setUploadError('');
@@ -1287,7 +1300,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
 
         {/* Transfer: wajib upload bukti */}
         {method === 'bank_transfer' && (
-          <div>
+          <div data-tour="pay-transfer-guide">
             <label className="block text-sm font-medium text-forest-700 mb-1">
               Bukti Transfer <span className="text-red-500">*</span>
             </label>
@@ -1318,7 +1331,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
         )}
 
         {method === 'qris' && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+          <div data-tour="pay-qris-guide" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
             <p className="font-semibold text-amber-950 flex items-center gap-1.5">
               <span>ℹ️</span> Biaya Layanan Administrasi QRIS (0,7%)
             </p>

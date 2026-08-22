@@ -10,6 +10,7 @@ import {
 import Papa from 'papaparse';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { useTour } from '../context/TourContext';
 import Modal from '../components/Modal';
 import {
   fetchResidents,
@@ -30,6 +31,7 @@ import {
 
 export default function Residents() {
   const { role, session, isReadOnly } = useAuth();
+  const { triggerTour } = useTour();
   const token = session?.access_token;
   const toast = useToast();
   const canManage = canManageResidents(role, isReadOnly);
@@ -76,7 +78,8 @@ export default function Residents() {
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    triggerTour('residents');
+  }, [loadData, triggerTour]);
 
   const getUnitById = useCallback((id) => {
     if (!id) return null;
@@ -314,7 +317,7 @@ export default function Residents() {
       </div>
 
       {/* Search & filters */}
-      <div className="pv-card p-4">
+      <div data-tour="residents-filters" className="pv-card p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-forest-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
