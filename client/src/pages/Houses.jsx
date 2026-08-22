@@ -145,10 +145,6 @@ export default function Houses() {
     });
   }, [filterBlock, filterStatus, search, units, getUnitOwner, getUnitOccupant]);
 
-  if (!isStaff) {
-    return <Navigate to="/" replace />;
-  }
-
   const openAdd = () => {
     setFormUnit({ ...EMPTY_FORM });
   };
@@ -214,16 +210,12 @@ export default function Houses() {
   };
 
   const handleDelete = async (unit) => {
-    // Delete in supabase: we can just update unit status or show warning.
-    // In our backend, there is only a units upsert workflow.
-    // If unit needs to be deleted/marked as inactive, we call upsertUnit setting occupancy_status = 'owner_vacant' and is_occupied = false.
     const relatedProfiles = profiles.filter((profile) => profile.unit_id === unit.id);
-    const relatedBills = payments.filter((bill) => bill.unit_id === unit.id);
 
-    if (relatedProfiles.length || relatedBills.length) {
+    if (relatedProfiles.length) {
       if (
         !confirm(
-          `Rumah ${unit.block}/${unit.unit_number} masih punya relasi warga/tagihan. Nonaktifkan status huni rumah ini?`
+          `Rumah ${unit.block}/${unit.unit_number} masih punya relasi warga. Nonaktifkan status huni rumah ini?`
         )
       ) {
         return;
@@ -243,20 +235,15 @@ export default function Houses() {
       return;
     }
 
-    if (!confirm(`Hapus rumah ${unit.block}/${unit.unit_number}?`)) return;
+    if (!confirm(`Tandai rumah ${unit.block}/${unit.unit_number} tidak dihuni?`)) return;
     setIsSaving(true);
     try {
-      // In the database schema, we don't have delete webhook for units, but we can set size = -1 or delete it if we had a webhook.
-      // Wait, let's look at the requirements: we don't delete units row from DB usually, we just de-occupy it or deactivate it.
-      // If we want to hard delete it, wait, does the upsert units webhook allow it? No, but we can de-occupy it.
-      // Wait, is there a delete webhook for units? No. So we will update units to set is_occupied = false or do a prompt.
-      // Wait, if the user really wants to delete it, we can just do a mock success or call upsert with is_occupied = false. Let's do upsert with is_occupied = false.
       await upsertUnit(token, { ...unit, is_occupied: false });
       toast.success(`Rumah ${unit.block}/${unit.unit_number} ditandai tidak dihuni.`);
       await loadData();
       setSelectedUnit(null);
     } catch (err) {
-      toast.error('Gagal menghapus rumah.');
+      toast.error('Gagal memperbarui status rumah.');
       console.error(err);
     } finally {
       setIsSaving(false);
@@ -267,14 +254,20 @@ export default function Houses() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-forest-900">Manajemen Rumah & Skema IPL</h2>
+          <h2 className="text-lg font-bold text-forest-900">
+            {canWrite ? 'Manajemen Rumah & Skema IPL' : 'Denah & Daftar Rumah Palm Village'}
+          </h2>
           <p className="text-sm text-forest-500">
-            Rawat master data unit rumah Palm Village dan tempelkan profil skema biaya IPL.
+            {canWrite
+              ? 'Rawat master data unit rumah Palm Village dan tempelkan profil skema biaya IPL.'
+              : 'Informasi denah perumahan blok CB1-CB4, status hunian, dan direktori unit rumah.'}
           </p>
         </div>
-        <button type="button" onClick={openAdd} disabled={!canWrite} className="pv-btn-primary text-xs disabled:opacity-50">
-          <AiOutlinePlus /> Tambah Rumah
-        </button>
+        {canWrite && (
+          <button type="button" onClick={openAdd} className="pv-btn-primary text-xs">
+            <AiOutlinePlus /> Tambah Rumah
+          </button>
+        )}
       </div>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
@@ -450,24 +443,28 @@ export default function Houses() {
                           >
                             <AiOutlineEye />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(unit)}
-                            disabled={!canWrite}
-                            className="rounded-lg p-2 text-forest-500 hover:bg-gold-50 hover:text-gold-700 disabled:opacity-50"
-                            aria-label="Edit rumah"
-                          >
-                            <AiOutlineEdit />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(unit)}
-                            disabled={!canWrite}
-                            className="rounded-lg p-2 text-red-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                            aria-label="Hapus atau nonaktifkan rumah"
-                          >
-                            <AiOutlineDelete />
-                          </button>
+                          {canWrite && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEdit(unit)}
+                                className="rounded-lg p-2 text-forest-500 hover:bg-gold-50 hover:text-gold-700"
+                                aria-label="Edit rumah"
+                                title="Edit Rumah"
+                              >
+                                <AiOutlineEdit />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(unit)}
+                                className="rounded-lg p-2 text-red-400 hover:bg-red-50 hover:text-red-600"
+                                aria-label="Hapus atau nonaktifkan rumah"
+                                title="Nonaktifkan Rumah"
+                              >
+                                <AiOutlineDelete />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -597,14 +594,16 @@ function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSch
         />
         {unit.notes && <InfoRow label="Catatan" value={unit.notes} />}
       </div>
-      <div className="mt-6 flex gap-2 border-t border-forest-100 pt-4">
-        <button type="button" onClick={onEdit} disabled={!canWrite} className="pv-btn-ghost flex-1 text-xs disabled:opacity-50">
-          <AiOutlineEdit /> Edit
-        </button>
-        <button type="button" onClick={onDelete} disabled={!canWrite} className="pv-btn-danger flex-1 text-xs disabled:opacity-50">
-          <AiOutlineDelete /> Hapus
-        </button>
-      </div>
+      {canWrite && (
+        <div className="mt-6 flex gap-2 border-t border-forest-100 pt-4">
+          <button type="button" onClick={onEdit} className="pv-btn-ghost flex-1 text-xs">
+            <AiOutlineEdit /> Edit
+          </button>
+          <button type="button" onClick={onDelete} className="pv-btn-danger flex-1 text-xs">
+            <AiOutlineDelete /> Hapus
+          </button>
+        </div>
+      )}
     </Modal>
   );
 }
