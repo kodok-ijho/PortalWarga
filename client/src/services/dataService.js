@@ -1149,13 +1149,13 @@ export async function createQrisPayment(token, { bill_ids, provider } = {}) {
 
 // Create one QRIS checkout for Non-IPL / Donasi / Kegiatan.
 export async function createNonIplQrisPayment(token, { amount, base_amount, qris_fee_amount, description, category, provider } = {}) {
-  const numericAmount = Number(amount || 0);
-  if (!numericAmount || numericAmount <= 0) {
+  const base = Number(base_amount || amount || 0);
+  if (!base || base <= 0) {
     throw new Error('Nominal pembayaran harus lebih dari 0.');
   }
+  const fee = Number(qris_fee_amount || Math.ceil(base * 0.007));
+  const total = base + fee;
   const normalizedProvider = normalizeQrisProvider(provider || 'doku');
-  const base = Number(base_amount || (qris_fee_amount ? numericAmount - Number(qris_fee_amount) : Math.round(numericAmount / 1.007)));
-  const fee = Number(qris_fee_amount || (numericAmount - base) || Math.ceil(base * 0.007));
 
   if (IS_DEMO) {
     return {
@@ -1165,8 +1165,8 @@ export async function createNonIplQrisPayment(token, { amount, base_amount, qris
       base_amount: base,
       qris_fee_amount: fee,
       qris_fee_rate: 0.007,
-      total_amount: numericAmount,
-      qr_content: `00020101021226550012COM.DOKU.WWW011893600899000010181002061018100303UKE51440014ID.CO.QRIS.WWW0215ID10265631295470303UKE5204864153033605407${numericAmount.toFixed(2)}5802ID5921Palm Village - Social6005BOGOR61051691462440703A015033DEMO-NONIPL-${Date.now()}6304ABCD`,
+      total_amount: total,
+      qr_content: `00020101021226550012COM.DOKU.WWW011893600899000010181002061018100303UKE51440014ID.CO.QRIS.WWW0215ID10265631295470303UKE5204864153033605407${total.toFixed(2)}5802ID5921Palm Village - Social6005BOGOR61051691462440703A015033DEMO-NONIPL-${Date.now()}6304ABCD`,
       demo: true,
     };
   }
@@ -1174,9 +1174,8 @@ export async function createNonIplQrisPayment(token, { amount, base_amount, qris
   const data = await portalApiPost(qrisRoute(normalizedProvider, 'create'), {
     token,
     body: {
-      amount: numericAmount,
+      amount: base,
       base_amount: base,
-      qris_fee_amount: fee,
       description: description || category || 'Non-IPL Palm Village',
       category,
       provider: normalizedProvider
@@ -1184,9 +1183,9 @@ export async function createNonIplQrisPayment(token, { amount, base_amount, qris
   });
 
   const resolvedProvider = normalizeQrisProvider(data?.provider || normalizedProvider);
-  const totalAmount = Number(data?.total_amount ?? numericAmount);
+  const totalAmount = Number(data?.total_amount ?? total);
   const resolvedBase = Number(data?.base_amount ?? base);
-  const resolvedFee = Number(data?.qris_fee_amount ?? fee);
+  const resolvedFee = Number(data?.qris_fee_amount ?? (totalAmount - resolvedBase));
 
   return {
     ...data,

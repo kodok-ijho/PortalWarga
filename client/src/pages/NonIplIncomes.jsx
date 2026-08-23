@@ -131,7 +131,7 @@ export default function NonIplIncomes() {
         const totalAmount = baseAmount + qrisFee;
         const desc = `${form.category} - ${form.source_name} (${form.scope === 'event' ? getEventName(form.event_id) : 'Kas Umum'})`;
         const qrisData = await createNonIplQrisPayment(token, {
-          amount: totalAmount,
+          amount: baseAmount,
           base_amount: baseAmount,
           qris_fee_amount: qrisFee,
           description: desc,
@@ -143,8 +143,8 @@ export default function NonIplIncomes() {
           order_id: qrisData.parent_order_id,
           parent_order_id: qrisData.parent_order_id,
           doku_reference_no: qrisData.doku_reference_no,
-          base_amount: baseAmount,
-          qris_fee_amount: qrisFee,
+          base_amount: qrisData.base_amount || baseAmount,
+          qris_fee_amount: qrisData.qris_fee_amount || qrisFee,
           total: qrisData.total_amount || totalAmount,
           amount: qrisData.total_amount || totalAmount,
           total_amount: qrisData.total_amount || totalAmount,
