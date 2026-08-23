@@ -171,7 +171,7 @@ export default function Residents() {
 
   const handleDelete = async (profile) => {
     if (!canManage) {
-      toast.error('Hanya Koordinator atau Admin yang dapat menghapus data penghuni.');
+      toast.error('Hanya Pengurus, Bendahara, atau Admin yang dapat menghapus data warga.');
       return;
     }
     if (!confirm(`Hapus warga "${profile.full_name}"? Tindakan ini tidak dapat dibatalkan.`)) return;
@@ -182,7 +182,7 @@ export default function Residents() {
       setSelectedId(null);
       await loadData();
     } catch (err) {
-      toast.error('Gagal menghapus data warga.');
+      toast.error(err.message || 'Gagal menghapus data warga.');
       console.error(err);
     } finally {
       setIsSaving(false);
