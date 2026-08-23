@@ -1509,6 +1509,22 @@ export function updatePayment(paymentId, opts = {}) {
     payment.receipt_file = opts.file.name || opts.file;
     payment.proof_file_name = payment.receipt_file;
   }
+  if (opts.unit_id) {
+    payment.unit_id = Number(opts.unit_id) || opts.unit_id;
+    const oldBill = mockIPLBills.find((b) => b.id === payment.ipl_bill_id);
+    if (oldBill && String(oldBill.unit_id) !== String(opts.unit_id)) {
+      const targetBill = mockIPLBills.find(b => String(b.unit_id) === String(opts.unit_id) && b.period === oldBill.period);
+      if (targetBill) {
+        payment.ipl_bill_id = targetBill.id;
+        targetBill.payment_id = payment.id;
+        targetBill.status = payment.status;
+        oldBill.payment_id = null;
+        oldBill.status = 'unpaid';
+      } else {
+        oldBill.unit_id = Number(opts.unit_id) || opts.unit_id;
+      }
+    }
+  }
   payment.updated_at = new Date().toISOString();
   return { ok: true, data: { payment } };
 }

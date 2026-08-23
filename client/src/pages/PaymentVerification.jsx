@@ -166,6 +166,14 @@ export default function PaymentVerification() {
   const [qrisEnabled, setQrisEnabled] = useState(true);
   const [qrisProvider, setQrisProvider] = useState('midtrans');
 
+  const sortedUnits = useMemo(() => {
+    return [...units].sort((a, b) => {
+      const blockCompare = String(a.block || '').localeCompare(String(b.block || ''));
+      if (blockCompare !== 0) return blockCompare;
+      return String(a.unit_number || '').localeCompare(String(b.unit_number || ''), undefined, { numeric: true });
+    });
+  }, [units]);
+
   useEffect(() => {
     let active = true;
     const loadData = async () => {
@@ -182,9 +190,18 @@ export default function PaymentVerification() {
         } else {
           // Prod mode fetches from API & Supabase
           const [payData, unitData, resData, matrixData, settingsData] = await Promise.all([
-            fetchPayments(session?.access_token),
-            fetchUnits(session?.access_token),
-            fetchResidents(session?.access_token),
+            fetchPayments(session?.access_token).catch((err) => {
+              console.error('fetchPayments error:', err);
+              return [];
+            }),
+            fetchUnits(session?.access_token).catch((err) => {
+              console.error('fetchUnits error:', err);
+              return [];
+            }),
+            fetchResidents(session?.access_token).catch((err) => {
+              console.error('fetchResidents error:', err);
+              return [];
+            }),
             fetchBillMatrix(session?.access_token, currentBillingYear()).catch(() => []),
             fetchSettings(session?.access_token).catch(() => null),
           ]);
@@ -320,8 +337,10 @@ export default function PaymentVerification() {
       toast.error('Akun read-only tidak dapat mengubah pembayaran.');
       return;
     }
+    const currentUnitId = payment.unit_id || payment._unit?.id || payment._bill?.unit_id || payment.ipl_bills?.unit_id || '';
     setSelectedPayment(payment);
     setPaymentForm({
+      unit_id: currentUnitId ? String(currentUnitId) : '',
       amount: payment.amount ?? '',
       method: payment.method || 'bank_transfer',
       paid_at: payment.paid_at ? String(payment.paid_at).slice(0, 10) : '',
@@ -740,6 +759,31 @@ export default function PaymentVerification() {
               Perbarui transaksi warga. Upload bukti baru bersifat opsional.
             </p>
             <form onSubmit={handleUpdatePayment} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-forest-700 mb-1">
+                  Unit Rumah Palm Village *
+                </label>
+                <select
+                  value={paymentForm.unit_id}
+                  onChange={(e) => setPaymentForm((prev) => ({ ...prev, unit_id: e.target.value }))}
+                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 outline-none focus:border-gold-500 font-medium"
+                >
+                  <option value="">-- Pilih Unit Rumah --</option>
+                  {sortedUnits.map((u) => {
+                    const resident = residents.find(r => String(r.unit_id) === String(u.id));
+                    const residentName = resident?.full_name ? ` - ${resident.full_name}` : ' (Kosong / Belum terdata)';
+                    return (
+                      <option key={u.id} value={String(u.id)}>
+                        Blok {u.block}/{u.unit_number}{residentName}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="mt-1 text-xs text-forest-500">
+                  Gunakan pilihan ini jika pengurus keliru memilih unit rumah saat pencatatan IPL.
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-forest-700 mb-1">Nominal Pembayaran *</label>
                 <input
