@@ -131,7 +131,7 @@ export default function Residents() {
   // ── Handlers ──────────────────────────────────────────
   const handleSaveProfile = async (data) => {
     if (!canManage) {
-      toast.error('Hanya Koordinator atau Admin yang dapat mengubah data penghuni.');
+      toast.error('Hanya Pengurus, Bendahara, atau Admin yang dapat menambah/mengubah data warga.');
       return;
     }
     setIsSaving(true);
@@ -156,7 +156,7 @@ export default function Residents() {
       await loadData();
       setModalAddEdit(null);
     } catch (err) {
-      toast.error('Gagal menyimpan data warga.');
+      toast.error(err.message || 'Gagal menyimpan data warga.');
       console.error(err);
     } finally {
       setIsSaving(false);
@@ -576,9 +576,10 @@ function ProfileFormModal({ profile, onSave, onClose, isSaving, units, currentUs
     if (!form.full_name.trim()) return;
     let finalEmail = form.email.trim().toLowerCase();
     if (!finalEmail) {
+      const rand = Math.random().toString(36).substring(2, 7);
       const unit = units.find((u) => u.id === Number(form.unit_id));
       const cleanUnit = unit ? `unit_${unit.block.toLowerCase()}_${unit.unit_number.toLowerCase()}` : `unassigned_${Date.now()}`;
-      finalEmail = `${cleanUnit}@warga.palmvillage.local`;
+      finalEmail = `${cleanUnit}_${rand}@warga.palmvillage.local`;
     }
     onSave({
       ...(profile ? { id: profile.id } : {}),
