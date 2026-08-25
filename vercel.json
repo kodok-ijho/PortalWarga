@@ -4,6 +4,11 @@
   "buildCommand": "npm --prefix client run build",
   "outputDirectory": "client/dist",
   "framework": "vite",
+  "functions": {
+    "api/n8n.js": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     { "source": "/api/n8n/:path*", "destination": "/api/n8n?path=:path*" },
     { "source": "/(.*)", "destination": "/index.html" }

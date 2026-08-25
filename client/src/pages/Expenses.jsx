@@ -405,14 +405,7 @@ function ExpenseFormModal({ expense, initialScope = 'general', eventOptions = []
       return;
     }
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      setUploadError('Format tidak didukung. Gunakan JPG or PNG.');
-      setFileName('');
-      setSelectedFile(null);
-      e.target.value = '';
-      return;
-    }
-    if (file.size > MAX_SIZE) {
-      setUploadError('Ukuran file melebihi 2 MB.');
+      setUploadError('Format tidak didukung. Gunakan JPG atau PNG.');
       setFileName('');
       setSelectedFile(null);
       e.target.value = '';
@@ -421,10 +414,24 @@ function ExpenseFormModal({ expense, initialScope = 'general', eventOptions = []
     try {
       const result = await compressImage(file);
       const compressedFile = result.file;
+      if (compressedFile.size > MAX_SIZE) {
+        setUploadError('Ukuran file melebihi 2 MB setelah kompresi.');
+        setFileName('');
+        setSelectedFile(null);
+        e.target.value = '';
+        return;
+      }
       setFileName(compressedFile.name);
       setForm({ ...form, receipt_file: compressedFile.name });
       setSelectedFile(compressedFile);
     } catch (err) {
+      if (file.size > MAX_SIZE) {
+        setUploadError('Ukuran file melebihi 2 MB.');
+        setFileName('');
+        setSelectedFile(null);
+        e.target.value = '';
+        return;
+      }
       setFileName(file.name);
       setForm({ ...form, receipt_file: file.name });
       setSelectedFile(file);
