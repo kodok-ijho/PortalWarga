@@ -498,7 +498,9 @@ function ExpenseFormModal({ expense, initialScope = 'general', eventOptions = []
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-forest-700 mb-1">Jumlah (Rp)</label>
+          <label className="block text-sm font-medium text-forest-700 mb-1">
+            Jumlah (Rp) <span className="text-red-500">*</span>
+          </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-forest-400">Rp</span>
             <input
@@ -506,8 +508,8 @@ function ExpenseFormModal({ expense, initialScope = 'general', eventOptions = []
               value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
               required
-              min="0"
-              step="500"
+              min="1"
+              step="1"
               className="pv-input pl-9"
               placeholder="0"
             />

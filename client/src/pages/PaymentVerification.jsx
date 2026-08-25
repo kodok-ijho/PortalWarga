@@ -789,7 +789,7 @@ export default function PaymentVerification() {
                 <input
                   type="number"
                   min="1"
-                  step="1000"
+                  step="1"
                   required
                   value={paymentForm.amount}
                   onChange={(e) => setPaymentForm((prev) => ({ ...prev, amount: e.target.value }))}

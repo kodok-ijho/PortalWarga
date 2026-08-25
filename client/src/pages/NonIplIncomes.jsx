@@ -470,8 +470,8 @@ export default function NonIplIncomes() {
             <input
               className="pv-input mt-1"
               type="number"
-              min="1000"
-              step="1000"
+              min="1"
+              step="1"
               placeholder="0"
               value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
