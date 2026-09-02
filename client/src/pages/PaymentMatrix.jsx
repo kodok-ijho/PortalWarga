@@ -502,7 +502,7 @@ export default function PaymentMatrix() {
     });
   };
 
-  const confirmManual = async ({ method, paidAt, note, receiptFile }) => {
+  const confirmManual = async ({ method, paidAt, note, receiptFile, customAmounts }) => {
     const methodLabel =
       method === 'cash' ? 'tunai' : method === 'bank_transfer' ? 'transfer' : 'QRIS';
     const noteWithDate = [note?.trim(), `Tanggal diterima: ${paidAt}`].filter(Boolean).join(' | ');
@@ -513,18 +513,26 @@ export default function PaymentMatrix() {
         return;
       }
       if (IS_DEMO) {
+        const isDirectVerify = isBendaharaOrAbove(role);
         let count = 0;
         for (const bill of manualModal.bills) {
+          const billCustomAmount = customAmounts?.[bill.id];
           recordManualPayment(bill.id, {
             method,
             paidAt,
             recordedBy: profile?.full_name || 'staff',
             note: noteWithDate,
             receiptFile,
+            recorderRole: role,
+            amount: billCustomAmount,
           });
           count++;
         }
-        toast.success(`${count} pembayaran ${methodLabel} berhasil dicatat.`);
+        toast.success(
+          isDirectVerify
+            ? `${count} pembayaran ${methodLabel} berhasil dicatat dan langsung terverifikasi.`
+            : `${count} pembayaran ${methodLabel} berhasil dicatat.`
+        );
       } else {
         if (method === 'qris') {
           const data = await createQrisPayment(session?.access_token, {
@@ -552,36 +560,43 @@ export default function PaymentMatrix() {
             if (i === 0) {
               firstPayment = await createCashPayment(session?.access_token, {
                 bill_id: bill.id,
-                amount: Number(bill.amount || 0) + Number(bill.late_fee || 0),
+                amount: customAmounts?.[bill.id] ?? (Number(bill.amount || 0) + Number(bill.late_fee || 0)),
                 file: receiptFile,
                 note: noteWithDate,
                 paid_at: paidAt,
+                recorderRole: role,
               });
             } else {
               await createCashPayment(session?.access_token, {
                 bill_id: bill.id,
-                amount: Number(bill.amount || 0) + Number(bill.late_fee || 0),
+                amount: customAmounts?.[bill.id] ?? (Number(bill.amount || 0) + Number(bill.late_fee || 0)),
                 file: null,
                 note: noteWithDate + (firstPayment?.file_url ? ` (Lampiran: ${firstPayment.file_url})` : ''),
                 paid_at: paidAt,
+                recorderRole: role,
               });
             }
             completedCount += 1;
           }
-          toast.success(`Pembayaran tunai untuk ${manualModal.bills.length} tagihan berhasil dicatat.`);
+          toast.success(`Pembayaran tunai untuk ${manualModal.bills.length} tagihan berhasil dicatat dan langsung terverifikasi.`);
         } else if (method === 'bank_transfer') {
           for (const bill of manualModal.bills) {
             await submitManualPayment(session?.access_token, {
               bill_id: bill.id,
               method: 'bank_transfer',
-              amount: Number(bill.amount || 0) + Number(bill.late_fee || 0),
+              amount: customAmounts?.[bill.id] ?? (Number(bill.amount || 0) + Number(bill.late_fee || 0)),
               file: receiptFile,
               note: noteWithDate,
               paid_at: paidAt,
             });
             completedCount += 1;
           }
-          toast.success(`Bukti transfer untuk ${manualModal.bills.length} tagihan berhasil dicatat dan menunggu verifikasi bendahara.`);
+          const isDirectVerifyTransfer = isBendaharaOrAbove(role);
+          toast.success(
+            isDirectVerifyTransfer
+              ? `Pembayaran transfer untuk ${manualModal.bills.length} tagihan berhasil dicatat dan langsung terverifikasi.`
+              : `Bukti transfer untuk ${manualModal.bills.length} tagihan berhasil dicatat dan menunggu verifikasi bendahara.`
+          );
         }
       }
       setSelected({});
@@ -1341,6 +1356,12 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
           </div>
         )}
 
+        {canEditNominal && method !== 'qris' && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+            \u2705 Pembayaran yang dicatat oleh Admin/Bendahara akan <strong>langsung terverifikasi otomatis</strong> (status Lunas).
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-forest-700 mb-1">
             Catatan <span className="text-forest-400 font-normal">(opsional)</span>
@@ -1383,14 +1404,31 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
   const [uploadError, setUploadError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Khusus admin/bendahara: nominal tagihan dapat diubah
+  const canEditNominal = isBendaharaOrAbove(role) && canWrite;
+  const [customAmounts, setCustomAmounts] = useState(() => {
+    const initial = {};
+    bills.forEach((bill) => {
+      initial[bill.id] = Number(bill.amount || 0) + Number(bill.late_fee || 0);
+    });
+    return initial;
+  });
+
+  const handleAmountChange = (billId, value) => {
+    const num = value === '' ? '' : Number(value);
+    setCustomAmounts((prev) => ({ ...prev, [billId]: num }));
+  };
+
   const MAX_SIZE = 2 * 1024 * 1024; // n8n manual payment endpoint limit
   const ACCEPTED = ['image/jpeg', 'image/jpg', 'image/png'];
 
   // bills diasumsikan satu unit, sudah runut & terurut (divalidasi sebelum modal).
-  const total = bills.reduce(
-    (sum, bill) => sum + Number(bill.amount || 0) + Number(bill.late_fee || 0),
-    0
-  );
+  const total = canEditNominal
+    ? Object.values(customAmounts).reduce((sum, v) => sum + (Number(v) || 0), 0)
+    : bills.reduce(
+        (sum, bill) => sum + Number(bill.amount || 0) + Number(bill.late_fee || 0),
+        0
+      );
   const qrisFee = Math.ceil(total * 0.007);
   const totalWithQrisFee = total + qrisFee;
   const unitLabel = unit ? `${unit.block} no ${unit.unit_number}` : '';
@@ -1437,7 +1475,7 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
     }
     setIsSubmitting(true);
     try {
-      await onConfirm({ method, paidAt, note, receiptFile });
+      await onConfirm({ method, paidAt, note, receiptFile, customAmounts: canEditNominal ? customAmounts : undefined });
     } finally {
       setIsSubmitting(false);
     }
@@ -1477,16 +1515,32 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
             {isMulti ? `${bills.length} tagihan IPL:` : 'Tagihan IPL:'}
           </p>
           {/* Daftar periode terpilih (lintas tahun) */}
-          <div className="mt-1 space-y-1 max-h-28 overflow-y-auto">
+          <div className="mt-1 space-y-1 max-h-40 overflow-y-auto">
             {bills.map((bill) => (
-              <div key={bill.id} className="flex justify-between text-xs py-0.5">
-                <span className="font-medium text-forest-800">
+              <div key={bill.id} className="flex items-center justify-between text-xs py-0.5 gap-2">
+                <span className="font-medium text-forest-800 flex-shrink-0">
                   {formatPeriod(bill.period)}
                 </span>
-                <span className="text-forest-700">{formatRupiah(bill.amount)}</span>
+                {canEditNominal ? (
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={customAmounts[bill.id] ?? ''}
+                    onChange={(e) => handleAmountChange(bill.id, e.target.value)}
+                    className="w-28 rounded border border-gold-300 bg-gold-50 px-2 py-1 text-right text-xs font-medium text-forest-900 outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-400/30"
+                  />
+                ) : (
+                  <span className="text-forest-700">{formatRupiah(Number(bill.amount || 0) + Number(bill.late_fee || 0))}</span>
+                )}
               </div>
             ))}
           </div>
+          {canEditNominal && (
+            <p className="mt-1 text-[10px] text-gold-700 italic">
+              ✨ Nominal dapat diubah (khusus Admin/Bendahara)
+            </p>
+          )}
 
           {method === 'qris' && (
             <div className="pt-2 border-t border-forest-200 space-y-1 text-xs">
@@ -1577,6 +1631,12 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
         {method === 'qris' && (
           <div className="rounded-lg border border-gold-200 bg-gold-50 p-3 text-xs text-gold-800">
             QRIS akan dibuka otomatis. Pembayaran dicatat untuk unit yang dipilih dan dikonfirmasi otomatis.
+          </div>
+        )}
+
+        {canEditNominal && method !== 'qris' && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+            ✅ Pembayaran yang dicatat oleh Admin/Bendahara akan <strong>langsung terverifikasi otomatis</strong> (status Lunas).
           </div>
         )}
 

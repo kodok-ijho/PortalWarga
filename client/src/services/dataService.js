@@ -874,7 +874,7 @@ export async function submitManualPayment(token, { bill_id, method, amount, file
   }
 }
 
-export async function createCashPayment(token, { bill_id, amount, file, note, paid_at }) {
+export async function createCashPayment(token, { bill_id, amount, file, note, paid_at, recorderRole }) {
   if (IS_DEMO) {
     const mock = await getMockData();
     return mock.recordManualPayment(bill_id, {
@@ -882,6 +882,8 @@ export async function createCashPayment(token, { bill_id, amount, file, note, pa
       paidAt: paid_at,
       note,
       receiptFile: file,
+      recorderRole,
+      amount,
     });
   }
   
@@ -1102,9 +1104,13 @@ function normalizeQrisProvider(provider) {
 }
 
 function qrisRoute(provider, suffix) {
-  return normalizeQrisProvider(provider) === 'doku'
-    ? `/payments/qris/doku/${suffix}`
-    : `/payments/qris/${suffix}`;
+  if (normalizeQrisProvider(provider) === 'doku') {
+    if (suffix === 'status') {
+      return '/payments/qris/doku/inquiry';
+    }
+    return `/payments/qris/doku/${suffix}`;
+  }
+  return `/payments/qris/${suffix}`;
 }
 
 // Create one QRIS checkout. Ownership and amount are resolved by the API.

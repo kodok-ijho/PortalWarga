@@ -1202,23 +1202,30 @@ export function getPaymentForBill(billId) {
 /**
  * Catat pembayaran manual oleh bendahara (cash / transfer bank).
  * @param {string} billId
- * @param {object} opts - { method, paidAt, recordedBy, note, receiptFile }
+ * @param {object} opts - { method, paidAt, recordedBy, note, receiptFile, recorderRole, amount }
  */
-export function recordManualPayment(billId, { method, paidAt, recordedBy, note, receiptFile, recorderRole }) {
+export function recordManualPayment(billId, { method, paidAt, recordedBy, note, receiptFile, recorderRole, amount }) {
   const bill = mockIPLBills.find((b) => b.id === billId);
   if (!bill) return null;
   const paymentId = `pay-manual-${Date.now()}`;
 
   // Bendahara/admin langsung paid; pengurus/warga perlu verifikasi
   const directPaid = recorderRole && (ROLE_LEVEL[recorderRole] || 0) >= 3;
+
+  // Admin/Bendahara dapat mengubah nominal tagihan saat pencatatan
+  if (directPaid && amount != null && Number(amount) > 0) {
+    bill.amount = Number(amount);
+  }
+
   bill.status = directPaid ? 'paid' : 'pending_verification';
   bill.late_fee = directPaid ? 0 : bill.late_fee;
   bill.payment_id = paymentId;
+  const paymentAmount = directPaid ? bill.amount : (Number(bill.amount || 0) + Number(bill.late_fee || 0));
   const payment = {
     id: paymentId,
     ipl_bill_id: bill.id,
     resident_id: bill.resident_id,
-    amount: bill.amount,
+    amount: paymentAmount,
     method,
     transaction_id: `MANUAL-${paymentId}`,
     status: directPaid ? 'completed' : 'pending_verification',
