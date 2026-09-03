@@ -1356,12 +1356,6 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
           </div>
         )}
 
-        {canEditNominal && method !== 'qris' && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
-            \u2705 Pembayaran yang dicatat oleh Admin/Bendahara akan <strong>langsung terverifikasi otomatis</strong> (status Lunas).
-          </div>
-        )}
-
         <div>
           <label className="block text-sm font-medium text-forest-700 mb-1">
             Catatan <span className="text-forest-400 font-normal">(opsional)</span>
