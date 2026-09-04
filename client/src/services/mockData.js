@@ -926,7 +926,13 @@ export function getPaymentsByMonth(year, month) {
     .map((p) => {
       const bill = mockIPLBills.find((b) => b.id === p.ipl_bill_id);
       const unit = bill ? getUnitById(bill.unit_id) : null;
-      const profile = getProfileById(p.resident_id);
+      const occupants = unit ? mockProfiles.filter(prof => prof.unit_id === unit.id) : [];
+      const profile = getProfileById(p.resident_id) || (unit?.owner_id ? getProfileById(unit.owner_id) : null);
+      const residentName =
+        profile?.full_name ||
+        (occupants.length > 0 ? occupants.map((o) => o.full_name).join(' / ') : '') ||
+        (bill ? bill.resident_name : 'Warga') ||
+        '-';
       return {
         paymentId: p.id,
         paidAt: p.paid_at,
@@ -935,8 +941,7 @@ export function getPaymentsByMonth(year, month) {
         unitId: bill?.unit_id || null,
         block: unit?.block || '-',
         unitNumber: unit?.unit_number || '-',
-        residentName:
-          profile?.full_name || (bill ? bill.resident_name : 'Warga') || '-',
+        residentName,
         period: bill?.period || '-',
         recordedBy: p.metadata?.recorded_by || p.metadata?.payer || null,
       };
@@ -1132,15 +1137,21 @@ export function computeReport(period) {
   // Detail per unit
   const details = bills.map((b) => {
     const unit = getUnitById(b.unit_id);
-    const resident = getProfileById(b.resident_id);
+    const occupants = unit ? mockProfiles.filter(prof => prof.unit_id === unit.id) : [];
+    const resident = getProfileById(b.resident_id) || (unit?.owner_id ? getProfileById(unit.owner_id) : null);
     const payment = b.payment_id
       ? mockPayments.find((p) => p.id === b.payment_id)
       : null;
+    const residentName =
+      resident?.full_name ||
+      (occupants.length > 0 ? occupants.map((o) => o.full_name).join(' / ') : '') ||
+      b.resident_name ||
+      '-';
     return {
       billId: b.id,
       block: unit?.block || '-',
       unitNumber: unit?.unit_number || '-',
-      residentName: resident?.full_name || '-',
+      residentName,
       amount: b.amount,
       status: b.status,
       paidAt: payment?.paid_at || null,

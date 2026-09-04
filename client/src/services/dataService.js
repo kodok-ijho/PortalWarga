@@ -1288,35 +1288,55 @@ function billTotal(bill) {
   return Number(bill?.amount || 0) + Number(bill?.late_fee || 0);
 }
 
-function mapBillDetail(bill) {
+function mapBillDetail(bill, profileMap = {}, unitProfilesMap = {}) {
   const payment = Array.isArray(bill.payments)
     ? bill.payments.find((item) => item.status === 'completed') || bill.payments[0]
     : null;
+  const unitId = bill.unit_id;
+  const unit = bill.units || {};
+  const residentName =
+    bill.profiles?.full_name ||
+    (unitId && unitProfilesMap[unitId] && unitProfilesMap[unitId].length > 0 ? unitProfilesMap[unitId].join(' / ') : '') ||
+    (unit.owner_id && profileMap[unit.owner_id] ? profileMap[unit.owner_id].full_name : '') ||
+    '-';
   return {
     billId: bill.id,
     unit_id: bill.unit_id,
-    unitNumber: bill.units?.unit_number || '-',
-    block: bill.units?.block || '-',
-    residentName: bill.profiles?.full_name || '-',
+    unitNumber: unit.unit_number || '-',
+    block: unit.block || '-',
+    residentName: residentName !== '-' ? residentName : '— Belum Ada Penghuni —',
     amount: billTotal(bill),
     status: bill.status,
     paidAt: payment?.paid_at || null,
   };
 }
 
-function mapCashPayment(payment) {
+function mapCashPayment(payment, profileMap = {}, unitProfilesMap = {}) {
   const bill = payment.ipl_bills || {};
+  const unit = bill.units || {};
+  const unitId = bill.unit_id;
+  let metadata = payment.metadata || {};
+  if (typeof metadata === 'string') {
+    try { metadata = JSON.parse(metadata); } catch (e) { metadata = {}; }
+  }
+  const metaName = metadata.customerName || metadata.customer || metadata.payer_name || metadata.payer || metadata.recorded_by;
+  const residentName =
+    payment.profiles?.full_name ||
+    (unitId && unitProfilesMap[unitId] && unitProfilesMap[unitId].length > 0 ? unitProfilesMap[unitId].join(' / ') : '') ||
+    (unit.owner_id && profileMap[unit.owner_id] ? profileMap[unit.owner_id].full_name : '') ||
+    (metaName && typeof metaName === 'string' && metaName.trim() ? metaName.trim() : '') ||
+    '-';
   return {
     paymentId: payment.id,
     paidAt: payment.paid_at,
     amount: Number(payment.amount || 0),
     method: payment.method,
     unitId: bill.unit_id || null,
-    block: bill.units?.block || '-',
-    unitNumber: bill.units?.unit_number || '-',
-    residentName: payment.profiles?.full_name || '-',
+    block: unit.block || '-',
+    unitNumber: unit.unit_number || '-',
+    residentName,
     period: bill.period || '-',
-    recordedBy: payment.recorded_by || null,
+    recordedBy: payment.recorded_by || metadata.recorded_by || metadata.payer || null,
   };
 }
 
@@ -1325,14 +1345,14 @@ async function fetchMonthlyFinanceFromSupabase(token, { year, month }) {
   const { start, end } = monthRange(year, month);
   const client = getAuthedSupabaseClient(token);
 
-  const [billsRes, paymentsRes, expensesRes] = await Promise.all([
+  const [billsRes, paymentsRes, expensesRes, profilesRes, unitsRes] = await Promise.all([
     client
       .from('ipl_bills')
-      .select('*, units(block, unit_number), profiles!ipl_bills_resident_id_fkey(full_name), payments!payments_ipl_bill_id_fkey(id, status, paid_at)')
+      .select('*, units(id, block, unit_number, owner_id), profiles!ipl_bills_resident_id_fkey(full_name), payments!payments_ipl_bill_id_fkey(id, status, paid_at)')
       .eq('period', period),
     client
       .from('payments')
-      .select('*, ipl_bills!payments_ipl_bill_id_fkey(period, unit_id, units(block, unit_number)), profiles!payments_resident_id_fkey(full_name)')
+      .select('*, ipl_bills!payments_ipl_bill_id_fkey(period, unit_id, units(id, block, unit_number, owner_id)), profiles!payments_resident_id_fkey(full_name)')
       .eq('status', 'completed')
       .gte('paid_at', `${start}T00:00:00+07:00`)
       .lt('paid_at', `${end}T00:00:00+07:00`)
@@ -1344,10 +1364,29 @@ async function fetchMonthlyFinanceFromSupabase(token, { year, month }) {
       .lt('expense_date', end)
       .is('deleted_at', null)
       .order('expense_date', { ascending: true }),
+    client
+      .from('profiles')
+      .select('id, full_name, unit_id, role')
+      .is('deleted_at', null),
+    client
+      .from('units')
+      .select('id, block, unit_number, owner_id'),
   ]);
 
   const error = billsRes.error || paymentsRes.error || expensesRes.error;
   if (error) throw error;
+
+  const allProfiles = profilesRes.data || [];
+  const profileMap = Object.fromEntries(allProfiles.map((p) => [p.id, p]));
+  const unitProfilesMap = {};
+  allProfiles.forEach((p) => {
+    if (p.unit_id && p.full_name) {
+      if (!unitProfilesMap[p.unit_id]) {
+        unitProfilesMap[p.unit_id] = [];
+      }
+      unitProfilesMap[p.unit_id].push(p.full_name.trim());
+    }
+  });
 
   const bills = billsRes.data || [];
   const paidBills = bills.filter((bill) => bill.status === 'paid');
@@ -1377,7 +1416,7 @@ async function fetchMonthlyFinanceFromSupabase(token, { year, month }) {
     totalOutstanding: totalBilled - totalCollected,
     collectionRate: totalBilled > 0 ? (totalCollected / totalBilled) * 100 : 0,
     byBlock: Object.values(byBlockMap).sort((a, b) => String(a.block).localeCompare(String(b.block), 'id-ID', { numeric: true })),
-    details: bills.map(mapBillDetail).sort((a, b) => {
+    details: bills.map((b) => mapBillDetail(b, profileMap, unitProfilesMap)).sort((a, b) => {
       const blockCompare = String(a.block || '').localeCompare(String(b.block || ''), 'id-ID', { numeric: true });
       if (blockCompare !== 0) return blockCompare;
       return String(a.unitNumber || '').localeCompare(String(b.unitNumber || ''), 'id-ID', { numeric: true });
@@ -1391,7 +1430,7 @@ async function fetchMonthlyFinanceFromSupabase(token, { year, month }) {
       date: expense.expense_date,
       amount: Number(expense.amount || 0),
     })),
-    cashPayments: (paymentsRes.data || []).map(mapCashPayment),
+    cashPayments: (paymentsRes.data || []).map((p) => mapCashPayment(p, profileMap, unitProfilesMap)),
   };
 }
 
