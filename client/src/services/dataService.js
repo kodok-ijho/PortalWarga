@@ -1376,11 +1376,15 @@ async function fetchMonthlyFinanceFromSupabase(token, { year, month }) {
   const error = billsRes.error || paymentsRes.error || expensesRes.error;
   if (error) throw error;
 
-  const allProfiles = profilesRes.data || [];
+  const isDemoUnit = (u) => !u || u.id === 5 || u.block === 'Z_DEMO' || String(u.block || '').includes('DEMO') || String(u.unit_number || '').includes('DEMO_HIDDEN');
+  const validUnits = (unitsRes.data || []).filter((u) => !isDemoUnit(u));
+  const validUnitIds = new Set(validUnits.map((u) => u.id));
+
+  const allProfiles = (profilesRes.data || []).filter((p) => p.role !== 'admin_viewer');
   const profileMap = Object.fromEntries(allProfiles.map((p) => [p.id, p]));
   const unitProfilesMap = {};
   allProfiles.forEach((p) => {
-    if (p.unit_id && p.full_name) {
+    if (p.unit_id && p.full_name && validUnitIds.has(p.unit_id)) {
       if (!unitProfilesMap[p.unit_id]) {
         unitProfilesMap[p.unit_id] = [];
       }
@@ -1388,7 +1392,7 @@ async function fetchMonthlyFinanceFromSupabase(token, { year, month }) {
     }
   });
 
-  const bills = billsRes.data || [];
+  const bills = (billsRes.data || []).filter((bill) => validUnitIds.has(bill.unit_id));
   const paidBills = bills.filter((bill) => bill.status === 'paid');
   const totalBilled = bills.reduce((sum, bill) => sum + billTotal(bill), 0);
   const totalCollected = paidBills.reduce((sum, bill) => sum + billTotal(bill), 0);
@@ -1430,7 +1434,12 @@ async function fetchMonthlyFinanceFromSupabase(token, { year, month }) {
       date: expense.expense_date,
       amount: Number(expense.amount || 0),
     })),
-    cashPayments: (paymentsRes.data || []).map((p) => mapCashPayment(p, profileMap, unitProfilesMap)),
+    cashPayments: (paymentsRes.data || [])
+      .filter((p) => {
+        const bill = p.ipl_bills || {};
+        return validUnitIds.has(bill.unit_id);
+      })
+      .map((p) => mapCashPayment(p, profileMap, unitProfilesMap)),
   };
 }
 

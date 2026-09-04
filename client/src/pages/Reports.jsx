@@ -466,7 +466,14 @@ export default function Reports() {
   }, [nonIplIncomes]);
 
   const sortedCashPayments = useMemo(() => {
-    let list = Array.isArray(cashPayments) ? [...cashPayments] : [];
+    let list = (Array.isArray(cashPayments) ? [...cashPayments] : []).filter((p) => {
+      const blockStr = String(p.block || '').toUpperCase();
+      const numStr = String(p.unitNumber || '').toUpperCase();
+      if (blockStr === 'Z_DEMO' || blockStr.includes('DEMO') || numStr.includes('DEMO_HIDDEN') || p.unitId === 5) {
+        return false;
+      }
+      return true;
+    });
 
     if (cashSearch.trim()) {
       const q = cashSearch.toLowerCase();
