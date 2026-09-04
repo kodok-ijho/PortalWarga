@@ -183,6 +183,20 @@ export default function Reports() {
   const [nonIplSearch, setNonIplSearch] = useState('');
   const [previewImage, setPreviewImage] = useState(null);
 
+  // Cash IPL payments sorting & search states
+  const [cashSortField, setCashSortField] = useState('paidAt'); // 'paidAt' | 'unit' | 'residentName' | 'period' | 'amount' | 'method'
+  const [cashSortOrder, setCashSortOrder] = useState('desc'); // 'asc' | 'desc'
+  const [cashSearch, setCashSearch] = useState('');
+
+  const handleCashSort = (field) => {
+    if (cashSortField === field) {
+      setCashSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setCashSortField(field);
+      setCashSortOrder('asc');
+    }
+  };
+
   const period = `${year}-${String(month).padStart(2, '0')}`;
 
   const loadData = useCallback(async () => {
@@ -450,6 +464,57 @@ export default function Reports() {
       methodPieData,
     };
   }, [nonIplIncomes]);
+
+  const sortedCashPayments = useMemo(() => {
+    let list = Array.isArray(cashPayments) ? [...cashPayments] : [];
+
+    if (cashSearch.trim()) {
+      const q = cashSearch.toLowerCase();
+      list = list.filter((p) => {
+        const unitStr = `${p.block || ''}/${p.unitNumber || ''}`.toLowerCase();
+        const resStr = String(p.residentName || '').toLowerCase();
+        const periodStr = String(p.period || '').toLowerCase();
+        const methodStr = String(p.method || '').toLowerCase();
+        const amountStr = String(p.amount || '');
+        return (
+          unitStr.includes(q) ||
+          resStr.includes(q) ||
+          periodStr.includes(q) ||
+          methodStr.includes(q) ||
+          amountStr.includes(q)
+        );
+      });
+    }
+
+    list.sort((a, b) => {
+      let cmp = 0;
+      if (cashSortField === 'paidAt') {
+        const aTime = new Date(a.paidAt || 0).getTime();
+        const bTime = new Date(b.paidAt || 0).getTime();
+        cmp = aTime - bTime;
+      } else if (cashSortField === 'unit') {
+        const aBlock = String(a.block || '');
+        const bBlock = String(b.block || '');
+        const blockCmp = aBlock.localeCompare(bBlock, 'id-ID', { numeric: true });
+        if (blockCmp !== 0) {
+          cmp = blockCmp;
+        } else {
+          cmp = String(a.unitNumber || '').localeCompare(String(b.unitNumber || ''), 'id-ID', { numeric: true });
+        }
+      } else if (cashSortField === 'residentName') {
+        cmp = String(a.residentName || '').localeCompare(String(b.residentName || ''), 'id-ID');
+      } else if (cashSortField === 'period') {
+        cmp = String(a.period || '').localeCompare(String(b.period || ''));
+      } else if (cashSortField === 'amount') {
+        cmp = Number(a.amount || 0) - Number(b.amount || 0);
+      } else if (cashSortField === 'method') {
+        cmp = String(a.method || '').localeCompare(String(b.method || ''));
+      }
+      return cashSortOrder === 'asc' ? cmp : -cmp;
+    });
+
+    return list;
+  }, [cashPayments, cashSortField, cashSortOrder, cashSearch]);
 
   // Running Balance dan Rincian untuk periode terpilih
   const activeBalance = useMemo(() => {
@@ -1259,33 +1324,139 @@ export default function Reports() {
 
               {/* ── Laporan B: Kas Masuk IPL (basis tanggal pembayaran) ── */}
               <div className="pv-card overflow-hidden">
-                <div className="px-5 py-3 border-b border-forest-100 bg-forest-50">
-                  <h3 className="text-sm font-semibold text-forest-800">
-                    Rincian Kas Masuk IPL — {periodLabel}
-                  </h3>
-                  <p className="text-[11px] text-forest-500 mt-0.5">
-                    Berdasarkan tanggal pembayaran, tanpa memandang periode tagihan IPL yang dilunasi.
-                  </p>
+                <div className="px-5 py-3.5 border-b border-forest-100 bg-forest-50 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-forest-800">
+                      Rincian Kas Masuk IPL — {periodLabel}
+                    </h3>
+                    <p className="text-[11px] text-forest-500 mt-0.5">
+                      Berdasarkan tanggal pembayaran, tanpa memandang periode tagihan IPL yang dilunasi. Klik judul kolom untuk mengurutkan.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2.5 self-end md:self-auto">
+                    <div className="relative">
+                      <AiOutlineSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-forest-400 text-xs" />
+                      <input
+                        type="text"
+                        placeholder="Cari unit / penghuni / periode..."
+                        value={cashSearch}
+                        onChange={(e) => setCashSearch(e.target.value)}
+                        className="pv-input text-xs pl-7 pr-7 py-1.5 w-48 md:w-56"
+                      />
+                      {cashSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setCashSearch('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-forest-400 hover:text-forest-700 text-xs"
+                        >
+                          <AiOutlineClose />
+                        </button>
+                      )}
+                    </div>
+                    <span className="pv-badge bg-emerald-100 text-emerald-800 text-xs whitespace-nowrap">
+                      {sortedCashPayments.length} {cashSearch ? `dari ${cashPayments.length}` : ''} Transaksi
+                    </span>
+                  </div>
                 </div>
-                {cashPayments.length === 0 ? (
+                {sortedCashPayments.length === 0 ? (
                   <div className="p-10 text-center text-forest-400 text-sm">
-                    Belum ada pembayaran IPL yang tercatat pada {periodLabel}.
+                    {cashSearch
+                      ? `Tidak ada transaksi pembayaran yang cocok dengan pencarian "${cashSearch}".`
+                      : `Belum ada pembayaran IPL yang tercatat pada ${periodLabel}.`}
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-forest-100 bg-white">
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Tgl Bayar</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Unit</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Penghuni</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase">Periode IPL</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase">Jumlah</th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-forest-600 uppercase">Metode</th>
+                          <th
+                            onClick={() => handleCashSort('paidAt')}
+                            className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase cursor-pointer select-none hover:bg-forest-100/60 transition-colors"
+                            title="Urutkan berdasarkan Tanggal Bayar"
+                          >
+                            <div className="inline-flex items-center gap-1.5">
+                              <span>Tgl Bayar</span>
+                              {cashSortField === 'paidAt' ? (
+                                <span className="text-gold-600 font-bold">{cashSortOrder === 'asc' ? '▲' : '▼'}</span>
+                              ) : (
+                                <span className="text-forest-300 text-[10px]">↕</span>
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleCashSort('unit')}
+                            className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase cursor-pointer select-none hover:bg-forest-100/60 transition-colors"
+                            title="Urutkan berdasarkan Blok / Nomor Unit"
+                          >
+                            <div className="inline-flex items-center gap-1.5">
+                              <span>Unit</span>
+                              {cashSortField === 'unit' ? (
+                                <span className="text-gold-600 font-bold">{cashSortOrder === 'asc' ? '▲' : '▼'}</span>
+                              ) : (
+                                <span className="text-forest-300 text-[10px]">↕</span>
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleCashSort('residentName')}
+                            className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase cursor-pointer select-none hover:bg-forest-100/60 transition-colors"
+                            title="Urutkan berdasarkan Nama Penghuni"
+                          >
+                            <div className="inline-flex items-center gap-1.5">
+                              <span>Penghuni</span>
+                              {cashSortField === 'residentName' ? (
+                                <span className="text-gold-600 font-bold">{cashSortOrder === 'asc' ? '▲' : '▼'}</span>
+                              ) : (
+                                <span className="text-forest-300 text-[10px]">↕</span>
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleCashSort('period')}
+                            className="px-4 py-3 text-left text-xs font-semibold text-forest-600 uppercase cursor-pointer select-none hover:bg-forest-100/60 transition-colors"
+                            title="Urutkan berdasarkan Periode IPL"
+                          >
+                            <div className="inline-flex items-center gap-1.5">
+                              <span>Periode IPL</span>
+                              {cashSortField === 'period' ? (
+                                <span className="text-gold-600 font-bold">{cashSortOrder === 'asc' ? '▲' : '▼'}</span>
+                              ) : (
+                                <span className="text-forest-300 text-[10px]">↕</span>
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleCashSort('amount')}
+                            className="px-4 py-3 text-right text-xs font-semibold text-forest-600 uppercase cursor-pointer select-none hover:bg-forest-100/60 transition-colors"
+                            title="Urutkan berdasarkan Jumlah Nominal"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1.5 w-full">
+                              <span>Jumlah</span>
+                              {cashSortField === 'amount' ? (
+                                <span className="text-gold-600 font-bold">{cashSortOrder === 'asc' ? '▲' : '▼'}</span>
+                              ) : (
+                                <span className="text-forest-300 text-[10px]">↕</span>
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleCashSort('method')}
+                            className="px-4 py-3 text-center text-xs font-semibold text-forest-600 uppercase cursor-pointer select-none hover:bg-forest-100/60 transition-colors"
+                            title="Urutkan berdasarkan Metode Pembayaran"
+                          >
+                            <div className="inline-flex items-center justify-center gap-1.5 w-full">
+                              <span>Metode</span>
+                              {cashSortField === 'method' ? (
+                                <span className="text-gold-600 font-bold">{cashSortOrder === 'asc' ? '▲' : '▼'}</span>
+                              ) : (
+                                <span className="text-forest-300 text-[10px]">↕</span>
+                              )}
+                            </div>
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-forest-100">
-                        {cashPayments.map((p) => (
+                        {sortedCashPayments.map((p) => (
                           <tr key={p.paymentId} className="hover:bg-forest-50">
                             <td className="px-4 py-2.5 text-forest-600 text-xs whitespace-nowrap">
                               {formatDate(p.paidAt)}
@@ -1295,7 +1466,7 @@ export default function Reports() {
                             </td>
                             <td className="px-4 py-2.5 text-forest-700">{p.residentName}</td>
                             <td className="px-4 py-2.5 text-forest-600">{formatPeriodLabel(p.period)}</td>
-                            <td className="px-4 py-2.5 text-right text-forest-700 whitespace-nowrap">
+                            <td className="px-4 py-2.5 text-right text-forest-700 whitespace-nowrap font-medium">
                               {formatRupiah(p.amount)}
                             </td>
                             <td className="px-4 py-2.5 text-center">
@@ -1308,12 +1479,14 @@ export default function Reports() {
                       </tbody>
                       <tfoot>
                         <tr className="border-t-2 border-forest-200 bg-forest-50 font-semibold">
-                          <td colSpan={4} className="px-4 py-3 text-forest-800">TOTAL KAS MASUK IPL</td>
-                          <td className="px-4 py-3 text-right text-forest-900">
-                            {formatRupiah(cashPayments.reduce((s, p) => s + Number(p.amount || 0), 0))}
+                          <td colSpan={4} className="px-4 py-3 text-forest-800">
+                            TOTAL KAS MASUK IPL {cashSearch ? '(HASIL FILTER)' : ''}
+                          </td>
+                          <td className="px-4 py-3 text-right text-forest-900 font-bold">
+                            {formatRupiah(sortedCashPayments.reduce((s, p) => s + Number(p.amount || 0), 0))}
                           </td>
                           <td className="px-4 py-3 text-center text-forest-400 text-[11px] font-normal">
-                            {cashPayments.length} transaksi
+                            {sortedCashPayments.length} transaksi
                           </td>
                         </tr>
                       </tfoot>
