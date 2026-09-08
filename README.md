@@ -10,6 +10,15 @@ Kelola data warga, tagihan IPL (Iuran Pemeliharaan Lingkungan), pembayaran QRIS,
 
 ---
 
+## Changelog v1.4.3 — Zero Nominal IPL Recording, Financial Report Sorting & Self-Healing Payments
+
+- **Pencatatan IPL Nominal Rp 0 oleh Admin & Bendahara**: Kemampuan mengubah nominal pembayaran menjadi Rp 0 (misalnya untuk unit/bulan yang dibebaskan atau disubsidi khusus) disertai perlindungan ketat yang memblokir angka negatif (minus / < 0) di Frontend UI, PostgreSQL DB trigger, dan backend API n8n.
+- **Self-Healing Transaksi Menggantung (Auto-Cancel Stale)**: Pembersihan otomatis pada workflow `PV API - Payments Cash Create` dan `PV API - Payments Manual Submit` untuk invoice pending/draft lama agar tidak mengunci tagihan (mencegah error 409 `PAYMENT_ALREADY_SUBMITTED`).
+- **Interactive Sorting & Quick Search Laporan Keuangan**: Penambahan fitur sortir interaktif pada seluruh kolom tabel transaksi rincian laporan keuangan (Periode, Tanggal, Unit, Nama, Kategori, Nominal) serta pencarian real-time.
+- **Enhanced Resident Name Resolution**: Resolusi nama warga otomatis dari data penghuni unit (`units.occupant_name`) dan metadata pembayaran, serta penyaringan unit demo dari neraca keuangan riil.
+
+---
+
 ## Changelog v1.4.2 — Resident Pre-population & Visual Denah Enhancements
 
 - **Pencatatan Penghuni Tanpa Email (Placeholder Profiles)**: Pengurus dapat mendaftarkan nama warga dan nomor telepon ke unit rumah tanpa memerlukan email warga. Nama warga langsung tampil utuh di Daftar Rumah, Matriks IPL, dan Laporan.
@@ -24,7 +33,7 @@ Kelola data warga, tagihan IPL (Iuran Pemeliharaan Lingkungan), pembayaran QRIS,
 - **Universal QRIS Production**: Integrasi DOKU QRIS Production aktif dan dapat digunakan langsung oleh seluruh warga dan pengurus perumahan.
 - **Resilient Checkout & Cancellation**: Tombol pembatalan transaksi QRIS yang mengembalikan tagihan secara instan tanpa mengganjal atau memblokir pembayaran via metode lain (Transfer Bank atau Tunai).
 - **Automated Transactional Emails**: Integrasi email transaksional otomatis via worker n8n yang mengirimkan kuitansi berstandar resmi ke Warga serta notifikasi pembayaran masuk ke jajaran Admin, Bendahara, dan Pengurus.
-- **Clean UI & Versioning**: Tampilan antarmuka bersih tanpa embel-embel nama vendor gateway, dilengkapi badge versi aplikasi (`v1.4.2`) di Header, Halaman Login, dan Footer.
+- **Clean UI & Versioning**: Tampilan antarmuka bersih tanpa embel-embel nama vendor gateway, dilengkapi badge versi aplikasi (`v1.4.3`) di Header, Halaman Login, dan Footer.
 
 ---
 

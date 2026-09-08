@@ -1223,8 +1223,8 @@ export function recordManualPayment(billId, { method, paidAt, recordedBy, note, 
   // Bendahara/admin langsung paid; pengurus/warga perlu verifikasi
   const directPaid = recorderRole && (ROLE_LEVEL[recorderRole] || 0) >= 3;
 
-  // Admin/Bendahara dapat mengubah nominal tagihan saat pencatatan
-  if (directPaid && amount != null && Number(amount) > 0) {
+  // Admin/Bendahara dapat mengubah nominal tagihan saat pencatatan (bisa 0, tidak boleh minus)
+  if (directPaid && amount != null && !isNaN(Number(amount)) && Number(amount) >= 0) {
     bill.amount = Number(amount);
   }
 

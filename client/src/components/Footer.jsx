@@ -1,7 +1,7 @@
 import { IS_DEMO_MODE } from '../hooks/useAuth';
 import pkg from '../../package.json';
 
-const APP_VERSION = `v${pkg.version || '1.4.2'}`;
+const APP_VERSION = `v${pkg.version || '1.4.3'}`;
 
 export default function Footer() {
   return (

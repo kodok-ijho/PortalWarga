@@ -1409,7 +1409,12 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
   });
 
   const handleAmountChange = (billId, value) => {
-    const num = value === '' ? '' : Number(value);
+    if (value === '') {
+      setCustomAmounts((prev) => ({ ...prev, [billId]: '' }));
+      return;
+    }
+    const num = Number(value);
+    if (num < 0) return; // Blokir input angka negatif
     setCustomAmounts((prev) => ({ ...prev, [billId]: num }));
   };
 
@@ -1459,6 +1464,19 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!paidAt) return;
+    if (canEditNominal) {
+      for (const bill of bills) {
+        const val = customAmounts[bill.id];
+        if (val === '' || val === null || val === undefined || isNaN(Number(val))) {
+          toast.error('Nominal pembayaran wajib diisi.');
+          return;
+        }
+        if (Number(val) < 0) {
+          toast.error('Nominal pembayaran tidak boleh bernilai negatif.');
+          return;
+        }
+      }
+    }
     if (needsReceipt && !receiptFile) {
       setUploadError(
         method === 'bank_transfer'
@@ -1518,7 +1536,7 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
                 {canEditNominal ? (
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     step="1"
                     value={customAmounts[bill.id] ?? ''}
                     onChange={(e) => handleAmountChange(bill.id, e.target.value)}
