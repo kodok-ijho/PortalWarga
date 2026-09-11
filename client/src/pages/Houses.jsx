@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   AiOutlineDelete,
+  AiOutlineDownload,
   AiOutlineEdit,
   AiOutlineEye,
   AiOutlineHome,
@@ -290,13 +291,23 @@ export default function Houses() {
                   Referensi visual blok CB1, CB2, CB3, CB4.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={openMapPreview}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-gold-300 hover:bg-white/15"
-              >
-                <AiOutlineEye /> Perbesar
-              </button>
+              <div className="flex items-center gap-2">
+                <a
+                  href="/Site Plan Update 2.pdf"
+                  download="Site Plan Palm Village.pdf"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gold-400/40 bg-gold-400/20 px-3 py-2 text-xs font-semibold text-gold-300 hover:bg-gold-400/30 transition-colors"
+                  title="Unduh file Site Plan PDF"
+                >
+                  <AiOutlineDownload className="text-sm" /> Unduh PDF
+                </a>
+                <button
+                  type="button"
+                  onClick={openMapPreview}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-gold-300 hover:bg-white/15 transition-colors"
+                >
+                  <AiOutlineEye /> Perbesar
+                </button>
+              </div>
             </div>
           </div>
           <div className="bg-white p-3">
@@ -318,14 +329,25 @@ export default function Houses() {
 
       <Modal open={isMapPreviewOpen} onClose={closeMapPreview} title="Mapsite Palm Village" size="xl">
         <div className="space-y-3">
-          <p className="text-sm text-forest-500">
-            Preview peta perumahan untuk referensi blok dan posisi rumah.
-          </p>
-          <img
-            src="/Mapsite%20Palm%20Village.png"
-            alt="Mapsite Palm Village versi besar"
-            className="max-h-[75vh] w-full rounded-lg border border-forest-100 object-contain"
-          />
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <p className="text-sm text-forest-500">
+              Preview peta perumahan untuk referensi blok dan posisi rumah.
+            </p>
+            <a
+              href="/Site Plan Update 2.pdf"
+              download="Site Plan Palm Village.pdf"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-forest-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-forest-900 transition-colors shrink-0"
+            >
+              <AiOutlineDownload className="text-sm" /> Unduh PDF Asli
+            </a>
+          </div>
+          <div className="max-h-[75vh] overflow-auto rounded-lg border border-forest-100 bg-forest-50/30 p-1">
+            <img
+              src="/Mapsite%20Palm%20Village.png"
+              alt="Mapsite Palm Village versi besar"
+              className="w-full h-auto object-contain rounded"
+            />
+          </div>
         </div>
       </Modal>
 
