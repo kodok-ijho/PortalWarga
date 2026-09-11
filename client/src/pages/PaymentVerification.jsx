@@ -353,8 +353,8 @@ export default function PaymentVerification() {
   const handleUpdatePayment = async (event) => {
     event.preventDefault();
     if (!canWrite || !selectedPayment || activeActionId) return;
-    if (!paymentForm.amount || Number(paymentForm.amount) <= 0) {
-      toast.error('Nominal pembayaran harus lebih besar dari 0.');
+    if (paymentForm.amount === '' || Number(paymentForm.amount) < 0) {
+      toast.error('Nominal pembayaran tidak boleh bernilai negatif.');
       return;
     }
     if (!paymentForm.paid_at) {
@@ -788,7 +788,7 @@ export default function PaymentVerification() {
                 <label className="block text-sm font-medium text-forest-700 mb-1">Nominal Pembayaran *</label>
                 <input
                   type="number"
-                  min="1"
+                  min="0"
                   step="1"
                   required
                   value={paymentForm.amount}

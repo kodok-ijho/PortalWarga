@@ -1513,6 +1513,7 @@ export function updatePayment(paymentId, opts = {}) {
   const payment = mockPayments.find((p) => p.id === paymentId);
   if (!payment) return null;
   if (opts.amount !== undefined && opts.amount !== '') payment.amount = Number(opts.amount);
+  if (opts.status) payment.status = opts.status;
   if (opts.method) {
     payment.method = opts.method;
     payment.provider = opts.method === 'qris' ? (payment.provider || mockSettings.qris_provider) : null;
@@ -1543,17 +1544,35 @@ export function updatePayment(paymentId, opts = {}) {
       }
     }
   }
+
+  const bill = mockIPLBills.find((b) => b.id === payment.ipl_bill_id);
+  if (bill) {
+    if (opts.amount !== undefined && opts.amount !== '') {
+      bill.amount = Number(opts.amount);
+    }
+    if (payment.status === 'completed' || payment.status === 'verified') {
+      bill.status = 'paid';
+      bill.late_fee = 0;
+      bill.payment_id = payment.id;
+    } else if (payment.status === 'cancelled') {
+      const dueDate = new Date(bill.due_date);
+      const today = new Date();
+      bill.status = today > dueDate ? 'overdue' : 'pending';
+      bill.payment_id = null;
+    }
+  }
+
   payment.updated_at = new Date().toISOString();
   return { ok: true, data: { payment } };
 }
 
 /**
- * Batalkan pembayaran — warga hapus pembayaran yang ditolak.
+ * Batalkan pembayaran — hapus pembayaran yang menggantung atau ditolak.
  * @param {string} paymentId
  */
 export function cancelPayment(paymentId) {
   const payment = mockPayments.find((p) => p.id === paymentId);
-  if (!payment || (payment.status !== 'rejected' && payment.status !== 'pending_verification')) return null;
+  if (!payment) return null;
   // Hapus payment dari array
   const idx = mockPayments.findIndex((p) => p.id === paymentId);
   if (idx !== -1) mockPayments.splice(idx, 1);

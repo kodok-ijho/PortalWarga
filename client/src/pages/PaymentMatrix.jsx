@@ -27,6 +27,7 @@ import {
   createCashPayment,
   approveManualPayment,
   rejectManualPayment,
+  updatePayment,
   fetchPayments,
   fetchPaymentByBillId,
   selectPreferredPayment,
@@ -43,11 +44,30 @@ import {
   verifyPayment,
   rejectPayment,
   revisePayment,
+  cancelPayment,
   downloadDigitalReceipt,
   sendEmailReceipt,
 } from '../services/mockData';
 import { compressImage } from '../utils/imageCompressor';
 import { AiOutlineDownload } from 'react-icons/ai';
+
+export function isHangingPayment(payment, bill, cellStatus) {
+  if (!bill) return false;
+  const bStatus = bill.status || cellStatus;
+  const pStatus = payment?.status;
+
+  if (bStatus === 'paid' || pStatus === 'completed' || pStatus === 'verified') return false;
+  if (bStatus === 'pending_verification' || pStatus === 'pending_verification') return false;
+  if (bStatus === 'rejected' || pStatus === 'rejected') return false;
+  if (bStatus === 'cancelled' || pStatus === 'cancelled') return false;
+  if (bStatus === 'failed' || pStatus === 'failed') return false;
+  if (bStatus === 'expired' || pStatus === 'expired') return false;
+
+  if (bill.payment_id || payment?.id) {
+    return true;
+  }
+  return false;
+}
 
 export default function PaymentMatrix() {
   const { profile, role, session, isReadOnly } = useAuth();
@@ -277,6 +297,8 @@ export default function PaymentMatrix() {
   // Sel yang sudah paid atau sudah di-select tidak perlu dicek lagi.
   const canSelectBill = (bill) => {
     if (!bill || bill.status === 'paid') return false;
+    const payment = mergePaymentDetails(null, bill.id, bill.payment_id);
+    if (isHangingPayment(payment, bill, bill.status)) return false;
     // Cegah seleksi lintas unit: jika sudah ada unit aktif, hanya boleh unit itu.
     // Satu transaksi = satu unit (satu tanda terima).
     if (activeUnitId !== null && bill.unit_id !== activeUnitId) return false;
@@ -718,6 +740,9 @@ export default function PaymentMatrix() {
           <span className="h-3 w-3 rounded bg-orange-100 border border-orange-400"></span> Menunggu Verifikasi
         </span>
         <span className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded bg-amber-100 border-2 border-dashed border-amber-500"></span> ⚠️ Perlu Perbaikan (Menggantung)
+        </span>
+        <span className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded bg-amber-50 border border-amber-300"></span> Belum Bayar
         </span>
         <span className="flex items-center gap-1.5">
@@ -831,28 +856,35 @@ export default function PaymentMatrix() {
                                 ? row.cells.find((c) => c?.bill?.period === targetPeriod)
                                 : null) || cell;
                         const isSelected = matchedCell?.bill ? isBillSelected(matchedCell.bill.id) : false;
+                        const payment = mergePaymentDetails(
+                          matchedCell?.payment,
+                          matchedCell?.bill?.id,
+                          matchedCell?.bill?.payment_id
+                        );
+                        const isHanging = isHangingPayment(payment, matchedCell?.bill, matchedCell?.status);
                         return (
                           <td key={mIdx} className="px-1 py-1 text-center">
                             <Cell
                               cell={matchedCell}
+                              payment={payment}
+                              isHanging={isHanging}
                               unitId={row.unit.id}
                               isSelected={isSelected}
                               isStaff={isStaff}
                               canInteract={canInteract}
                               isLockedOtherUnit={isLockedOtherUnit}
                               onClick={() => {
+                                if (isHanging) {
+                                  setDetailModal({ bill: matchedCell.bill, payment, unit: row.unit, isHanging: true });
+                                  return;
+                                }
                                 if (
                                   matchedCell?.status === 'paid' ||
                                   matchedCell?.status === 'pending_verification' ||
                                   matchedCell?.status === 'rejected' ||
                                   matchedCell?.payment?.status === 'rejected'
                                 ) {
-                                  const payment = mergePaymentDetails(
-                                    matchedCell.payment,
-                                    matchedCell.bill.id,
-                                    matchedCell.bill.payment_id
-                                  );
-                                  setDetailModal({ bill: matchedCell.bill, payment, unit: row.unit });
+                                  setDetailModal({ bill: matchedCell.bill, payment, unit: row.unit, isHanging: false });
                                   return;
                                 }
                                 // Cancelled/failed/expired: allow selecting for re-payment
@@ -1026,6 +1058,7 @@ export default function PaymentMatrix() {
           myUnitId={myUnitId}
           profile={profile}
           session={session}
+          isHanging={detailModal.isHanging}
           onRefresh={() => setRefreshKey(k => k + 1)}
           onRetry={() => {
             toggleCell(detailModal.bill);
@@ -1040,22 +1073,52 @@ export default function PaymentMatrix() {
 }
 
 // ── Komponen sel matriks ──────────────────────────────────────────
-function Cell({ cell, unitId, isSelected, isStaff, canInteract, isLockedOtherUnit = false, onClick }) {
+function Cell({ cell, payment: propPayment, isHanging, unitId, isSelected, isStaff, canInteract, isLockedOtherUnit = false, onClick }) {
   if (!cell) {
     return <span className="block h-12 rounded bg-gray-50"></span>;
   }
   const { status, bill } = cell;
-  const payment = status === 'paid' ? getPaymentForBill(bill.id) : null;
+  const payment = propPayment || (status === 'paid' ? getPaymentForBill(bill.id) : null);
   const isPaid = status === 'paid';
   const isOverdue = status === 'overdue';
   const isPending = status === 'pending';
   const isPendingVerif = status === 'pending_verification';
-  const isRejected = status === 'rejected' || cell.payment?.status === 'rejected';
+  const isRejected = status === 'rejected' || cell.payment?.status === 'rejected' || payment?.status === 'rejected';
   const isCancelled = status === 'cancelled';
   const isFailed = status === 'failed';
   const isExpired = status === 'expired';
   // Sel non-interaktif (warga lihat unit lain): view-only, tidak bisa diklik
   const isViewOnly = !canInteract;
+
+  // Sel TRANSAKSI MENGGANTUNG / PERLU PERBAIKAN
+  if (isHanging) {
+    if (isStaff) {
+      return (
+        <span
+          onClick={onClick}
+          className="block h-12 rounded bg-amber-100 border-2 border-dashed border-amber-500 hover:bg-amber-200 text-amber-900 flex flex-col items-center justify-center px-0.5 cursor-pointer transition-colors shadow-sm"
+          title={`Transaksi Menggantung / Perlu Perbaikan (${formatRupiah(bill.amount)}) · Klik untuk perbaiki atau batalkan`}
+        >
+          <span className="text-[9px] font-bold leading-none">{formatShort(bill.amount)}</span>
+          <span className="text-[8px] leading-none mt-0.5 font-bold text-amber-800">
+            ⚠️ Perbaiki
+          </span>
+        </span>
+      );
+    }
+    return (
+      <span
+        onClick={canInteract ? onClick : undefined}
+        className={`block h-12 rounded bg-amber-50 border border-amber-300 text-amber-800 flex flex-col items-center justify-center px-0.5 ${canInteract ? 'cursor-pointer hover:bg-amber-100' : ''}`}
+        title={`Pembayaran sedang diproses / menggantung (${formatRupiah(bill.amount)})`}
+      >
+        <span className="text-[9px] font-bold leading-none">{formatShort(bill.amount)}</span>
+        <span className="text-[8px] leading-none mt-0.5 font-medium">
+          ⏳ Diproses
+        </span>
+      </span>
+    );
+  }
 
   // Sel LUNAS / PENDING VERIF / REJECTED → tampilkan info & klik buka detail
   if (isPaid || isPendingVerif || isRejected) {
@@ -1771,7 +1834,7 @@ function getResolvedPaymentDate(payment, bill) {
 
 // Modal Detail Pembayaran Lunas
 // Modal Detail / Verifikasi / Revisi Pembayaran
-function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, session, onRefresh, onRetry, onClose }) {
+function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, session, isHanging: initialIsHanging, onRefresh, onRetry, onClose }) {
   const toast = useToast();
   const [asyncPayment, setAsyncPayment] = useState(null);
 
@@ -1837,6 +1900,8 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
 
   const canViewReceipt = isStaffRole(role) || isMyUnit;
   const canVerify = isBendaharaOrAbove(role) && canModifyData(role);
+  const canRepair = isBendaharaOrAbove(role) && canModifyData(role);
+  const isHanging = Boolean(initialIsHanging || isHangingPayment(activePayment, resolvedBill, resolvedBill?.status));
   const paymentMethod = activePayment?.method || activePayment?.payment_method || activePayment?.paymentMethod;
 
   let proofFileUrl =
@@ -1883,6 +1948,28 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
       : paymentMethod === 'cash'
       ? 'Tidak ada file bukti untuk pembayaran tunai.'
       : 'Tidak ada file bukti transfer yang tersimpan.';
+
+  const [isEditing, setIsEditing] = useState(Boolean(isHanging && canRepair));
+  const [editForm, setEditForm] = useState({
+    amount: activePayment?.amount ?? resolvedBill?.amount ?? 0,
+    method: activePayment?.method || 'cash',
+    paid_at: resolvedPaidAt ? String(resolvedPaidAt).slice(0, 10) : new Date().toISOString().slice(0, 10),
+    note: activePayment?.metadata?.note || '',
+    file: null,
+    markCompleted: true,
+  });
+
+  useEffect(() => {
+    if (activePayment) {
+      setEditForm((prev) => ({
+        ...prev,
+        amount: activePayment.amount !== undefined && activePayment.amount !== null ? activePayment.amount : prev.amount,
+        method: activePayment.method || prev.method,
+        paid_at: activePayment.paid_at ? String(activePayment.paid_at).slice(0, 10) : prev.paid_at,
+        note: activePayment.metadata?.note !== undefined ? activePayment.metadata.note : prev.note,
+      }));
+    }
+  }, [activePayment]);
 
   const [isRevising, setIsRevising] = useState(false);
   const [newReceipt, setNewReceipt] = useState(null);
@@ -1937,17 +2024,67 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
     }
   };
 
+  const handleSaveEdit = async (e) => {
+    if (e) e.preventDefault();
+    if (isActing) return;
+
+    if (editForm.amount === '' || Number(editForm.amount) < 0) {
+      toast.error('Nominal pembayaran tidak boleh bernilai negatif.');
+      return;
+    }
+    if (!editForm.paid_at) {
+      toast.error('Tanggal pembayaran wajib diisi.');
+      return;
+    }
+
+    const paymentId = activePayment?.id || resolvedBill?.payment_id;
+    if (!paymentId) {
+      toast.error('ID transaksi pembayaran tidak ditemukan pada tagihan ini.');
+      return;
+    }
+
+    setIsActing(true);
+    try {
+      await updatePayment(session?.access_token, {
+        payment_id: paymentId,
+        unit_id: resolvedUnitId,
+        amount: Number(editForm.amount),
+        method: editForm.method,
+        paid_at: editForm.paid_at,
+        note: editForm.note,
+        file: editForm.file,
+        status: editForm.markCompleted ? 'completed' : undefined,
+      });
+
+      toast.success(
+        editForm.markCompleted
+          ? 'Transaksi berhasil diperbaiki dan status tagihan menjadi LUNAS!'
+          : 'Detail transaksi berhasil diperbarui.'
+      );
+      if (onRefresh) onRefresh();
+      onClose();
+    } catch (err) {
+      toast.error(err.message || 'Gagal menyimpan perbaikan transaksi.');
+    } finally {
+      setIsActing(false);
+    }
+  };
+
   const handleCancel = async () => {
-    if (!payment) return;
-    if (!confirm('Yakin ingin membatalkan transaksi ini? Tagihan akan kembali belum dibayar.')) return;
+    const paymentId = activePayment?.id || resolvedBill?.payment_id;
+    if (!paymentId) {
+      toast.warning('Tidak ada ID transaksi untuk dibatalkan.');
+      return;
+    }
+    if (!confirm('Yakin ingin membatalkan transaksi ini? Catatan pembayaran yang bermasalah akan dibatalkan/dihapus dan status tagihan kembali belum dibayar.')) return;
     setIsActing(true);
     try {
       if (IS_DEMO) {
-        cancelPayment(payment.id);
+        cancelPayment(paymentId);
       } else {
         await portalApiPost('/payments/cancel', {
           token: session?.access_token,
-          body: { payment_id: payment.id },
+          body: { payment_id: paymentId },
         });
       }
       toast.info('Transaksi pembayaran berhasil dibatalkan. Tagihan kembali belum dibayar.');
@@ -1998,10 +2135,23 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
 
   return (
     <>
-    <Modal open onClose={onClose} title="Detail Bukti Pembayaran IPL" size="md">
+    <Modal open onClose={onClose} title={isHanging ? 'Detail & Perbaikan Transaksi IPL' : 'Detail Bukti Pembayaran IPL'} size="md">
       <div className="space-y-4 text-sm text-forest-900">
         {/* Banner Status */}
-        {payment?.status === 'pending_verification' && (
+        {isHanging && (
+          <div className="rounded-lg bg-amber-50 border-2 border-dashed border-amber-400 p-3 text-xs text-amber-900 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⚠️</span>
+              <p className="font-bold text-amber-950">Transaksi Menggantung / Perlu Perbaikan</p>
+            </div>
+            <p className="text-amber-800 leading-relaxed">
+              {canRepair
+                ? 'Tagihan ini memiliki catatan transaksi yang belum tuntas. Sebagai Bendahara/Admin, Anda dapat langsung memperbaiki nominal (bisa Rp 0), mengganti metode, dan menyelesaikan tagihan (Lunas) tanpa membuat transaksi baru yang berisiko error.'
+                : 'Transaksi untuk tagihan ini sedang diproses atau perlu pemeriksaan oleh pengurus / bendahara.'}
+            </p>
+          </div>
+        )}
+        {payment?.status === 'pending_verification' && !isHanging && (
           <div className="rounded-lg bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800 flex items-center gap-2">
             <span className="text-lg">⏳</span>
             <div>
@@ -2023,7 +2173,125 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
           </div>
         )}
 
-        {isRevising ? (
+        {isEditing && canRepair ? (
+          <form onSubmit={handleSaveEdit} className="space-y-3.5 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200">
+            <div className="flex items-center justify-between pb-1 border-b border-amber-200">
+              <h4 className="font-bold text-xs text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
+                <span>✏️</span> Perbaikan Transaksi IPL
+              </h4>
+              <span className="text-[10px] text-amber-700 font-medium">
+                {targetUnit ? `Blok ${targetUnit.block}/${targetUnit.unit_number}` : ''} · {formatPeriod(resolvedBill.period)}
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-forest-800 mb-1">
+                Nominal Pembayaran (Rp) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                required
+                value={editForm.amount}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, amount: e.target.value }))}
+                className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-forest-900 outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+                placeholder="0"
+              />
+              <p className="mt-1 text-[11px] text-forest-500">
+                Bisa diisi 0 jika warga dibebaskan iuran. Nominal tidak boleh bernilai negatif.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-forest-800 mb-1">
+                  Metode Pembayaran <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={editForm.method}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, method: e.target.value }))}
+                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2 text-xs text-forest-900 outline-none focus:border-gold-500"
+                >
+                  <option value="cash">💵 Tunai (Cash)</option>
+                  <option value="bank_transfer">🏦 Transfer Bank</option>
+                  <option value="qris">📱 QRIS</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-forest-800 mb-1">
+                  Tanggal Bayar <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={editForm.paid_at}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, paid_at: e.target.value }))}
+                  className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2 text-xs text-forest-900 outline-none focus:border-gold-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-forest-800 mb-1">
+                Catatan Perbaikan <span className="text-forest-400 font-normal">(opsional)</span>
+              </label>
+              <textarea
+                rows={2}
+                value={editForm.note}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, note: e.target.value }))}
+                placeholder="Alasan perubahan atau rincian perbaikan..."
+                className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2 text-xs text-forest-900 outline-none focus:border-gold-500 resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-forest-800 mb-1">
+                Ganti File Bukti <span className="text-forest-400 font-normal">(opsional)</span>
+              </label>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(e) => setEditForm((prev) => ({ ...prev, file: e.target.files?.[0] || null }))}
+                className="block w-full text-xs text-forest-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-medium file:bg-forest-100 file:text-forest-800 hover:file:bg-forest-200"
+              />
+              {proofFileName && !editForm.file && (
+                <p className="mt-1 text-[10px] text-forest-400">File bukti saat ini: {proofFileName}</p>
+              )}
+            </div>
+
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2.5 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="markCompletedCheckbox"
+                checked={editForm.markCompleted}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, markCompleted: e.target.checked }))}
+                className="rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500"
+              />
+              <label htmlFor="markCompletedCheckbox" className="text-xs font-medium text-emerald-900 cursor-pointer">
+                Langsung verifikasi & selesaikan transaksi (Status Tagihan: LUNAS)
+              </label>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                disabled={isActing}
+                className="pv-btn-ghost flex-1 text-xs py-2 disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={isActing}
+                className="pv-btn-primary flex-1 text-xs py-2 disabled:opacity-50"
+              >
+                {isActing ? 'Menyimpan...' : 'Simpan Perbaikan Transaksi'}
+              </button>
+            </div>
+          </form>
+        ) : isRevising ? (
           <form onSubmit={submitRevision} className="space-y-3 bg-forest-50 p-3 rounded-lg border border-forest-200">
             <h4 className="font-semibold text-xs text-forest-800 uppercase tracking-wide">Revisi Bukti Transfer</h4>
             <div>
@@ -2163,6 +2431,17 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
 
         {/* Tombol Aksi */}
         <div className="pt-2 flex flex-col gap-2">
+          {canRepair && !isEditing && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="pv-btn-primary w-full text-xs py-2.5 bg-amber-600 hover:bg-amber-700 flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <span>✏️</span>
+              <span>Perbaiki / Edit Transaksi</span>
+            </button>
+          )}
+
           {payment?.status === 'rejected' && isMyUnit && onRetry && (
             <button
               type="button"
@@ -2202,7 +2481,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
             </div>
           )}
 
-          {payment?.status === 'pending_verification' && canVerify && (
+          {payment?.status === 'pending_verification' && canVerify && !isEditing && (
             <div className="flex gap-2">
               <button type="button" onClick={handleVerify} disabled={isActing} className="pv-btn-primary flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
                 ✓ Verifikasi Lunas
@@ -2213,7 +2492,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
             </div>
           )}
 
-          {payment?.status === 'rejected' && (isMyUnit || isStaffRole(role)) && !isRevising && canModifyData(role) && (
+          {payment?.status === 'rejected' && (isMyUnit || isStaffRole(role)) && !isRevising && canModifyData(role) && !isEditing && (
             <div className="flex gap-2">
               <button type="button" onClick={() => setIsRevising(true)} className="pv-btn-primary flex-1 text-xs">
                 🔄 Revisi & Upload Ulang
@@ -2224,9 +2503,10 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
             </div>
           )}
 
-          {payment?.status === 'pending_verification' && (isMyUnit || isStaffRole(role)) && canModifyData(role) && (
-            <button type="button" onClick={handleCancel} disabled={isActing} className="pv-btn-ghost w-full text-xs border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50">
-              🗑 Batalkan Pembayaran
+          {(isHanging || payment?.status === 'pending_verification') && (isMyUnit || isStaffRole(role)) && canModifyData(role) && !isEditing && (
+            <button type="button" onClick={handleCancel} disabled={isActing} className="pv-btn-ghost w-full text-xs border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-1">
+              <span>🗑</span>
+              <span>Batalkan Transaksi {isHanging ? 'Menggantung' : 'Pembayaran'}</span>
             </button>
           )}
 

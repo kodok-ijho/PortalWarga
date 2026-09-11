@@ -923,15 +923,18 @@ export async function rejectManualPayment(token, { payment_id, note }) {
   });
 }
 
-export async function updatePayment(token, { payment_id, unit_id, amount, method, paid_at, note, file }) {
+export async function updatePayment(token, { payment_id, unit_id, amount, method, paid_at, note, file, status }) {
   if (IS_DEMO) {
     const mock = await getMockData();
-    return mock.updatePayment(payment_id, { unit_id, amount, method, paid_at, note, file });
+    return mock.updatePayment(payment_id, { unit_id, amount, method, paid_at, note, file, status });
   }
 
   const fields = { payment_id, amount, method, paid_at, note };
   if (unit_id !== undefined && unit_id !== null && unit_id !== '') {
     fields.unit_id = unit_id;
+  }
+  if (status) {
+    fields.status = status;
   }
 
   if (file) {
