@@ -90,7 +90,8 @@ Thumbs.db
 *~
 
 # Local tooling and debug artifacts
-.agents/
+.agents/*
+!.agents/skills/
 client/.tmp/
 client/debug-login.js
 client/error-debug.png
