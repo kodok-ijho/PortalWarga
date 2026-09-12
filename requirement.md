@@ -1,5 +1,7 @@
 # Requirement.md — Portal Warga Multi-Tenant SaaS
 
+> **Repository pengembangan:** https://github.com/kodok-ijho/RuangWarga-dev
+> Semua commit, push, dan pull dilakukan ke repo ini.
 ## 1. Latar Belakang
 
 Portal Warga (repo: `kodok-ijho/PortalWarga`) saat ini adalah aplikasi manajemen paguyuban

@@ -1,8 +1,12 @@
 # Specification.md — Portal Warga Multi-Tenant SaaS
 
+> **Repository pengembangan:** https://github.com/kodok-ijho/RuangWarga-dev
+> Semua commit, push, dan pull dilakukan ke repo ini.
+
 Dokumen ini adalah spesifikasi teknis turunan dari `requirement.md`, dengan basis kode
-existing di `github.com/kodok-ijho/PortalWarga` (React 18 + Vite 5 + TailwindCSS +
-Supabase/PostgreSQL + Mayar QRIS + n8n).
+existing di `github.com/kodok-ijho/PortalWarga` (repo asal, read-only reference) →
+pengembangan dilanjutkan di `github.com/kodok-ijho/RuangWarga-dev`
+(React 18 + Vite 5 + TailwindCSS + Supabase/PostgreSQL + Mayar QRIS + n8n).
 
 > Catatan: skema di bawah adalah **rancangan baru** untuk versi multi-tenant. Skema lama
 > PortalWarga (`profiles`, `units`, `ipl_bills`, `payments`, `expenses`, `events`, `rsvp`,

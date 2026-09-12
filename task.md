@@ -1,5 +1,7 @@
 # Task.md — Portal Warga Multi-Tenant SaaS
 
+> **Repository pengembangan:** https://github.com/kodok-ijho/RuangWarga-dev
+> Semua commit, push, dan pull dilakukan ke repo ini.
 Breakdown task implementasi, disusun bertahap (phase) agar bisa dikerjakan agent coding
 secara berurutan. Setiap task mengacu ke `requirement.md` (FR/NFR) dan `specification.md`
 (bagian §) yang relevan.
