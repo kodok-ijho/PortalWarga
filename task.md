@@ -56,7 +56,7 @@ bisa dibuktikan bekerja -- semua dengan data dummy/kosong.
   billing menyusul di Phase 5). Sesuaikan dengan nama kolom asli dari hasil audit T0.1.
 - [x] **T1.5** -- Buat helper functions: `current_tenant_ids()`, `is_tenant_admin()`,
   `tenant_subscription_status()`. (Spec §6)
-- [ ] **T1.6** -- Buat trigger `handle_new_tenant()` -- otomatis membuat baris
+- [x] **T1.6** -- Buat trigger `handle_new_tenant()` -- otomatis membuat baris
   `tenant_subscriptions` (status `trial`, `trial_ends_at = now() + interval '15 days'`)
   setiap kali baris baru masuk ke `tenants`. (Req FR-4)
 - [ ] **T1.7** -- Terapkan RLS dasar pada `tenants`, `tenant_members`, `tenant_units`,
