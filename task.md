@@ -67,7 +67,7 @@ bisa dibuktikan bekerja -- semua dengan data dummy/kosong.
     pricing), tapi INSERT/UPDATE/DELETE hanya untuk `is_platform_admin()`
 - [x] **T1.8** -- Seed data awal `block_pricing` (angka sementara/dummy, dapat diubah
   Platform Owner nanti via dashboard di Phase 3) dan `subscription_periods` (3, 6, 12 bulan).
-- [ ] **T1.9** -- Tulis test SQL/pgTAP (atau minimal manual test script) yang memverifikasi
+- [x] **T1.9** -- Tulis test SQL/pgTAP (atau minimal manual test script) yang memverifikasi
   isolasi tenant: user tenant A tidak bisa `SELECT`/`INSERT` ke data tenant B, dan user
   biasa tidak bisa mengakses data lintas tenant yang seharusnya hanya untuk
   `is_platform_admin()`.
