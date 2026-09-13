@@ -51,7 +51,7 @@ bisa dibuktikan bekerja -- semua dengan data dummy/kosong.
 - [x] **T1.3** -- Buat migration SQL: `platform_admins` dan fungsi `is_platform_admin()`.
   (Spec §7.1) -- ini fondasi akses Platform Owner Dashboard, harus ada sebelum dashboard-nya
   dibangun di Phase 3.
-- [ ] **T1.4** -- Buat migration SQL kerangka tabel operasional generik: `tenant_units`,
+- [x] **T1.4** -- Buat migration SQL kerangka tabel operasional generik: `tenant_units`,
   `tenant_members` (skema penuh mengikuti Spec §3, tapi *tanpa* data/fitur billing dulu --
   billing menyusul di Phase 5). Sesuaikan dengan nama kolom asli dari hasil audit T0.1.
 - [ ] **T1.5** -- Buat helper functions: `current_tenant_ids()`, `is_tenant_admin()`,
