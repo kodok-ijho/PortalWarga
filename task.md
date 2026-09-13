@@ -48,7 +48,7 @@ bisa dibuktikan bekerja -- semua dengan data dummy/kosong.
 - [x] **T1.2** -- Buat migration SQL: `block_pricing`, `subscription_periods`,
   `tenant_subscriptions`, `tenant_subscription_blocks`, `subscription_payments`, enum
   `subscription_status`. (Spec §2)
-- [ ] **T1.3** -- Buat migration SQL: `platform_admins` dan fungsi `is_platform_admin()`.
+- [x] **T1.3** -- Buat migration SQL: `platform_admins` dan fungsi `is_platform_admin()`.
   (Spec §7.1) -- ini fondasi akses Platform Owner Dashboard, harus ada sebelum dashboard-nya
   dibangun di Phase 3.
 - [ ] **T1.4** -- Buat migration SQL kerangka tabel operasional generik: `tenant_units`,
