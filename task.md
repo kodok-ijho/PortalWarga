@@ -89,7 +89,7 @@ operasional apapun di dalamnya.
 - [x] **T2.2** -- Handle kasus user dengan >1 tenant (mis. satu orang jadi admin di
   beberapa tenant, lihat FR-0.3) -- tentukan default tenant aktif saat login, dengan opsi
   berpindah lewat `MyTenants.jsx` (dibangun di T2.6) dan `TenantSwitcher.jsx`.
-- [ ] **T2.3** -- Buat halaman `ChooseTenantType.jsx` -- pilihan 4 tipe tenant dengan
+- [x] **T2.3** -- Buat halaman `ChooseTenantType.jsx` -- pilihan 4 tipe tenant dengan
   penjelasan singkat tiap opsi.
 - [ ] **T2.4** -- Implementasi signup flow: setelah OAuth Google sukses & pilih tipe
   tenant, panggil RPC/insert untuk membuat baris `tenants` baru + `tenant_members` (role

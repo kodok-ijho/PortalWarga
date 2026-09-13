@@ -40,6 +40,7 @@ const Users = lazy(() => import('./pages/Users'));
 const Logs = lazy(() => import('./pages/Logs'));
 const UserApproval = lazy(() => import('./pages/UserApproval'));
 const PaymentVerification = lazy(() => import('./pages/PaymentVerification'));
+const ChooseTenantType = lazy(() => import('./pages/onboarding/ChooseTenantType'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center py-20">
@@ -79,8 +80,16 @@ export default function App() {
               <TourProvider>
               <WalkthroughTour />
               <Routes>
-                {/* Login terbuka */}
+                {/* Login & Onboarding terbuka */}
                 <Route path="/login" element={<Login />} />
+                <Route
+                  path="/onboarding/choose-type"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ChooseTenantType />
+                    </Suspense>
+                  }
+                />
 
                 {/* Halaman butuh login */}
                 <Route element={<ProtectedLayout />}>
