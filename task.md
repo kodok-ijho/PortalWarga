@@ -119,16 +119,16 @@ Dashboard internal untuk kamu sendiri sebagai Platform Owner. Dibangun sebelum m
 vertikal apapun karena kamu butuh alat ini untuk mengawasi tenant-tenant percobaan yang
 mulai bermunculan dari Phase 2.
 
-- [ ] **T3.1** -- Buat halaman `PlatformTenantList.jsx` -- list semua tenant (tipe, status
+- [x] **T3.1** -- Buat halaman `PlatformTenantList.jsx` -- list semua tenant (tipe, status
   subscription, tanggal daftar), dengan filter dan pencarian. Akses dibatasi
   `is_platform_admin()`.
-- [ ] **T3.2** -- Buat halaman `PlatformPricingConfig.jsx` -- CRUD `block_pricing` dan
+- [x] **T3.2** -- Buat halaman `PlatformPricingConfig.jsx` -- CRUD `block_pricing` dan
   `subscription_periods`, menggantikan seed manual dari T1.8.
-- [ ] **T3.3** -- Buat halaman `PlatformRevenue.jsx` -- MRR total dan breakdown per tipe
+- [x] **T3.3** -- Buat halaman `PlatformRevenue.jsx` -- MRR total dan breakdown per tipe
   tenant serta per status (trial/active/read_only). Karena belum ada transaksi subscription
   sungguhan sampai Phase 4 selesai, halaman ini boleh dibangun dengan data kosong/nol dulu,
   lalu divalidasi ulang setelah Phase 4.
-- [ ] **T3.4** -- Tambahkan routing `/platform/*` terpisah dari `/account/*` dan
+- [x] **T3.4** -- Tambahkan routing `/platform/*` terpisah dari `/account/*` dan
   `/t/:tenantId/*`, dengan guard frontend + RLS ganda (RLS sebagai penegak utama).
 
 **Definition of Done Phase 3:** Platform Owner bisa login dan melihat seluruh tenant yang

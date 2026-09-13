@@ -19,8 +19,10 @@ import {
   AiOutlineEdit,
   AiOutlineCalendar,
   AiOutlineBulb,
+  AiOutlineSafetyCertificate,
 } from 'react-icons/ai';
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
+import { useTenant } from '../hooks/useTenant';
 import { useToast } from '../hooks/useToast';
 import { useTour } from '../context/TourContext';
 import TenantSwitcher from './TenantSwitcher';
@@ -42,6 +44,7 @@ const APP_VERSION = `v${pkg.version || '1.4.3'}`;
 
 export default function Header() {
   const { isAuthenticated, profile, role, isReadOnly, signOut, updateProfile, session } = useAuth();
+  const { isPlatformAdmin } = useTenant();
   const { startTour } = useTour();
   const canWrite = canModifyData(role) && !isReadOnly;
   const location = useLocation();
@@ -223,18 +226,32 @@ export default function Header() {
           : []),
       ],
     },
-    ...(isStaffRole(role)
+    ...(isStaffRole(role) || isPlatformAdmin
       ? [
           {
             key: 'sistem',
             label: 'Sistem & Pengaturan',
             icon: AiOutlineSetting,
-            activePaths: ['/settings', '/logs'],
+            activePaths: ['/settings', '/logs', '/platform'],
             items: [
-              { to: '/settings', label: 'Pengaturan', icon: AiOutlineSetting, desc: 'Atur tarif IPL dan denda' },
-                ...(canViewLogs(role)
-                  ? [{ to: '/logs', label: 'Log Sistem', icon: AiOutlineFileText, desc: 'Audit log aktivitas portal' }]
-                  : []),
+              ...(isStaffRole(role)
+                ? [
+                    { to: '/settings', label: 'Pengaturan', icon: AiOutlineSetting, desc: 'Atur tarif IPL dan denda' },
+                    ...(canViewLogs(role)
+                      ? [{ to: '/logs', label: 'Log Sistem', icon: AiOutlineFileText, desc: 'Audit log aktivitas portal' }]
+                      : []),
+                  ]
+                : []),
+              ...(isPlatformAdmin
+                ? [
+                    {
+                      to: '/platform',
+                      label: 'Platform Owner',
+                      icon: AiOutlineSafetyCertificate,
+                      desc: 'Kelola seluruh tenant, harga & MRR',
+                    },
+                  ]
+                : []),
             ],
           },
         ]
@@ -416,6 +433,17 @@ export default function Header() {
                 <span className="lg:hidden">17-an</span>
                 <span className="text-[10px] opacity-80">↗</span>
               </a>
+
+              {isPlatformAdmin && (
+                <NavLink
+                  to="/platform"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40 shadow-xs transition-all hover:scale-105"
+                  title="Buka Platform Owner Dashboard"
+                >
+                  <AiOutlineSafetyCertificate className="text-sm" />
+                  <span className="hidden xl:inline">Platform</span>
+                </NavLink>
+              )}
 
               {profile?.full_name && (
                 <button

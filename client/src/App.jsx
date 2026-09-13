@@ -44,6 +44,10 @@ const ChooseTenantType = lazy(() => import('./pages/onboarding/ChooseTenantType'
 const MyTenants = lazy(() => import('./pages/account/MyTenants'));
 const AddNewTenant = lazy(() => import('./pages/account/AddNewTenant'));
 const TenantDashboardPlaceholder = lazy(() => import('./pages/tenant/TenantDashboardPlaceholder'));
+const PlatformLayout = lazy(() => import('./pages/platform/PlatformLayout'));
+const PlatformTenantList = lazy(() => import('./pages/platform/PlatformTenantList'));
+const PlatformPricingConfig = lazy(() => import('./pages/platform/PlatformPricingConfig'));
+const PlatformRevenue = lazy(() => import('./pages/platform/PlatformRevenue'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center py-20">
@@ -137,6 +141,49 @@ export default function App() {
                     </Suspense>
                   }
                 />
+
+                {/* Platform Owner Dashboard Layer (§7.1, T3.4) */}
+                <Route
+                  path="/platform"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PlatformLayout />
+                    </Suspense>
+                  }
+                >
+                  <Route
+                    index
+                    element={
+                      <Suspense fallback={<PageLoader />}>
+                        <PlatformTenantList />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="tenants"
+                    element={
+                      <Suspense fallback={<PageLoader />}>
+                        <PlatformTenantList />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="pricing"
+                    element={
+                      <Suspense fallback={<PageLoader />}>
+                        <PlatformPricingConfig />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="revenue"
+                    element={
+                      <Suspense fallback={<PageLoader />}>
+                        <PlatformRevenue />
+                      </Suspense>
+                    }
+                  />
+                </Route>
 
                 {/* Halaman butuh login */}
                 <Route element={<ProtectedLayout />}>
