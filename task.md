@@ -59,7 +59,7 @@ bisa dibuktikan bekerja -- semua dengan data dummy/kosong.
 - [x] **T1.6** -- Buat trigger `handle_new_tenant()` -- otomatis membuat baris
   `tenant_subscriptions` (status `trial`, `trial_ends_at = now() + interval '15 days'`)
   setiap kali baris baru masuk ke `tenants`. (Req FR-4)
-- [ ] **T1.7** -- Terapkan RLS dasar pada `tenants`, `tenant_members`, `tenant_units`,
+- [x] **T1.7** -- Terapkan RLS dasar pada `tenants`, `tenant_members`, `tenant_units`,
   `tenant_subscriptions`, `tenant_subscription_blocks`, `subscription_payments`:
   - SELECT/INSERT/UPDATE tenant data hanya untuk anggota tenant terkait
   - SELECT lintas-tenant penuh hanya untuk `is_platform_admin()`
