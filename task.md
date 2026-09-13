@@ -54,7 +54,7 @@ bisa dibuktikan bekerja -- semua dengan data dummy/kosong.
 - [x] **T1.4** -- Buat migration SQL kerangka tabel operasional generik: `tenant_units`,
   `tenant_members` (skema penuh mengikuti Spec §3, tapi *tanpa* data/fitur billing dulu --
   billing menyusul di Phase 5). Sesuaikan dengan nama kolom asli dari hasil audit T0.1.
-- [ ] **T1.5** -- Buat helper functions: `current_tenant_ids()`, `is_tenant_admin()`,
+- [x] **T1.5** -- Buat helper functions: `current_tenant_ids()`, `is_tenant_admin()`,
   `tenant_subscription_status()`. (Spec §6)
 - [ ] **T1.6** -- Buat trigger `handle_new_tenant()` -- otomatis membuat baris
   `tenant_subscriptions` (status `trial`, `trial_ends_at = now() + interval '15 days'`)
