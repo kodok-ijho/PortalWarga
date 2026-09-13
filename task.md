@@ -21,16 +21,16 @@ secara berurutan. Setiap task mengacu ke `requirement.md` (FR/NFR) dan `specific
 
 ## Phase 0 -- Persiapan & Audit Kode Existing
 
-- [ ] **T0.1** -- Clone/pull `github.com/kodok-ijho/PortalWarga`, baca ulang
+- [x] **T0.1** -- Clone/pull `github.com/kodok-ijho/PortalWarga`, baca ulang
   `supabase/schema.sql`, `client/src/context/AuthContext.jsx`, dan seluruh isi
   `client/src/pages/` untuk memetakan nama kolom, nama tabel, dan konvensi penamaan
   aktual (jangan asumsikan nama dari dokumen ini -- verifikasi ke file sumber).
-- [ ] **T0.2** -- Buat branch baru `feature/platform-foundation` dari `main` (bukan
+- [x] **T0.2** -- Buat branch baru `feature/platform-foundation` dari `main` (bukan
   `feature/multi-tenant` -- penamaan branch sengaja menegaskan bahwa yang dibangun duluan
   adalah fondasi platform, bukan fitur multi-tenant untuk RT/RW).
-- [ ] **T0.3** -- Setup Supabase project baru khusus untuk pengembangan fondasi platform
+- [x] **T0.3** -- Setup Supabase project baru khusus untuk pengembangan fondasi platform
   (jangan langsung ubah project production existing PortalWarga single-tenant).
-- [ ] **T0.4** -- Dokumentasikan hasil audit T0.1 sebagai catatan tambahan (mis.
+- [x] **T0.4** -- Dokumentasikan hasil audit T0.1 sebagai catatan tambahan (mis.
   `docs/audit-notes.md`) -- mencatat perbedaan nyata antara skema lama vs rancangan di
   `specification.md`, agar task berikutnya disesuaikan bila ada perbedaan.
 
