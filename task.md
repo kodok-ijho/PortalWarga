@@ -98,11 +98,11 @@ operasional apapun di dalamnya.
 - [x] **T2.5** -- Buat `tenantTemplates.js` (Spec §7) dan hook `useTenantTemplate()` untuk
   mengganti istilah UI (Rumah/Kamar/Slot, IPL/Sewa/Kontribusi/Iuran, dst) secara dinamis --
   disiapkan di sini walau baru benar-benar dipakai luas mulai Phase 5.
-- [ ] **T2.6** -- Buat halaman `MyTenants.jsx` (Spec §7.2, FR-0.3) -- daftar tenant milik
+- [x] **T2.6** -- Buat halaman `MyTenants.jsx` (Spec §7.2, FR-0.3) -- daftar tenant milik
   user login, dengan opsi pindah tenant aktif dan tombol menuju `AddNewTenant.jsx`.
-- [ ] **T2.7** -- Buat halaman `AddNewTenant.jsx` (Spec §7.2) -- entry point membuat tenant
+- [x] **T2.7** -- Buat halaman `AddNewTenant.jsx` (Spec §7.2) -- entry point membuat tenant
   baru tanpa logout, memicu ulang T2.3--T2.4.
-- [ ] **T2.8** -- Setelah tenant dipilih di `MyTenants.jsx`, arahkan ke placeholder route
+- [x] **T2.8** -- Setelah tenant dipilih di `MyTenants.jsx`, arahkan ke placeholder route
   `/t/:tenantId/dashboard` (isi sebenarnya baru dibangun mulai Phase 5 -- untuk saat ini
   cukup halaman kosong yang menampilkan nama tenant, tipe, dan status subscription, sebagai
   bukti bahwa context sudah mengalir dengan benar).

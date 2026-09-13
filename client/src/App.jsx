@@ -41,6 +41,9 @@ const Logs = lazy(() => import('./pages/Logs'));
 const UserApproval = lazy(() => import('./pages/UserApproval'));
 const PaymentVerification = lazy(() => import('./pages/PaymentVerification'));
 const ChooseTenantType = lazy(() => import('./pages/onboarding/ChooseTenantType'));
+const MyTenants = lazy(() => import('./pages/account/MyTenants'));
+const AddNewTenant = lazy(() => import('./pages/account/AddNewTenant'));
+const TenantDashboardPlaceholder = lazy(() => import('./pages/tenant/TenantDashboardPlaceholder'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center py-20">
@@ -87,6 +90,50 @@ export default function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ChooseTenantType />
+                    </Suspense>
+                  }
+                />
+
+                {/* Tenant Owner Dashboard Layer (§7.2, T2.6, T2.7) */}
+                <Route
+                  path="/account"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <MyTenants />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/account/tenants"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <MyTenants />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/account/add-tenant"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AddNewTenant />
+                    </Suspense>
+                  }
+                />
+
+                {/* Tenant Operational Layer (§7, T2.8) */}
+                <Route
+                  path="/t/:tenantId/dashboard"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <TenantDashboardPlaceholder />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/t/:tenantId"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <TenantDashboardPlaceholder />
                     </Suspense>
                   }
                 />
