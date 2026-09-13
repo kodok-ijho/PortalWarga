@@ -68,6 +68,18 @@ export default function Login() {
         setPendingSuccess({ message: result.message });
         return;
       }
+      // Cek apakah ada pending tenant onboarding dari ChooseTenantType
+      const pendingType = sessionStorage.getItem('rw_pending_tenant_type');
+      const pendingName = sessionStorage.getItem('rw_pending_tenant_name');
+      if (pendingType && pendingName) {
+        sessionStorage.removeItem('rw_pending_tenant_type');
+        sessionStorage.removeItem('rw_pending_tenant_name');
+        navigate('/onboarding/choose-type', {
+          replace: true,
+          state: { autoSubmit: true, type: pendingType, name: pendingName },
+        });
+        return;
+      }
       navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || 'Login Google belum berhasil.');

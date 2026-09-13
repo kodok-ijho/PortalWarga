@@ -91,7 +91,7 @@ operasional apapun di dalamnya.
   berpindah lewat `MyTenants.jsx` (dibangun di T2.6) dan `TenantSwitcher.jsx`.
 - [x] **T2.3** -- Buat halaman `ChooseTenantType.jsx` -- pilihan 4 tipe tenant dengan
   penjelasan singkat tiap opsi.
-- [ ] **T2.4** -- Implementasi signup flow: setelah OAuth Google sukses & pilih tipe
+- [x] **T2.4** -- Implementasi signup flow: setelah OAuth Google sukses & pilih tipe
   tenant, panggil RPC/insert untuk membuat baris `tenants` baru + `tenant_members` (role
   admin, status approved untuk diri sendiri). Trigger `handle_new_tenant()` (T1.6) akan
   otomatis mengaktifkan trial.

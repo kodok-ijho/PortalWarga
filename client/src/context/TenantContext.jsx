@@ -271,6 +271,53 @@ export function TenantProvider({ children }) {
   const userRole = activeTenant?.role || 'anggota';
   const isTenantAdmin = userRole === 'admin' || activeTenant?.owner_id === (user?.id || profile?.id);
 
+  // Buat tenant baru (Demo mode & Supabase mode) sesuai T2.4
+  const createTenant = useCallback(async ({ name, type }) => {
+    const currentUserId = user?.id || profile?.id;
+    if (!currentUserId) {
+      throw new Error('Anda harus masuk terlebih dahulu untuk membuat layanan baru.');
+    }
+
+    if (IS_DEMO) {
+      const newMockTenant = {
+        id: `demo-tenant-${Date.now()}`,
+        name: name.trim(),
+        type,
+        owner_id: currentUserId,
+        role: 'admin',
+        subscription: {
+          id: `sub-demo-${Date.now()}`,
+          status: 'trial',
+          trial_started_at: new Date().toISOString(),
+          trial_ends_at: new Date(Date.now() + 15 * 86400000).toISOString(),
+          current_period_start: null,
+          current_period_end: null,
+        },
+      };
+      setUserTenants((prev) => [newMockTenant, ...prev]);
+      setActiveTenantId(newMockTenant.id);
+      return newMockTenant;
+    }
+
+    const { data: newTenant, error: insertError } = await supabase
+      .from('tenants')
+      .insert({
+        name: name.trim(),
+        type,
+        owner_id: currentUserId,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      throw new Error(insertError.message || 'Gagal mendaftarkan tenant baru.');
+    }
+
+    await fetchTenantData();
+    setActiveTenantId(newTenant.id);
+    return newTenant;
+  }, [user?.id, profile?.id, setActiveTenantId, fetchTenantData]);
+
   const value = {
     // State Utama (Spec §7 & T2.1)
     activeTenantId,
@@ -289,6 +336,7 @@ export function TenantProvider({ children }) {
     setActiveTenantId,
     switchTenant: setActiveTenantId,
     refreshTenant: fetchTenantData,
+    createTenant,
   };
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;

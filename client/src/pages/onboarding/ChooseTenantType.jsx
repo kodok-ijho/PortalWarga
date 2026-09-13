@@ -1,10 +1,9 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AiOutlineCheck, AiOutlineArrowRight, AiOutlineSafetyCertificate, AiOutlineArrowLeft } from 'react-icons/ai';
 import { useAuth } from '../../hooks/useAuth';
 import { useTenant } from '../../hooks/useTenant';
 import { useToast } from '../../hooks/useToast';
-import { supabase } from '../../services/supabaseClient';
 
 export const TENANT_TYPE_OPTIONS = [
   {
@@ -99,13 +98,38 @@ export const TENANT_TYPE_OPTIONS = [
 
 export default function ChooseTenantType({ onCancel, initialType = 'rt_rw', redirectOnSuccess = true }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
-  const { user, profile, isAuthenticated } = useAuth();
-  const { refreshTenant, switchTenant } = useTenant();
+  const { isAuthenticated } = useAuth();
+  const { createTenant } = useTenant();
 
-  const [selectedType, setSelectedType] = useState(initialType);
-  const [tenantName, setTenantName] = useState('');
+  const [selectedType, setSelectedType] = useState(() => location.state?.type || initialType);
+  const [tenantName, setTenantName] = useState(() => location.state?.name || '');
   const [submitting, setSubmitting] = useState(false);
+
+  // Auto-submit jika kembali dari login dengan pending tenant data
+  useEffect(() => {
+    if (location.state?.autoSubmit && location.state?.name && isAuthenticated && !submitting) {
+      const runAutoCreate = async () => {
+        setSubmitting(true);
+        try {
+          const tenant = await createTenant({
+            name: location.state.name,
+            type: location.state.type || selectedType,
+          });
+          toast.success(`Layanan "${tenant.name}" berhasil dibuat! Trial 15 hari aktif.`);
+          if (redirectOnSuccess) {
+            navigate(`/t/${tenant.id}/dashboard`, { replace: true });
+          }
+        } catch (err) {
+          toast.error(err.message || 'Gagal membuat layanan otomatis.');
+        } finally {
+          setSubmitting(false);
+        }
+      };
+      runAutoCreate();
+    }
+  }, [location.state, isAuthenticated, createTenant, redirectOnSuccess, navigate, selectedType, submitting, toast]);
 
   const activeOption = TENANT_TYPE_OPTIONS.find((o) => o.type === selectedType) || TENANT_TYPE_OPTIONS[0];
 
@@ -132,32 +156,12 @@ export default function ChooseTenantType({ onCancel, initialType = 'rt_rw', redi
 
     setSubmitting(true);
     try {
-      const currentUserId = user?.id || profile?.id;
-
-      // ── SUPABASE INSERT FLOW ─────────────────────────────────────
-      // Trigger handle_new_tenant() di database akan otomatis:
-      // 1. Membuat tenant_subscriptions berstatus trial 15 hari
-      // 2. Mengalokasikan 1 blok trial 10 unit
-      // 3. Mendaftarkan owner sebagai admin approved di tenant_members
-      const { data: newTenant, error: insertError } = await supabase
-        .from('tenants')
-        .insert({
-          name: tenantName.trim(),
-          type: selectedType,
-          owner_id: currentUserId,
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        throw new Error(insertError.message || 'Gagal mendaftarkan tenant baru.');
-      }
+      const newTenant = await createTenant({
+        name: tenantName.trim(),
+        type: selectedType,
+      });
 
       toast.success(`Layanan "${newTenant.name}" berhasil dibuat! Trial 15 hari aktif.`);
-
-      // Refresh konteks tenant dan aktifkan tenant baru
-      await refreshTenant();
-      switchTenant(newTenant.id);
 
       if (redirectOnSuccess) {
         navigate(`/t/${newTenant.id}/dashboard`, { replace: true });
