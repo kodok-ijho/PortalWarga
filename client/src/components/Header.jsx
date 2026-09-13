@@ -23,6 +23,7 @@ import {
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { useTour } from '../context/TourContext';
+import TenantSwitcher from './TenantSwitcher';
 import {
   isStaffRole,
   isBendaharaOrAbove,
@@ -275,6 +276,11 @@ export default function Header() {
               Portal Warga
             </p>
           </div>
+          {isAuthenticated && (
+            <div className="hidden xl:flex items-center ml-3">
+              <TenantSwitcher />
+            </div>
+          )}
         </div>
 
         {/* Tengah: Navigasi Desktop Dropdown (Bebas Scrollbar) */}
@@ -516,6 +522,12 @@ export default function Header() {
                 </button>
               </div>
             )}
+
+            {/* Tenant Switcher Mobile */}
+            <div className="p-3 bg-[#082315] border-b border-forest-800 shrink-0">
+              <p className="text-[10px] text-forest-400 uppercase tracking-wider font-semibold mb-1.5 px-1">Layanan Aktif</p>
+              <TenantSwitcher isMobile={true} />
+            </div>
 
             {/* Tombol Panduan Aplikasi Mobile */}
             <div className="px-3 pt-3">
