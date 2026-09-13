@@ -44,7 +44,7 @@ Phase ini murni membangun "pabrik" -- tidak ada satu pun fitur RT/RW/kos/arisan/
 disentuh di sini. Tujuannya: tenant bisa dibuat, subscription bisa dilacak, isolasi data
 bisa dibuktikan bekerja -- semua dengan data dummy/kosong.
 
-- [ ] **T1.1** -- Buat migration SQL: tabel `tenants`, enum `tenant_type`. (Spec §2)
+- [x] **T1.1** -- Buat migration SQL: tabel `tenants`, enum `tenant_type`. (Spec §2)
 - [ ] **T1.2** -- Buat migration SQL: `block_pricing`, `subscription_periods`,
   `tenant_subscriptions`, `tenant_subscription_blocks`, `subscription_payments`, enum
   `subscription_status`. (Spec §2)
