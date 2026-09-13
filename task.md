@@ -95,7 +95,7 @@ operasional apapun di dalamnya.
   tenant, panggil RPC/insert untuk membuat baris `tenants` baru + `tenant_members` (role
   admin, status approved untuk diri sendiri). Trigger `handle_new_tenant()` (T1.6) akan
   otomatis mengaktifkan trial.
-- [ ] **T2.5** -- Buat `tenantTemplates.js` (Spec §7) dan hook `useTenantTemplate()` untuk
+- [x] **T2.5** -- Buat `tenantTemplates.js` (Spec §7) dan hook `useTenantTemplate()` untuk
   mengganti istilah UI (Rumah/Kamar/Slot, IPL/Sewa/Kontribusi/Iuran, dst) secara dinamis --
   disiapkan di sini walau baru benar-benar dipakai luas mulai Phase 5.
 - [ ] **T2.6** -- Buat halaman `MyTenants.jsx` (Spec §7.2, FR-0.3) -- daftar tenant milik
