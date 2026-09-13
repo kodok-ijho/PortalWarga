@@ -84,7 +84,7 @@ tenant (T1.9) lulus.
 Masih bagian fondasi: alur signup sampai tenant baru berdiri (trial aktif), tanpa fitur
 operasional apapun di dalamnya.
 
-- [ ] **T2.1** -- Perluas `AuthContext.jsx` dan buat `TenantContext.jsx` baru (Spec §7)
+- [x] **T2.1** -- Perluas `AuthContext.jsx` dan buat `TenantContext.jsx` baru (Spec §7)
   yang menyimpan `activeTenantId`, tipe tenant aktif, dan status subscription-nya.
 - [ ] **T2.2** -- Handle kasus user dengan >1 tenant (mis. satu orang jadi admin di
   beberapa tenant, lihat FR-0.3) -- tentukan default tenant aktif saat login, dengan opsi

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
+import { TenantProvider } from './context/TenantContext';
 import { ToastProvider } from './context/ToastContext';
 import { TourProvider } from './context/TourContext';
 import WalkthroughTour from './components/WalkthroughTour';
@@ -73,8 +74,9 @@ export default function App() {
       <ToastProvider>
         <PWAUpdatePrompt />
         <AuthProvider>
-          <BrowserRouter>
-            <TourProvider>
+          <TenantProvider>
+            <BrowserRouter>
+              <TourProvider>
               <WalkthroughTour />
               <Routes>
                 {/* Login terbuka */}
@@ -218,6 +220,7 @@ export default function App() {
               </Routes>
             </TourProvider>
           </BrowserRouter>
+          </TenantProvider>
         </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>
