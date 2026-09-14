@@ -2403,3 +2403,34 @@ export async function drawArisanWinner(tenantId, roundId, operatorMemberId = nul
   return data;
 }
 
+/**
+ * Memulai siklus arisan baru dengan mereset status has_won seluruh peserta (RPC start_new_arisan_cycle)
+ */
+export async function startNewArisanCycle(tenantId, operatorMemberId = null, force = false) {
+  if (!tenantId) throw new Error('Tenant ID wajib disertakan.');
+
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
+    return {
+      success: true,
+      tenant_id: tenantId,
+      new_cycle: 2,
+      total_participants_reset: 10,
+      reset_at: new Date().toISOString(),
+    };
+  }
+
+  const { data, error } = await supabase.rpc('start_new_arisan_cycle', {
+    p_tenant_id: tenantId,
+    p_operator_member_id: operatorMemberId || null,
+    p_force: force,
+  });
+
+  if (error) {
+    console.error('[tenantOperationalService] startNewArisanCycle RPC error:', error);
+    throw new Error(error.message || 'Gagal memulai siklus arisan baru.');
+  }
+
+  return data;
+}
+
+

@@ -26,6 +26,7 @@ import {
   generateArisanRoundBills,
   fetchArisanRoundBills,
   payArisanBillManual,
+  startNewArisanCycle,
 } from '../../services/tenantOperationalService';
 import { formatRupiah } from '../../services/dataHelpers';
 import Modal from '../../components/Modal';
@@ -81,6 +82,8 @@ export default function ArisanRounds() {
   const [loadingRoundBills, setLoadingRoundBills] = useState(false);
   const [generatingBills, setGeneratingBills] = useState(false);
   const [markingPaidId, setMarkingPaidId] = useState(null);
+  const [isResetCycleModalOpen, setIsResetCycleModalOpen] = useState(false);
+  const [resettingCycle, setResettingCycle] = useState(false);
 
   // Load Data Putaran & Peserta
   const loadData = async () => {
@@ -249,6 +252,31 @@ export default function ArisanRounds() {
     }
   };
 
+  // Handler Mulai Siklus Baru
+  const handleConfirmResetCycle = async (force = false) => {
+    if (isReadOnly) {
+      toast.warning(bannerText || 'Fitur dinonaktifkan dalam status langganan read-only.');
+      return;
+    }
+    if (!isTenantAdmin) {
+      toast.error('Hanya Admin Arisan yang berwenang memulai siklus baru.');
+      return;
+    }
+
+    try {
+      setResettingCycle(true);
+      const res = await startNewArisanCycle(tenantId, user?.id, force);
+      toast.success(`Siklus baru #${res.new_cycle || ''} berhasil dimulai! Status seluruh peserta telah direset.`);
+      setIsResetCycleModalOpen(false);
+      await loadData();
+    } catch (err) {
+      console.error('[ArisanRounds] Gagal memulai siklus baru:', err);
+      toast.error(err.message || 'Gagal memulai siklus arisan baru.');
+    } finally {
+      setResettingCycle(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#071f13] text-white py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -294,18 +322,62 @@ export default function ArisanRounds() {
             </button>
 
             {isTenantAdmin && (
-              <button
-                type="button"
-                disabled={isReadOnly}
-                onClick={handleOpenCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white font-bold text-xs shadow-lg shadow-purple-950/40 transition-all hover:scale-105 disabled:opacity-50 disabled:pointer-events-none"
-              >
-                <AiOutlinePlus />
-                <span>+ Buat Putaran Baru</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  disabled={isReadOnly}
+                  onClick={() => setIsResetCycleModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-200 hover:text-white border border-purple-700/60 font-semibold text-xs transition-colors disabled:opacity-50"
+                  title="Mulai Siklus Baru Arisan (Reset Peserta)"
+                >
+                  <AiOutlineReload />
+                  <span className="hidden sm:inline">Siklus Baru</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isReadOnly}
+                  onClick={handleOpenCreateModal}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white font-bold text-xs shadow-lg shadow-purple-950/40 transition-all hover:scale-105 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  <AiOutlinePlus />
+                  <span>+ Buat Putaran Baru</span>
+                </button>
+              </>
             )}
           </div>
         </div>
+
+        {/* Banner Siklus Arisan Lengkap */}
+        {participants.length > 0 && stats.totalWinners >= stats.totalParticipants && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950/90 via-amber-950/40 to-forest-900/90 border border-gold-500/50 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center text-xl shrink-0">
+                🏆
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white">
+                  Siklus Putaran Arisan Telah Selesai 100%!
+                </h4>
+                <p className="text-xs text-forest-300">
+                  Seluruh peserta ({stats.totalParticipants} slot) telah memenangkan undian. Pengurus dapat memulai siklus baru.
+                </p>
+              </div>
+            </div>
+
+            {isTenantAdmin && (
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => setIsResetCycleModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white font-bold text-xs rounded-xl shadow-lg shrink-0 transition-all hover:scale-105 disabled:opacity-50"
+              >
+                <AiOutlineReload />
+                <span>Mulai Siklus Baru</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* 4 Kartu Metrik Ringkasan */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -793,6 +865,68 @@ export default function ArisanRounds() {
             </div>
           </div>
         </Modal>
+
+        {/* Modal Konfirmasi Mulai Siklus Baru */}
+        {isResetCycleModalOpen && (
+          <Modal
+            isOpen={isResetCycleModalOpen}
+            onClose={() => !resettingCycle && setIsResetCycleModalOpen(false)}
+            title="🔄 Konfirmasi Mulai Siklus Baru"
+            maxWidth="max-w-md"
+          >
+            <div className="p-4 space-y-4 text-left">
+              <div className="p-3.5 bg-purple-950/40 border border-purple-800 rounded-xl text-xs text-purple-200 leading-relaxed">
+                <p className="font-semibold text-white mb-1.5">Penjelasan &amp; Dampak Tindakan:</p>
+                <ul className="list-disc list-inside space-y-1 text-forest-300">
+                  <li>
+                    Status kemenangan seluruh peserta (<strong>{participants.length} anggota</strong>) akan direset kembali menjadi <strong>Belum Menang</strong>.
+                  </li>
+                  <li>Nomor siklus grup arisan akan dinaikkan ke siklus berikutnya.</li>
+                  <li>
+                    Riwayat putaran dan catatan pemenang sebelumnya <strong>tetap aman tersimpan</strong> untuk arsip dan transparansi.
+                  </li>
+                </ul>
+              </div>
+
+              {stats.totalWinners < stats.totalParticipants && (
+                <div className="p-3 bg-amber-500/20 border border-amber-500/40 rounded-xl text-xs text-amber-300 flex items-start gap-2">
+                  <AiOutlineWarning className="text-lg shrink-0 mt-0.5" />
+                  <span>
+                    Masih terdapat <strong>{stats.totalParticipants - stats.totalWinners} peserta</strong> yang belum memenangkan undian pada siklus ini. Reset sekarang akan menjalankan force-reset.
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={resettingCycle}
+                  onClick={() => setIsResetCycleModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-forest-900 hover:bg-forest-800 text-forest-300 hover:text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={resettingCycle || isReadOnly}
+                  onClick={() => handleConfirmResetCycle(stats.totalWinners < stats.totalParticipants)}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white text-xs font-bold shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  {resettingCycle ? (
+                    <>
+                      <AiOutlineReload className="animate-spin" />
+                      <span>Memproses...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🔄 Ya, Mulai Siklus Baru</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
       </div>
     </div>
   );

@@ -29,6 +29,7 @@ import {
   payArisanBillManual,
   fetchArisanCandidates,
   drawArisanWinner,
+  startNewArisanCycle,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -531,6 +532,19 @@ describe('tenantOperationalService - Unit Tests', () => {
       // Validasi error jika parameter kosong
       await expect(drawArisanWinner('', 'demo-round-1')).rejects.toThrow('Tenant ID wajib disertakan.');
       await expect(drawArisanWinner('demo-arisan-tenant', '')).rejects.toThrow('ID putaran arisan wajib disertakan.');
+    });
+
+    it('startNewArisanCycle berhasil mereset status peserta dan menaikkan siklus baru (T8.7)', async () => {
+      const resetRes = await startNewArisanCycle('demo-arisan-tenant', 'demo-admin-id', false);
+      expect(resetRes).toBeDefined();
+      expect(resetRes.success).toBe(true);
+      expect(resetRes.tenant_id).toBe('demo-arisan-tenant');
+      expect(resetRes.new_cycle).toBe(2);
+      expect(typeof resetRes.total_participants_reset).toBe('number');
+      expect(resetRes.reset_at).toBeDefined();
+
+      // Validasi error jika tenantId kosong
+      await expect(startNewArisanCycle('', 'demo-admin-id')).rejects.toThrow('Tenant ID wajib disertakan.');
     });
   });
 });

@@ -190,4 +190,94 @@ describe('ArisanDraw Logic & Safeguards (T8.6)', () => {
       expect(drawnRounds[0].drawn_at).toBeDefined();
     });
   });
+
+  describe('Aksi Mulai Siklus Baru (T8.7)', () => {
+    const simulateResetCycle = ({ participants, currentCycle, isReadOnly, userRole, force = false }) => {
+      if (isReadOnly) throw new Error('READ_ONLY_LOCKED');
+      if (userRole !== 'admin') throw new Error('UNAUTHORIZED_ROLE');
+
+      const remainingCandidates = participants.filter((p) => !p.has_won);
+      if (!force && remainingCandidates.length > 0) {
+        throw new Error(`CYCLE_INCOMPLETE: ${remainingCandidates.length} participants remaining`);
+      }
+
+      const resetParticipants = participants.map((p) => ({
+        ...p,
+        has_won: false,
+        won_at_round_id: null,
+      }));
+
+      return {
+        success: true,
+        new_cycle: currentCycle + 1,
+        total_participants_reset: resetParticipants.length,
+        participants: resetParticipants,
+      };
+    };
+
+    it('berhasil mereset seluruh peserta dan menaikkan nomor siklus saat siklus selesai', () => {
+      const allWonParticipants = mockParticipants.map((p) => ({ ...p, has_won: true }));
+      const result = simulateResetCycle({
+        participants: allWonParticipants,
+        currentCycle: 1,
+        isReadOnly: false,
+        userRole: 'admin',
+        force: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.new_cycle).toBe(2);
+      expect(result.total_participants_reset).toBe(5);
+      expect(result.participants.every((p) => p.has_won === false)).toBe(true);
+    });
+
+    it('menolak reset siklus jika tenant dalam status read_only', () => {
+      const allWonParticipants = mockParticipants.map((p) => ({ ...p, has_won: true }));
+      expect(() =>
+        simulateResetCycle({
+          participants: allWonParticipants,
+          currentCycle: 1,
+          isReadOnly: true,
+          userRole: 'admin',
+        })
+      ).toThrow('READ_ONLY_LOCKED');
+    });
+
+    it('menolak reset siklus jika bukan dilakukan oleh admin', () => {
+      const allWonParticipants = mockParticipants.map((p) => ({ ...p, has_won: true }));
+      expect(() =>
+        simulateResetCycle({
+          participants: allWonParticipants,
+          currentCycle: 1,
+          isReadOnly: false,
+          userRole: 'anggota',
+        })
+      ).toThrow('UNAUTHORIZED_ROLE');
+    });
+
+    it('menolak reset siklus jika masih ada kandidat belum menang tanpa force=true', () => {
+      expect(() =>
+        simulateResetCycle({
+          participants: mockParticipants, // masih ada 4 peserta has_won = false
+          currentCycle: 1,
+          isReadOnly: false,
+          userRole: 'admin',
+          force: false,
+        })
+      ).toThrow(/CYCLE_INCOMPLETE/);
+    });
+
+    it('mengizinkan force reset siklus jika admin mengonfirmasi force=true', () => {
+      const result = simulateResetCycle({
+        participants: mockParticipants,
+        currentCycle: 1,
+        isReadOnly: false,
+        userRole: 'admin',
+        force: true,
+      });
+      expect(result.success).toBe(true);
+      expect(result.new_cycle).toBe(2);
+      expect(result.participants.every((p) => p.has_won === false)).toBe(true);
+    });
+  });
 });
