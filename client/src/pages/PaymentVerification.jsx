@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useTenant } from '../context/TenantContext';
+import { useSubscriptionGate } from '../hooks/useSubscriptionGate';
+import { useTenantTemplate } from '../hooks/useTenantTemplate';
 import {
   fetchPayments,
   fetchBillMatrix,
@@ -12,6 +15,7 @@ import {
   updatePayment,
   IS_DEMO,
 } from '../services/dataService';
+import { fetchTenantUnits, fetchTenantMembers } from '../services/tenantOperationalService';
 import {
   formatRupiah,
   formatDate,
@@ -141,9 +145,15 @@ function mergePaymentSources(payments, matrixRows) {
 }
 
 export default function PaymentVerification() {
-  const { role, profile, session, isReadOnly } = useAuth();
+  const params = useParams();
+  const { role, profile, session, isReadOnly: authReadOnly } = useAuth();
+  const { currentTenant, userTenants } = useTenant();
+  const activeTenantId = params.tenantId || currentTenant?.id || userTenants?.[0]?.id || null;
+  const { canWrite: subCanWrite, isReadOnly: subReadOnly } = useSubscriptionGate(activeTenantId);
+  const template = useTenantTemplate(currentTenant?.type || 'rt_rw');
+
   const toast = useToast();
-  const canWrite = canModifyData(role) && !isReadOnly;
+  const canWrite = canModifyData(role) && !authReadOnly && subCanWrite;
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState('pending');
   const [selectedPayment, setSelectedPayment] = useState(null);
@@ -179,7 +189,7 @@ export default function PaymentVerification() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        if (IS_DEMO) {
+        if (IS_DEMO && (!activeTenantId || String(activeTenantId).startsWith('demo-'))) {
           // Demo mode uses mock data directly
           const mockPay = getPendingPayments(); // Just to load mockData module
           setPayments(mockPayments);
@@ -187,6 +197,38 @@ export default function PaymentVerification() {
           setResidents([]);
           setQrisEnabled(mockSettings.qris_enabled ?? true);
           setQrisProvider(String(mockSettings.qris_provider || 'midtrans').toLowerCase());
+        } else if (activeTenantId) {
+          // Multi-tenant mode
+          const [payData, unitData, memberData, settingsData] = await Promise.all([
+            fetchPayments(session?.access_token, { tenantId: activeTenantId }).catch((err) => {
+              console.error('fetchPayments error:', err);
+              return [];
+            }),
+            fetchTenantUnits(activeTenantId).catch((err) => {
+              console.error('fetchTenantUnits error:', err);
+              return [];
+            }),
+            fetchTenantMembers(activeTenantId).catch((err) => {
+              console.error('fetchTenantMembers error:', err);
+              return [];
+            }),
+            fetchSettings(session?.access_token).catch(() => null),
+          ]);
+          if (active) {
+            setPayments(payData);
+            setUnits(
+              unitData.map((u) => ({
+                ...u,
+                block: u.metadata?.block || u.label,
+                unit_number: u.metadata?.unit_number || '',
+              }))
+            );
+            setResidents(memberData);
+            if (settingsData) {
+              setQrisEnabled(settingsData.qris_enabled ?? true);
+              setQrisProvider(String(settingsData.qris_provider || 'midtrans').toLowerCase());
+            }
+          }
         } else {
           // Prod mode fetches from API & Supabase
           const [payData, unitData, resData, matrixData, settingsData] = await Promise.all([
@@ -222,8 +264,10 @@ export default function PaymentVerification() {
       }
     };
     loadData();
-    return () => { active = false; };
-  }, [refreshKey, session?.access_token]);
+    return () => {
+      active = false;
+    };
+  }, [refreshKey, session?.access_token, activeTenantId]);
 
   useEffect(() => {
     setReceiptPreviewError(false);
@@ -232,11 +276,11 @@ export default function PaymentVerification() {
   const showQrisOption = qrisEnabled || paymentForm.method === 'qris';
 
   const getUnit = (unitId) => {
-    return units.find(u => String(u.id) === String(unitId)) || getUnitById(unitId);
+    return units.find((u) => String(u.id) === String(unitId)) || getUnitById(unitId);
   };
 
   const getResident = (residentId) => {
-    return residents.find(r => r.id === residentId) || getProfileById(residentId);
+    return residents.find((r) => r.id === residentId) || getProfileById(residentId);
   };
 
   const pendingPayments = useMemo(
@@ -268,16 +312,20 @@ export default function PaymentVerification() {
 
   const handleVerify = async (payment) => {
     if (!canWrite) {
-      toast.error('Akun read-only tidak dapat memverifikasi pembayaran.');
+      toast.error('Akun read-only atau langganan kadaluarsa tidak dapat memverifikasi pembayaran.');
       return;
     }
     if (!payment || activeActionId) return;
     setActiveActionId(payment.id);
     try {
-      if (IS_DEMO) {
-        verifyPayment(payment.id, { verifiedBy: profile.full_name });
+      if (IS_DEMO && (!activeTenantId || String(activeTenantId).startsWith('demo-'))) {
+        verifyPayment(payment.id, { verifiedBy: profile?.full_name || 'Demo Staff' });
       } else {
-        await approveManualPayment(session?.access_token, { payment_id: payment.id });
+        await approveManualPayment(session?.access_token, {
+          payment_id: payment.id,
+          tenantId: activeTenantId,
+          verifiedBy: profile?.full_name || 'Pengurus',
+        });
       }
       toast.success('Pembayaran berhasil diverifikasi.');
       setRefreshKey((k) => k + 1);
@@ -292,7 +340,7 @@ export default function PaymentVerification() {
 
   const openRejectModal = (payment) => {
     if (!canWrite) {
-      toast.error('Akun read-only tidak dapat menolak pembayaran.');
+      toast.error('Akun read-only atau langganan kadaluarsa tidak dapat menolak pembayaran.');
       return;
     }
     setSelectedPayment(payment);
@@ -308,13 +356,18 @@ export default function PaymentVerification() {
     }
     setActiveActionId(selectedPayment.id);
     try {
-      if (IS_DEMO) {
+      if (IS_DEMO && (!activeTenantId || String(activeTenantId).startsWith('demo-'))) {
         rejectPayment(selectedPayment.id, {
-          rejectedBy: profile.full_name,
+          rejectedBy: profile?.full_name || 'Demo Staff',
           reason: rejectReason,
         });
       } else {
-        await rejectManualPayment(session?.access_token, { payment_id: selectedPayment.id, note: rejectReason });
+        await rejectManualPayment(session?.access_token, {
+          payment_id: selectedPayment.id,
+          note: rejectReason,
+          tenantId: activeTenantId,
+          rejectedBy: profile?.full_name || 'Pengurus',
+        });
       }
       toast.warning('Pembayaran ditolak.');
       setRefreshKey((k) => k + 1);
@@ -334,10 +387,15 @@ export default function PaymentVerification() {
 
   const openEditModal = (payment) => {
     if (!canWrite) {
-      toast.error('Akun read-only tidak dapat mengubah pembayaran.');
+      toast.error('Akun read-only atau langganan kadaluarsa tidak dapat mengubah pembayaran.');
       return;
     }
-    const currentUnitId = payment.unit_id || payment._unit?.id || payment._bill?.unit_id || payment.ipl_bills?.unit_id || '';
+    const currentUnitId =
+      payment.unit_id ||
+      payment._unit?.id ||
+      payment._bill?.unit_id ||
+      payment.ipl_bills?.unit_id ||
+      '';
     setSelectedPayment(payment);
     setPaymentForm({
       unit_id: currentUnitId ? String(currentUnitId) : '',
@@ -366,6 +424,7 @@ export default function PaymentVerification() {
     try {
       await updatePayment(session?.access_token, {
         payment_id: selectedPayment.id,
+        tenantId: activeTenantId,
         ...paymentForm,
       });
       toast.success('Detail pembayaran berhasil diperbarui.');
@@ -406,10 +465,10 @@ export default function PaymentVerification() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-lg font-bold text-forest-900 sm:text-xl">
-            <AiOutlineCheck className="shrink-0 text-gold-600" /> Verifikasi Pembayaran
+            <AiOutlineCheck className="shrink-0 text-gold-600" /> Verifikasi Pembayaran {template.billLabel}
           </h1>
           <p className="mt-1 text-sm leading-5 text-forest-500">
-            Verifikasi bukti transfer pembayaran IPL dari warga
+            Verifikasi bukti transfer pembayaran {template.billLabel} dari {template.memberLabel.toLowerCase()}
           </p>
         </div>
         {pendingPayments.length > 0 && (
@@ -419,6 +478,19 @@ export default function PaymentVerification() {
           </span>
         )}
       </div>
+
+      {/* Read-Only Subscription Banner */}
+      {subReadOnly && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 p-3.5 text-sm text-amber-900 flex items-center gap-3">
+          <span className="text-xl">⚠️</span>
+          <div>
+            <p className="font-semibold text-amber-900">Mode Read-Only Aktif</p>
+            <p className="text-xs text-amber-800 mt-0.5">
+              Langganan tenant ini sedang dalam masa tenggang / non-aktif. Anda tetap dapat melihat data, namun tindakan verifikasi, penolakan, dan pengubahan pembayaran dinonaktifkan.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="grid grid-cols-3 gap-1 rounded-lg bg-forest-100 p-1">
@@ -761,26 +833,27 @@ export default function PaymentVerification() {
             <form onSubmit={handleUpdatePayment} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-forest-700 mb-1">
-                  Unit Rumah Palm Village *
+                  {template.unitLabel} {currentTenant?.name || ''} *
                 </label>
                 <select
                   value={paymentForm.unit_id}
                   onChange={(e) => setPaymentForm((prev) => ({ ...prev, unit_id: e.target.value }))}
                   className="w-full rounded-lg border border-forest-200 bg-white px-3 py-2.5 text-sm text-forest-900 outline-none focus:border-gold-500 font-medium"
                 >
-                  <option value="">-- Pilih Unit Rumah --</option>
+                  <option value="">-- Pilih {template.unitLabel} --</option>
                   {sortedUnits.map((u) => {
-                    const resident = residents.find(r => String(r.unit_id) === String(u.id));
+                    const resident = residents.find((r) => String(r.unit_id) === String(u.id));
                     const residentName = resident?.full_name ? ` - ${resident.full_name}` : ' (Kosong / Belum terdata)';
+                    const unitName = u.block && u.unit_number ? `Blok ${u.block}/${u.unit_number}` : (u.label || `Unit #${u.id}`);
                     return (
                       <option key={u.id} value={String(u.id)}>
-                        Blok {u.block}/{u.unit_number}{residentName}
+                        {unitName}{residentName}
                       </option>
                     );
                   })}
                 </select>
                 <p className="mt-1 text-xs text-forest-500">
-                  Gunakan pilihan ini jika pengurus keliru memilih unit rumah saat pencatatan IPL.
+                  Gunakan pilihan ini jika pengurus keliru memilih {template.unitLabel.toLowerCase()} saat pencatatan {template.billLabel}.
                 </p>
               </div>
 

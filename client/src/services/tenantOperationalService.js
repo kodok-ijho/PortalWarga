@@ -332,6 +332,55 @@ export async function fetchPendingTenantMembers(tenantId) {
 }
 
 /**
+ * Mengambil seluruh anggota tenant (approved atau sesuai opsi status)
+ * @param {string} tenantId
+ * @param {object} opts - { status }
+ */
+export async function fetchTenantMembers(tenantId, opts = {}) {
+  if (!tenantId) return [];
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    return mock.mockResidents || [];
+  }
+
+  let query = supabase
+    .from('tenant_members')
+    .select(`
+      id,
+      tenant_id,
+      user_id,
+      unit_id,
+      full_name,
+      phone,
+      role,
+      status,
+      occupancy_status,
+      created_at,
+      tenant_units:unit_id (
+        id,
+        label,
+        metadata
+      )
+    `)
+    .eq('tenant_id', tenantId);
+
+  if (opts.status) {
+    query = query.eq('status', opts.status);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] fetchTenantMembers error:', error);
+    throw error;
+  }
+
+  return data || [];
+}
+
+/**
  * Menyetujui pendaftaran anggota tenant
  */
 export async function approveTenantMember(memberId, { role = 'anggota', unitId, occupancyStatus }) {
@@ -738,5 +787,335 @@ export async function fetchTenantBillMatrix(tenantId, year = 2026, opts = {}) {
   return rows;
 }
 
+/**
+ * Mengambil daftar pembayaran tenant generik (payments + billing_items + members + units)
+ * @param {string} tenantId - UUID tenant
+ * @param {object} opts - { status }
+ */
+export async function fetchTenantPayments(tenantId, opts = {}) {
+  if (!tenantId) return [];
 
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    return mock.mockPayments;
+  }
 
+  let query = supabase
+    .from('payments')
+    .select(`
+      id,
+      tenant_id,
+      billing_item_id,
+      member_id,
+      amount,
+      method,
+      transaction_id,
+      status,
+      proof_url,
+      verified_by,
+      verified_at,
+      paid_at,
+      metadata,
+      created_at,
+      updated_at,
+      billing_items:billing_item_id (
+        id,
+        period,
+        amount,
+        late_fee,
+        unit_id,
+        status,
+        tenant_units:unit_id (
+          id,
+          label,
+          metadata
+        )
+      ),
+      tenant_members:member_id (
+        id,
+        full_name,
+        phone,
+        role,
+        occupancy_status
+      )
+    `)
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false });
+
+  if (opts.status) {
+    query = query.eq('status', opts.status);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] fetchTenantPayments error:', error);
+    throw error;
+  }
+
+  return (data || []).map((p) => {
+    const bill = p.billing_items || {};
+    const unit = bill.tenant_units || {};
+    const member = p.tenant_members || {};
+    const meta = p.metadata || {};
+
+    const proofFileUrl = p.proof_url || meta.proof_file_url || meta.proof_url || '';
+    const proofFileName =
+      meta.proof_file_name ||
+      meta.receipt_file ||
+      (proofFileUrl ? proofFileUrl.split('/').pop().split('?')[0] : '');
+
+    return {
+      ...p,
+      id: p.id,
+      tenant_id: p.tenant_id,
+      billing_item_id: p.billing_item_id || bill.id || '',
+      resident_id: p.member_id || member.id || '',
+      unit_id: bill.unit_id || unit.id || '',
+      period: bill.period || meta.period || '',
+      amount: Number(p.amount ?? bill.amount ?? 0),
+      method: p.method || 'bank_transfer',
+      status: p.status === 'completed' ? 'verified' : p.status,
+      paid_at: p.paid_at || p.created_at,
+      verified_by: meta.verified_by_name || p.verified_by || '',
+      verified_at: p.verified_at,
+      rejection_reason: meta.rejection_reason || '',
+      proof_file_url: proofFileUrl,
+      proof_file_name: proofFileName,
+      receipt_file: proofFileName,
+      metadata: meta,
+      _bill: {
+        id: bill.id,
+        period: bill.period,
+        amount: Number(bill.amount || 0),
+        unit_id: bill.unit_id,
+        status: bill.status,
+      },
+      _profile: member.id ? member : null,
+      _unit: unit.id
+        ? {
+            id: unit.id,
+            label: unit.label,
+            block: unit.metadata?.block || unit.label,
+            unit_number: unit.metadata?.unit_number || '',
+          }
+        : null,
+    };
+  });
+}
+
+/**
+ * Memverifikasi / menyetujui pembayaran manual (bank_transfer/cash) untuk tenant
+ * @param {string} tenantId - UUID tenant
+ * @param {string} paymentId - UUID payment
+ * @param {object} param2 - { verifiedBy, note }
+ */
+export async function verifyTenantPayment(tenantId, paymentId, { verifiedBy, note } = {}) {
+  if (!tenantId || !paymentId) throw new Error('tenantId dan paymentId wajib disertakan.');
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    const payment = mock.verifyPayment(paymentId, { verifiedBy, note });
+    return {
+      success: true,
+      paymentId,
+      status: 'verified',
+      payment: payment || { id: paymentId, status: 'verified', verified_by: verifiedBy },
+    };
+  }
+
+  const { data: currentPayment, error: fetchErr } = await supabase
+    .from('payments')
+    .select('id, billing_item_id, metadata')
+    .eq('tenant_id', tenantId)
+    .eq('id', paymentId)
+    .single();
+
+  if (fetchErr) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] verifyTenantPayment fetch error:', fetchErr);
+    throw fetchErr;
+  }
+
+  const updatedMetadata = {
+    ...(currentPayment.metadata || {}),
+    verified_by_name: verifiedBy || 'Pengurus',
+    verification_note: note || '',
+  };
+
+  const { error: payErr } = await supabase
+    .from('payments')
+    .update({
+      status: 'completed',
+      verified_at: new Date().toISOString(),
+      metadata: updatedMetadata,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('tenant_id', tenantId)
+    .eq('id', paymentId);
+
+  if (payErr) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] verifyTenantPayment update error:', payErr);
+    throw payErr;
+  }
+
+  if (currentPayment.billing_item_id) {
+    const { error: billErr } = await supabase
+      .from('billing_items')
+      .update({
+        status: 'paid',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('tenant_id', tenantId)
+      .eq('id', currentPayment.billing_item_id);
+
+    if (billErr) {
+      // eslint-disable-next-line no-console
+      console.error('[tenantOperationalService] verifyTenantPayment billing update error:', billErr);
+    }
+  }
+
+  return { success: true, paymentId, status: 'completed' };
+}
+
+/**
+ * Menolak bukti pembayaran manual untuk tenant
+ * @param {string} tenantId - UUID tenant
+ * @param {string} paymentId - UUID payment
+ * @param {object} param2 - { rejectedBy, reason }
+ */
+export async function rejectTenantPayment(tenantId, paymentId, { rejectedBy, reason } = {}) {
+  if (!tenantId || !paymentId) throw new Error('tenantId dan paymentId wajib disertakan.');
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    const payment = mock.rejectPayment(paymentId, { rejectedBy, reason });
+    return {
+      success: true,
+      paymentId,
+      status: 'rejected',
+      payment: payment || { id: paymentId, status: 'rejected', rejected_by: rejectedBy, rejection_reason: reason },
+    };
+  }
+
+  const { data: currentPayment, error: fetchErr } = await supabase
+    .from('payments')
+    .select('id, billing_item_id, metadata')
+    .eq('tenant_id', tenantId)
+    .eq('id', paymentId)
+    .single();
+
+  if (fetchErr) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] rejectTenantPayment fetch error:', fetchErr);
+    throw fetchErr;
+  }
+
+  const updatedMetadata = {
+    ...(currentPayment.metadata || {}),
+    rejected_by_name: rejectedBy || 'Pengurus',
+    rejection_reason: reason || '',
+    rejected_at: new Date().toISOString(),
+  };
+
+  const { error: payErr } = await supabase
+    .from('payments')
+    .update({
+      status: 'rejected',
+      metadata: updatedMetadata,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('tenant_id', tenantId)
+    .eq('id', paymentId);
+
+  if (payErr) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] rejectTenantPayment update error:', payErr);
+    throw payErr;
+  }
+
+  if (currentPayment.billing_item_id) {
+    const { error: billErr } = await supabase
+      .from('billing_items')
+      .update({
+        status: 'unpaid',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('tenant_id', tenantId)
+      .eq('id', currentPayment.billing_item_id);
+
+    if (billErr) {
+      // eslint-disable-next-line no-console
+      console.error('[tenantOperationalService] rejectTenantPayment billing update error:', billErr);
+    }
+  }
+
+  return { success: true, paymentId, status: 'rejected' };
+}
+
+/**
+ * Memperbarui rincian pembayaran untuk tenant
+ * @param {string} tenantId - UUID tenant
+ * @param {string} paymentId - UUID payment
+ * @param {object} param2 - { unit_id, amount, method, paid_at, note }
+ */
+export async function updateTenantPayment(tenantId, paymentId, { unit_id, amount, method, paid_at, note } = {}) {
+  if (!tenantId || !paymentId) throw new Error('tenantId dan paymentId wajib disertakan.');
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    return mock.updatePayment(paymentId, { unit_id, amount, method, paid_at, note });
+  }
+
+  const updateFields = {
+    updated_at: new Date().toISOString(),
+  };
+  if (amount !== undefined && amount !== null && amount !== '') updateFields.amount = Number(amount);
+  if (method) updateFields.method = method;
+  if (paid_at) updateFields.paid_at = paid_at;
+
+  const { data: current, error: fetchErr } = await supabase
+    .from('payments')
+    .select('id, metadata, billing_item_id')
+    .eq('tenant_id', tenantId)
+    .eq('id', paymentId)
+    .single();
+
+  if (fetchErr) throw fetchErr;
+
+  if (note !== undefined) {
+    updateFields.metadata = {
+      ...(current.metadata || {}),
+      note: String(note).trim(),
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('payments')
+    .update(updateFields)
+    .eq('tenant_id', tenantId)
+    .eq('id', paymentId)
+    .select()
+    .single();
+
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] updateTenantPayment error:', error);
+    throw error;
+  }
+
+  if (unit_id && current.billing_item_id) {
+    await supabase
+      .from('billing_items')
+      .update({ unit_id, updated_at: new Date().toISOString() })
+      .eq('tenant_id', tenantId)
+      .eq('id', current.billing_item_id);
+  }
+
+  return data;
+}

@@ -222,7 +222,7 @@ sungguhan, bukan hanya tenant kosong.
 - [x] **T6.5** -- Adaptasi komponen tagihan existing PortalWarga (`ipl_bills`/matriks
   pembayaran) agar membaca dari `billing_items` generik dan tampil sesuai istilah tenant
   (`billLabel`) dari `tenantTemplates.js` (T2.5).
-- [ ] **T6.6** -- Adaptasi alur verifikasi pembayaran (upload bukti transfer, approval
+- [x] **T6.6** -- Adaptasi alur verifikasi pembayaran (upload bukti transfer, approval
   bendahara/admin) agar generik terhadap `billing_items`, dan memakai `useSubscriptionGate()`
   dari T5.1 untuk disable saat `read_only`.
 - [ ] **T6.7** -- Adaptasi halaman Laporan Keuangan & Pengeluaran (`expenses`) agar

@@ -912,10 +912,14 @@ export async function createCashPayment(token, { bill_id, amount, file, note, pa
   }
 }
 
-export async function approveManualPayment(token, { payment_id, note }) {
+export async function approveManualPayment(token, { payment_id, note, tenantId, verifiedBy } = {}) {
+  if (tenantId) {
+    const { verifyTenantPayment } = await import('./tenantOperationalService');
+    return verifyTenantPayment(tenantId, payment_id, { verifiedBy, note });
+  }
   if (IS_DEMO) {
     const mock = await getMockData();
-    return mock.verifyPayment(payment_id, { verifiedBy: 'Demo Staff', note });
+    return mock.verifyPayment(payment_id, { verifiedBy: verifiedBy || 'Demo Staff', note });
   }
   return portalApiPost('/payments/manual/approve', {
     token,
@@ -923,10 +927,14 @@ export async function approveManualPayment(token, { payment_id, note }) {
   });
 }
 
-export async function rejectManualPayment(token, { payment_id, note }) {
+export async function rejectManualPayment(token, { payment_id, note, tenantId, rejectedBy } = {}) {
+  if (tenantId) {
+    const { rejectTenantPayment } = await import('./tenantOperationalService');
+    return rejectTenantPayment(tenantId, payment_id, { rejectedBy, reason: note });
+  }
   if (IS_DEMO) {
     const mock = await getMockData();
-    return mock.rejectPayment(payment_id, { rejectedBy: 'Demo Staff', reason: note });
+    return mock.rejectPayment(payment_id, { rejectedBy: rejectedBy || 'Demo Staff', reason: note });
   }
   return portalApiPost('/payments/manual/reject', {
     token,
@@ -934,7 +942,11 @@ export async function rejectManualPayment(token, { payment_id, note }) {
   });
 }
 
-export async function updatePayment(token, { payment_id, unit_id, amount, method, paid_at, note, file, status }) {
+export async function updatePayment(token, { payment_id, unit_id, amount, method, paid_at, note, file, status, tenantId } = {}) {
+  if (tenantId) {
+    const { updateTenantPayment } = await import('./tenantOperationalService');
+    return updateTenantPayment(tenantId, payment_id, { unit_id, amount, method, paid_at, note });
+  }
   if (IS_DEMO) {
     const mock = await getMockData();
     return mock.updatePayment(payment_id, { unit_id, amount, method, paid_at, note, file, status });
@@ -962,6 +974,11 @@ export async function updatePayment(token, { payment_id, unit_id, amount, method
 }
 
 export async function fetchPayments(token, opts = {}) {
+  if (opts?.tenantId) {
+    const { fetchTenantPayments } = await import('./tenantOperationalService');
+    return fetchTenantPayments(opts.tenantId, opts);
+  }
+
   if (IS_DEMO) {
     const mock = await getMockData();
     return mock.mockPayments;

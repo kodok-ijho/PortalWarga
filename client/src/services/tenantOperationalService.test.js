@@ -3,6 +3,9 @@ import {
   generateInviteCode,
   calculateBillingPreview,
   generateTenantBillingItems,
+  fetchTenantPayments,
+  verifyTenantPayment,
+  rejectTenantPayment,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -121,6 +124,52 @@ describe('tenantOperationalService - Unit Tests', () => {
       expect(result.preview[0]).toHaveProperty('due_date');
       expect(result.preview[0].due_date).toMatch(/^2026-10-\d{2}$/);
       expect(result.preview[0].metadata).toHaveProperty('components');
+    });
+  });
+
+  describe('Payment Verification Operations', () => {
+    it('melempar error jika tenantId atau paymentId tidak disediakan saat verifikasi/penolakan', async () => {
+      await expect(verifyTenantPayment('', 'pay-1')).rejects.toThrow(
+        'tenantId dan paymentId wajib disertakan.'
+      );
+      await expect(verifyTenantPayment('tenant-1', '')).rejects.toThrow(
+        'tenantId dan paymentId wajib disertakan.'
+      );
+      await expect(rejectTenantPayment('', 'pay-1')).rejects.toThrow(
+        'tenantId dan paymentId wajib disertakan.'
+      );
+      await expect(rejectTenantPayment('tenant-1', '')).rejects.toThrow(
+        'tenantId dan paymentId wajib disertakan.'
+      );
+    });
+
+    it('mengembalikan array pembayaran pada mode demo tenant', async () => {
+      const payments = await fetchTenantPayments('demo-tenant-rtrw');
+      expect(Array.isArray(payments)).toBe(true);
+      expect(payments.length).toBeGreaterThan(0);
+      expect(payments[0]).toHaveProperty('id');
+      expect(payments[0]).toHaveProperty('amount');
+      expect(payments[0]).toHaveProperty('status');
+    });
+
+    it('berhasil memverifikasi pembayaran pada mode demo tenant', async () => {
+      const result = await verifyTenantPayment('demo-tenant-rtrw', 'pay-pending-1', {
+        verifiedBy: 'Bendahara Test',
+        note: 'Bukti transfer valid',
+      });
+      expect(result).toBeDefined();
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('verified');
+    });
+
+    it('berhasil menolak pembayaran dengan alasan pada mode demo tenant', async () => {
+      const result = await rejectTenantPayment('demo-tenant-rtrw', 'pay-pending-2', {
+        rejectedBy: 'Bendahara Test',
+        reason: 'Bukti transfer buram dan tidak terbaca',
+      });
+      expect(result).toBeDefined();
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('rejected');
     });
   });
 });

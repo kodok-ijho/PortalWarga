@@ -188,6 +188,16 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="/t/:tenantId/payment-verification"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RoleGuard canAccess={canViewPaymentVerification}>
+                        <PaymentVerification />
+                      </RoleGuard>
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/t/:tenantId/dashboard"
                   element={
                     <Suspense fallback={<PageLoader />}>
