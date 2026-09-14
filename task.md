@@ -269,7 +269,7 @@ saat kontrak selesai.
   (collecting/ready_to_draw/drawn).
 - [x] **T8.4** -- Implementasi pengumpulan kontribusi arisan menggunakan `billing_items`
   (period sama untuk semua anggota, bukan per-unit).
-- [ ] **T8.5** -- Implementasi fungsi/Edge Function pengocokan sesuai algoritma di Spec §5:
+- [x] **T8.5** -- Implementasi fungsi/Edge Function pengocokan sesuai algoritma di Spec §5:
   validasi seluruh peserta lunas -> filter kandidat `has_won = false` -> pilih acak ->
   catat pemenang.
 - [ ] **T8.6** -- Buat halaman `ArisanDraw.jsx` -- tombol "Jalankan Kocok" (disabled saat

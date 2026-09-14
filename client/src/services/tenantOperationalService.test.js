@@ -27,6 +27,8 @@ import {
   generateArisanRoundBills,
   fetchArisanRoundBills,
   payArisanBillManual,
+  fetchArisanCandidates,
+  drawArisanWinner,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -504,6 +506,31 @@ describe('tenantOperationalService - Unit Tests', () => {
       // Validasi error jika parameter kosong
       await expect(payArisanBillManual('', 'demo-bill-2')).rejects.toThrow('Tenant ID dan Bill ID wajib diisi.');
       await expect(payArisanBillManual('demo-arisan-tenant', '')).rejects.toThrow('Tenant ID dan Bill ID wajib diisi.');
+    });
+
+    it('fetchArisanCandidates mengambil peserta yang belum pernah menang (has_won = false)', async () => {
+      const candidates = await fetchArisanCandidates('demo-arisan-tenant');
+      expect(Array.isArray(candidates)).toBe(true);
+      expect(candidates.length).toBe(2);
+      expect(candidates[0].has_won).toBe(false);
+
+      const emptyRes = await fetchArisanCandidates('');
+      expect(emptyRes).toEqual([]);
+    });
+
+    it('drawArisanWinner berhasil memilih pemenang acak dan mengembalikan data pemenang', async () => {
+      const result = await drawArisanWinner('demo-arisan-tenant', 'demo-round-1', 'demo-admin-id');
+      expect(result).toBeDefined();
+      expect(result.success).toBe(true);
+      expect(result.round_id).toBe('demo-round-1');
+      expect(result.winner_member_id).toBeDefined();
+      expect(result.winner_name).toBe('Pak Budi');
+      expect(result.total_prize).toBe(3000000);
+      expect(typeof result.remaining_candidates).toBe('number');
+
+      // Validasi error jika parameter kosong
+      await expect(drawArisanWinner('', 'demo-round-1')).rejects.toThrow('Tenant ID wajib disertakan.');
+      await expect(drawArisanWinner('demo-arisan-tenant', '')).rejects.toThrow('ID putaran arisan wajib disertakan.');
     });
   });
 });

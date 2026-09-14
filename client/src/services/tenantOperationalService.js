@@ -2310,3 +2310,96 @@ export async function payArisanBillManual(tenantId, billId) {
   return { success: true, bill: updatedBill };
 }
 
+/**
+ * Mengambil daftar kandidat peserta arisan yang memenuhi syarat (has_won = false)
+ */
+export async function fetchArisanCandidates(tenantId) {
+  if (!tenantId) return [];
+
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
+    return [
+      {
+        id: 'demo-cand-1',
+        member_id: 'demo-mem-1',
+        has_won: false,
+        member: { full_name: 'Pak Budi', phone: '08123456780' },
+        slot: { label: 'Slot #01' },
+      },
+      {
+        id: 'demo-cand-2',
+        member_id: 'demo-mem-2',
+        has_won: false,
+        member: { full_name: 'Ibu Siti', phone: '08123456781' },
+        slot: { label: 'Slot #02' },
+      },
+    ];
+  }
+
+  const { data, error } = await supabase
+    .from('arisan_participants')
+    .select(`
+      id,
+      tenant_id,
+      member_id,
+      unit_slot_id,
+      has_won,
+      member:member_id (
+        id,
+        full_name,
+        phone,
+        status
+      ),
+      slot:unit_slot_id (
+        id,
+        label
+      )
+    `)
+    .eq('tenant_id', tenantId)
+    .eq('has_won', false);
+
+  if (error) {
+    console.error('[tenantOperationalService] fetchArisanCandidates error:', error);
+    throw new Error(error.message || 'Gagal memuat kandidat peserta arisan.');
+  }
+
+  return data || [];
+}
+
+/**
+ * Menjalankan pengocokan pemenang putaran arisan secara acak atomik (RPC draw_arisan_winner)
+ */
+export async function drawArisanWinner(tenantId, roundId, operatorMemberId = null) {
+  if (!tenantId) throw new Error('Tenant ID wajib disertakan.');
+  if (!roundId) throw new Error('ID putaran arisan wajib disertakan.');
+
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
+    return {
+      success: true,
+      round_id: roundId,
+      round_number: 1,
+      period: 'Putaran 1',
+      winner_member_id: 'demo-mem-1',
+      winner_name: 'Pak Budi',
+      winner_phone: '08123456780',
+      slot_label: 'Slot #01',
+      drawn_at: new Date().toISOString(),
+      total_prize: 3000000,
+      remaining_candidates: 4,
+      is_cycle_completed: false,
+    };
+  }
+
+  const { data, error } = await supabase.rpc('draw_arisan_winner', {
+    p_tenant_id: tenantId,
+    p_round_id: roundId,
+    p_operator_member_id: operatorMemberId || null,
+  });
+
+  if (error) {
+    console.error('[tenantOperationalService] drawArisanWinner RPC error:', error);
+    throw new Error(error.message || 'Gagal menjalankan pengocokan arisan.');
+  }
+
+  return data;
+}
+
