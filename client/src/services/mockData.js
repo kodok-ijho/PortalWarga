@@ -1761,3 +1761,49 @@ export const mockListingPricing = [
     price: 25000,
   },
 ];
+
+/**
+ * Mock Public Listings (T10.4 / Demo Mode)
+ */
+export const mockPublicListings = [
+  {
+    id: 'mock-listing-kos-1',
+    tenant_id: 'demo-tenant-kos',
+    unit_id: 1,
+    posted_by: 'mem-kos-owner-1',
+    type: 'room_vacancy',
+    title: 'Kamar 101 - Kos Melati Harmoni',
+    description: 'Kamar lantai 1 ukuran 3x4 meter, kamar mandi dalam, AC, kasur springbed, lemari pakaian, WiFi 50Mbps gratis.',
+    category: 'Campur',
+    price: 1200000,
+    photos: ['https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80'],
+    contact_phone: '081234567891',
+    location_hint: 'Jl. Melati Raya No. 12, Sleman (Dekat Kampus)',
+    is_featured: true,
+    featured_until: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'active',
+    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'mock-listing-umkm-1',
+    tenant_id: 'demo-tenant-rtrw',
+    unit_id: null,
+    posted_by: 'mem-rtrw-warga-1',
+    type: 'umkm',
+    title: 'Catering Berkah Barokah - Nasi Kotak & Syukuran',
+    description: 'Menerima pesanan nasi kotak arisan, rapat RT, aqiqah, dan tumpeng syukuran. Menu higienis dan bersertifikat halal.',
+    category: 'Kuliner & Makanan',
+    price: 25000,
+    photos: ['https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=600&q=80'],
+    contact_phone: '081299887766',
+    location_hint: 'Blok A3 No. 12, Palm Village RT 05',
+    is_featured: false,
+    featured_until: null,
+    status: 'active',
+    expires_at: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];

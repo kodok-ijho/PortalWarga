@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import {
   AiOutlineDelete,
   AiOutlineDownload,
@@ -9,6 +9,7 @@ import {
   AiOutlinePlus,
   AiOutlineSearch,
 } from 'react-icons/ai';
+import { HiOutlineSparkles } from 'react-icons/hi';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { useTour } from '../context/TourContext';
@@ -585,6 +586,7 @@ function StatCard({ label, value, tone }) {
 }
 
 function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSchemas, token, role, template, activeTenant, onClose, onEdit, onDelete, canWrite }) {
+  const navigate = useNavigate();
   const owner = getUnitOwner(unit.id);
   const occupant = getUnitOccupant(unit.id);
   const relatedProfiles = profiles.filter((profile) => profile.unit_id === unit.id);
@@ -648,8 +650,24 @@ function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSch
         />
         {unit.notes && <InfoRow label="Catatan" value={unit.notes} />}
       </div>
+
+      {!unit.is_occupied && activeTenant?.type === 'kos' && canWrite && (
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              navigate(`/t/${activeTenant.id}/listings/post?unitId=${unit.id}`);
+            }}
+            className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-gold-500 px-3 py-2 text-xs font-semibold text-forest-900 shadow-sm hover:bg-gold-600 transition-colors"
+          >
+            <HiOutlineSparkles className="text-base" /> Iklankan Kamar Ini ke Publik
+          </button>
+        </div>
+      )}
+
       {canWrite && (
-        <div className="mt-6 flex gap-2 border-t border-forest-100 pt-4">
+        <div className="mt-4 flex gap-2 border-t border-forest-100 pt-4">
           <button type="button" onClick={onEdit} className="pv-btn-ghost flex-1 text-xs">
             <AiOutlineEdit /> Edit
           </button>

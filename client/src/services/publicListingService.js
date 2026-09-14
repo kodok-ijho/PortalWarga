@@ -6,7 +6,7 @@
  */
 
 import { supabase } from './supabaseClient';
-import { mockListingPricing } from './mockData';
+import { mockListingPricing, mockPublicListings } from './mockData';
 
 /**
  * Memeriksa apakah sebuah listing memenuhi syarat untuk dilihat oleh publik (termasuk anonim)
@@ -190,6 +190,104 @@ export async function fetchListingPricing(options = {}) {
   const { data, error } = await query;
   if (error) {
     throw new Error(`Gagal memuat tarif listing: ${error.message}`);
+  }
+
+  return data || [];
+}
+
+// In-memory list untuk demo mode
+let inMemoryListings = [...mockPublicListings];
+
+/**
+ * Membuat postingan listing publik baru (FR-25, FR-27, FR-28, FR-29)
+ * 
+ * @param {string} tenantId
+ * @param {Object} payload
+ * @returns {Promise<Object>}
+ */
+export async function createPublicListing(tenantId, payload = {}) {
+  if (!tenantId) {
+    throw new Error('Tenant ID wajib disertakan.');
+  }
+  if (!payload.title || !payload.title.trim()) {
+    throw new Error('Judul listing wajib diisi.');
+  }
+  if (!payload.contact_phone || !payload.contact_phone.trim()) {
+    throw new Error('Nomor kontak WhatsApp/telepon wajib diisi.');
+  }
+
+  const durationDays = Number(payload.duration_days) || 30;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+  const isFeatured = Boolean(payload.is_featured);
+
+  const listingRecord = {
+    tenant_id: tenantId,
+    unit_id: payload.unit_id ? Number(payload.unit_id) : null,
+    posted_by: payload.posted_by || 'mem-default-poster',
+    type: payload.type || 'room_vacancy',
+    title: payload.title.trim(),
+    description: payload.description ? payload.description.trim() : '',
+    category: payload.category ? payload.category.trim() : null,
+    price: payload.price !== undefined && payload.price !== '' ? Number(payload.price) : null,
+    photos: Array.isArray(payload.photos) ? payload.photos : [],
+    contact_phone: payload.contact_phone.trim(),
+    location_hint: payload.location_hint ? payload.location_hint.trim() : null,
+    is_featured: isFeatured,
+    featured_until: isFeatured ? expiresAt : null,
+    status: payload.status || 'active',
+    expires_at: expiresAt,
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
+  };
+
+  const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
+
+  if (!isSupabaseConfigured() || isDemo || String(tenantId).startsWith('demo-')) {
+    const createdItem = {
+      id: `listing-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      ...listingRecord,
+    };
+    inMemoryListings.unshift(createdItem);
+    return createdItem;
+  }
+
+  const { data, error } = await supabase
+    .from('public_listings')
+    .insert([listingRecord])
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Gagal membuat listing publik: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Fetch semua listing milik tenant tertentu (untuk kelola postingan di dashboard tenant)
+ * 
+ * @param {string} tenantId
+ * @returns {Promise<Array<Object>>}
+ */
+export async function fetchTenantListings(tenantId) {
+  if (!tenantId) return [];
+
+  const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
+
+  if (!isSupabaseConfigured() || isDemo || String(tenantId).startsWith('demo-')) {
+    return inMemoryListings.filter((l) => l.tenant_id === tenantId);
+  }
+
+  const { data, error } = await supabase
+    .from('public_listings')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Gagal memuat listing tenant: ${error.message}`);
   }
 
   return data || [];

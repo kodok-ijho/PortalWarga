@@ -320,7 +320,7 @@ adalah pengecualian sengaja terhadap prinsip isolasi tenant yang ditegakkan seja
   sebelumnya).
 - [x] **T10.3** -- Seed data awal `listing_pricing` (harga listing biasa vs featured per
   jenis, angka sementara/dummy -- lihat catatan angka final di akhir dokumen).
-- [ ] **T10.4** -- Buat halaman `PostListing.jsx` di dalam dashboard tenant (`/t/:tenantId/*`):
+- [x] **T10.4** -- Buat halaman `PostListing.jsx` di dalam dashboard tenant (`/t/:tenantId/*`):
   - Untuk tipe `kos`: prefill dari `tenant_units` yang berstatus `vacant`
   - Untuk tipe `rt_rw`: form kosong diisi manual oleh warga
   - Tampilkan harga dari `listing_pricing` sebelum lanjut ke pembayaran
@@ -337,7 +337,7 @@ adalah pengecualian sengaja terhadap prinsip isolasi tenant yang ditegakkan seja
   diakses tanpa login sama sekali (uji dalam mode incognito/tanpa sesi).
 - [ ] **T10.9** -- Implementasi tampilan prioritas untuk listing `is_featured = true` pada
   kedua halaman direktori (tampil di posisi awal atau dengan penanda visual berbeda).
-- [ ] **T10.10** -- Terapkan `useSubscriptionGate()` (dari T5.1) pada `PostListing.jsx` --
+- [x] **T10.10** -- Terapkan `useSubscriptionGate()` (dari T5.1) pada `PostListing.jsx` --
   tenant berstatus `read_only` tidak dapat membuat listing baru, sesuai FR-26.
 
 **Definition of Done Phase 10:** Pemilik kos bisa mengiklankan kamar kosong dan warga RT

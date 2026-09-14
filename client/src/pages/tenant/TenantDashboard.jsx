@@ -17,6 +17,7 @@ import {
   AiOutlineWarning,
   AiOutlineReload,
 } from 'react-icons/ai';
+import { HiOutlineSparkles } from 'react-icons/hi';
 import { useTenant } from '../../hooks/useTenant';
 import { useTenantTemplate } from '../../hooks/useTenantTemplate';
 import { useSubscriptionGate } from '../../hooks/useSubscriptionGate';
@@ -678,6 +679,31 @@ export default function TenantDashboard() {
                   </div>
                 </Link>
               </>
+            )}
+
+            {/* Modul Pasang Iklan Publik (Kos & RT/RW) - T10.4 */}
+            {(activeTenant?.type === 'kos' || activeTenant?.type === 'rt_rw') && (
+              <Link
+                to={`/t/${tenantId}/listings/post`}
+                className="p-5 rounded-2xl bg-gradient-to-br from-amber-950/30 to-forest-900/60 hover:from-amber-950/50 hover:to-forest-900/90 border border-gold-500/40 hover:border-gold-400 transition-all shadow-md group flex flex-col justify-between"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-gold-500/20 text-gold-400 group-hover:bg-gold-500 group-hover:text-forest-950 flex items-center justify-center text-xl transition-colors">
+                    <HiOutlineSparkles />
+                  </div>
+                  <AiOutlineArrowRight className="text-gold-400 group-hover:text-white transition-colors" />
+                </div>
+                <div className="mt-4">
+                  <h4 className="text-base font-bold text-white group-hover:text-gold-300 transition-colors">
+                    {activeTenant?.type === 'kos' ? 'Iklankan Kamar Kos' : 'Pasang Iklan UMKM'}
+                  </h4>
+                  <p className="text-xs text-forest-300 mt-1">
+                    {activeTenant?.type === 'kos'
+                      ? 'Iklankan kamar kosong ke direktori publik RuangWarga agar cepat tersewa.'
+                      : 'Promosikan produk kuliner dan jasa warga ke publik di luar komplek RT.'}
+                  </p>
+                </div>
+              </Link>
             )}
           </div>
         </div>

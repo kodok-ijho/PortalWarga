@@ -6,6 +6,8 @@ import {
   filterPublicListings,
   getPricingForListing,
   fetchListingPricing,
+  createPublicListing,
+  fetchTenantListings,
 } from './publicListingService';
 
 describe('publicListingService - Unit Tests (T10.2: RLS & Public Access)', () => {
@@ -287,4 +289,77 @@ describe('publicListingService - Unit Tests (T10.2: RLS & Public Access)', () =>
       expect(kosPricing.length).toBe(2); // regular & featured
     });
   });
+
+  describe('Post Listing Operations & Management (T10.4)', () => {
+    it('melempar error jika tenantId tidak disertakan saat membuat listing', async () => {
+      await expect(createPublicListing('', { title: 'Test', contact_phone: '08123' })).rejects.toThrow(
+        'Tenant ID wajib disertakan.'
+      );
+    });
+
+    it('melempar error jika judul iklan atau nomor kontak kosong', async () => {
+      await expect(createPublicListing('demo-tenant-1', { title: '', contact_phone: '08123' })).rejects.toThrow(
+        'Judul listing wajib diisi.'
+      );
+      await expect(createPublicListing('demo-tenant-1', { title: 'Judul Valid', contact_phone: '' })).rejects.toThrow(
+        'Nomor kontak WhatsApp/telepon wajib diisi.'
+      );
+    });
+
+    it('berhasil membuat listing kamar kos baru dengan prefill unit_id dan tanggal kedaluwarsa 30 hari', async () => {
+      const newListing = await createPublicListing('demo-tenant-kos', {
+        unit_id: 101,
+        type: 'room_vacancy',
+        title: 'Kamar 101 - Kos Melati Eksklusif',
+        description: 'AC, kamar mandi dalam, WiFi, water heater',
+        price: 1500000,
+        contact_phone: '081234567890',
+        location_hint: 'Sleman, Depok',
+        is_featured: false,
+        duration_days: 30,
+      });
+
+      expect(newListing).toBeDefined();
+      expect(newListing.id).toBeDefined();
+      expect(newListing.tenant_id).toBe('demo-tenant-kos');
+      expect(newListing.unit_id).toBe(101);
+      expect(newListing.type).toBe('room_vacancy');
+      expect(newListing.status).toBe('active');
+      expect(newListing.expires_at).toBeDefined();
+
+      const createdDate = new Date(newListing.created_at);
+      const expiryDate = new Date(newListing.expires_at);
+      const diffDays = Math.round((expiryDate - createdDate) / (1000 * 60 * 60 * 24));
+      expect(diffDays).toBe(30);
+    });
+
+    it('berhasil membuat listing UMKM warga dengan paket unggulan (is_featured = true)', async () => {
+      const umkmListing = await createPublicListing('demo-tenant-rtrw', {
+        unit_id: null,
+        type: 'umkm',
+        title: 'Katering Nasi Kotak Ibu Joko',
+        category: 'Kuliner & Makanan',
+        description: 'Menerima pesanan tumpeng dan nasi kotak untuk rapat RT',
+        price: 25000,
+        contact_phone: '081999888777',
+        location_hint: 'Blok B2 No. 5',
+        is_featured: true,
+        duration_days: 30,
+      });
+
+      expect(umkmListing).toBeDefined();
+      expect(umkmListing.type).toBe('umkm');
+      expect(umkmListing.is_featured).toBe(true);
+      expect(umkmListing.featured_until).toBeDefined();
+      expect(umkmListing.featured_until).toBe(umkmListing.expires_at);
+    });
+
+    it('fetchTenantListings mengembalikan daftar listing milik tenant yang diminta', async () => {
+      const tenantListings = await fetchTenantListings('demo-tenant-kos');
+      expect(Array.isArray(tenantListings)).toBe(true);
+      expect(tenantListings.length).toBeGreaterThan(0);
+      expect(tenantListings.every((l) => l.tenant_id === 'demo-tenant-kos')).toBe(true);
+    });
+  });
 });
+
