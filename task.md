@@ -181,15 +181,15 @@ Sengaja dikerjakan sebelum ada modul vertikal apapun, supaya pola disable/read-o
 jadi kebiasaan/pola yang matang saat modul vertikal dibangun di phase-phase berikutnya
 (lebih gampang mewajibkan pola dari awal daripada menambal belakangan di banyak halaman).
 
-- [ ] **T5.1** -- Buat komponen/hook generik (mis. `useSubscriptionGate()`) yang
+- [x] **T5.1** -- Buat komponen/hook generik (mis. `useSubscriptionGate()`) yang
   mengembalikan boolean "aksi transaksi diizinkan" berdasarkan
   `tenant.subscriptionStatus`. Semua modul vertikal nanti wajib memakai hook ini untuk
   tombol aksi transaksi mereka -- didefinisikan sekali di sini, dipakai berulang.
-- [ ] **T5.2** -- Definisikan pola UI standar: tombol disabled + tooltip untuk
+- [x] **T5.2** -- Definisikan pola UI standar: tombol disabled + tooltip untuk
   Admin/Pengurus/Bendahara saat `read_only`, dan pola pesan generik untuk Anggota ("...
   Silakan hubungi pengurus.") yang bisa dipakai lintas vertikal tanpa istilah teknis
   "subscription"/"platform" bocor ke tampilan anggota.
-- [ ] **T5.3** -- Pastikan RLS (Phase 1, T1.7, dan RLS billing yang akan ditambah di Phase
+- [x] **T5.3** -- Pastikan RLS (Phase 1, T1.7, dan RLS billing yang akan ditambah di Phase
   6) menjadi lapisan penegakan utama -- siapkan test template yang bisa dipakai ulang tiap
   kali tabel operasional baru ditambahkan di phase vertikal, untuk memverifikasi
   INSERT/UPDATE tetap ditolak database saat `read_only`, bukan hanya disembunyikan di
