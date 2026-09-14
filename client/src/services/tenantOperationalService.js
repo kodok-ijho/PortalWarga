@@ -2159,3 +2159,154 @@ export async function enrollArisanParticipants(tenantId, participants) {
   return data || [];
 }
 
+/**
+ * Memicu penerbitan tagihan kontribusi serentak untuk seluruh peserta putaran arisan
+ */
+export async function generateArisanRoundBills(tenantId, roundId, { dueDate } = {}) {
+  if (!tenantId) throw new Error('Tenant ID wajib disertakan.');
+  if (!roundId) throw new Error('ID putaran arisan wajib disertakan.');
+
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
+    return {
+      success: true,
+      round_id: roundId,
+      total_generated: 10,
+      total_skipped: 0,
+      contribution_amount: 300000,
+    };
+  }
+
+  const { data, error } = await supabase.rpc('generate_arisan_round_bills', {
+    p_tenant_id: tenantId,
+    p_round_id: roundId,
+    p_due_date: dueDate || null,
+  });
+
+  if (error) {
+    console.error('[tenantOperationalService] generateArisanRoundBills error:', error);
+    throw new Error(error.message || 'Gagal menerbitkan tagihan iuran arisan.');
+  }
+
+  return data;
+}
+
+/**
+ * Mengambil daftar tagihan iuran peserta untuk suatu putaran arisan
+ */
+export async function fetchArisanRoundBills(tenantId, roundId, period) {
+  if (!tenantId) return [];
+
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
+    return [
+      {
+        id: 'demo-bill-1',
+        tenant_id: tenantId,
+        member_id: 'demo-member-1',
+        amount: 300000,
+        status: 'paid',
+        period: period || 'Putaran 1',
+        tenant_members: { full_name: 'Ibu Rina', phone: '08123456789' },
+      },
+      {
+        id: 'demo-bill-2',
+        tenant_id: tenantId,
+        member_id: 'demo-member-2',
+        amount: 300000,
+        status: 'unpaid',
+        period: period || 'Putaran 1',
+        tenant_members: { full_name: 'Pak Budi', phone: '08123456780' },
+      },
+    ];
+  }
+
+  let query = supabase
+    .from('billing_items')
+    .select(`
+      id,
+      tenant_id,
+      unit_id,
+      member_id,
+      period,
+      amount,
+      status,
+      due_date,
+      metadata,
+      created_at,
+      tenant_members:member_id (
+        id,
+        full_name,
+        phone
+      ),
+      tenant_units:unit_id (
+        id,
+        label
+      )
+    `)
+    .eq('tenant_id', tenantId);
+
+  if (roundId) {
+    query = query.filter('metadata->>round_id', 'eq', String(roundId));
+  } else if (period) {
+    query = query.eq('period', period);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('[tenantOperationalService] fetchArisanRoundBills error:', error);
+    throw new Error(error.message || 'Gagal memuat tagihan putaran arisan.');
+  }
+
+  return data || [];
+}
+
+/**
+ * Mencatat pembayaran manual (tunai/transfer) untuk iuran putaran arisan
+ */
+export async function payArisanBillManual(tenantId, billId) {
+  if (!tenantId || !billId) throw new Error('Tenant ID dan Bill ID wajib diisi.');
+
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
+    return { success: true, bill_id: billId, status: 'paid' };
+  }
+
+  // 1. Update status billing_item menjadi paid
+  const { data: updatedBill, error: billErr } = await supabase
+    .from('billing_items')
+    .update({
+      status: 'paid',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', billId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+
+  if (billErr) {
+    console.error('[tenantOperationalService] payArisanBillManual update error:', billErr);
+    throw new Error(billErr.message || 'Gagal memperbarui status tagihan arisan.');
+  }
+
+  // 2. Buat record transaksi di tabel payments
+  const { error: payErr } = await supabase.from('payments').insert([
+    {
+      tenant_id: tenantId,
+      billing_item_id: billId,
+      amount: updatedBill.amount,
+      method: 'manual_transfer',
+      status: 'verified',
+      verified_at: new Date().toISOString(),
+      metadata: {
+        note: 'Pembayaran manual iuran arisan dikonfirmasi admin',
+        round_id: updatedBill.metadata?.round_id || null,
+      },
+    },
+  ]);
+
+  if (payErr) {
+    console.warn('[tenantOperationalService] payArisanBillManual payment log warning:', payErr);
+  }
+
+  return { success: true, bill: updatedBill };
+}
+

@@ -23,6 +23,9 @@ import {
   fetchArisanRounds,
   createArisanRound,
   fetchArisanParticipants,
+  generateArisanRoundBills,
+  fetchArisanRoundBills,
+  payArisanBillManual,
 } from '../../services/tenantOperationalService';
 import { formatRupiah } from '../../services/dataHelpers';
 import Modal from '../../components/Modal';
@@ -71,6 +74,13 @@ export default function ArisanRounds() {
   const [newRoundPool, setNewRoundPool] = useState('');
   const [newRoundNotes, setNewRoundNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Modal Rincian Iuran Peserta Putaran
+  const [selectedRoundForBills, setSelectedRoundForBills] = useState(null);
+  const [roundBills, setRoundBills] = useState([]);
+  const [loadingRoundBills, setLoadingRoundBills] = useState(false);
+  const [generatingBills, setGeneratingBills] = useState(false);
+  const [markingPaidId, setMarkingPaidId] = useState(null);
 
   // Load Data Putaran & Peserta
   const loadData = async () => {
@@ -175,6 +185,67 @@ export default function ArisanRounds() {
       toast.error(err.message || 'Gagal membuat putaran baru.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Buka rincian iuran peserta
+  const handleOpenRoundBills = async (round) => {
+    setSelectedRoundForBills(round);
+    setLoadingRoundBills(true);
+    try {
+      const bills = await fetchArisanRoundBills(tenantId, round.id, round.period);
+      setRoundBills(bills || []);
+    } catch (err) {
+      console.error('[ArisanRounds] Gagal memuat tagihan peserta:', err);
+      toast.error('Gagal memuat rincian iuran peserta.');
+    } finally {
+      setLoadingRoundBills(false);
+    }
+  };
+
+  // Terbitkan tagihan iuran serentak untuk putaran
+  const handleGenerateBills = async (round) => {
+    if (isReadOnly) {
+      toast.error('Layanan dalam status Read-Only.');
+      return;
+    }
+    setGeneratingBills(true);
+    try {
+      const res = await generateArisanRoundBills(tenantId, round.id);
+      toast.success(
+        `Iuran diterbitkan untuk ${res.total_generated} peserta (${res.total_skipped} sudah memiliki tagihan).`
+      );
+      await loadData();
+      if (selectedRoundForBills?.id === round.id) {
+        await handleOpenRoundBills(round);
+      }
+    } catch (err) {
+      console.error('[ArisanRounds] Gagal menerbitkan tagihan:', err);
+      toast.error(err.message || 'Gagal menerbitkan tagihan iuran.');
+    } finally {
+      setGeneratingBills(false);
+    }
+  };
+
+  // Tandai iuran lunas secara manual oleh admin
+  const handleMarkPaid = async (billId) => {
+    if (isReadOnly) {
+      toast.error('Layanan dalam status Read-Only.');
+      return;
+    }
+    setMarkingPaidId(billId);
+    try {
+      await payArisanBillManual(tenantId, billId);
+      toast.success('Iuran peserta berhasil ditandai lunas!');
+      if (selectedRoundForBills) {
+        await handleOpenRoundBills(selectedRoundForBills);
+      }
+      await loadData();
+    } catch (err) {
+      console.error('[ArisanRounds] Gagal verifikasi pembayaran:', err);
+      toast.error(err.message || 'Gagal memperbarui status pembayaran.');
+    } finally {
+      setMarkingPaidId(null);
     }
   };
 
@@ -453,38 +524,54 @@ export default function ArisanRounds() {
                   </div>
 
                   {/* Tombol Aksi Bawah */}
-                  <div className="pt-4 mt-4 border-t border-forest-800/80 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => navigate('/payment-matrix')}
-                      className="px-3 py-2 rounded-xl bg-forest-950 hover:bg-forest-800 text-forest-300 hover:text-white text-xs font-semibold border border-forest-800 transition-colors flex items-center gap-1.5"
-                    >
-                      <AiOutlineDollarCircle />
-                      <span>Matriks Iuran</span>
-                    </button>
-
-                    {isReadyToDraw && isTenantAdmin && (
+                  <div className="pt-4 mt-4 border-t border-forest-800/80 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        disabled={isReadOnly}
-                        onClick={() => navigate(`/t/${tenantId}/arisan/draw?roundId=${round.id}`)}
-                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow flex items-center gap-1.5 animate-pulse"
+                        onClick={() => handleOpenRoundBills(round)}
+                        className="px-3 py-2 rounded-xl bg-forest-950 hover:bg-forest-800 text-purple-300 hover:text-white text-xs font-semibold border border-forest-800 transition-colors flex items-center gap-1.5"
                       >
-                        <span>🎲 Kocok Sekarang</span>
-                        <AiOutlineArrowRight />
+                        <AiOutlineTeam />
+                        <span>Iuran Peserta</span>
                       </button>
-                    )}
 
-                    {round.status === 'collecting' && isTenantAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/t/${tenantId}/arisan/draw?roundId=${round.id}`)}
-                        className="px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5"
-                      >
-                        <span>Ruang Kocok</span>
-                        <AiOutlineArrowRight />
-                      </button>
-                    )}
+                      {isTenantAdmin && round.status === 'collecting' && (
+                        <button
+                          type="button"
+                          disabled={generatingBills || isReadOnly}
+                          onClick={() => handleGenerateBills(round)}
+                          className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/40 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                          title="Terbitkan tagihan iuran untuk seluruh peserta yang belum memiliki tagihan pada putaran ini"
+                        >
+                          <span>⚡ Terbitkan Iuran</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {isReadyToDraw && isTenantAdmin && (
+                        <button
+                          type="button"
+                          disabled={isReadOnly}
+                          onClick={() => navigate(`/t/${tenantId}/arisan/draw?roundId=${round.id}`)}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow flex items-center gap-1.5 animate-pulse"
+                        >
+                          <span>🎲 Kocok Sekarang</span>
+                          <AiOutlineArrowRight />
+                        </button>
+                      )}
+
+                      {round.status === 'collecting' && isTenantAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/t/${tenantId}/arisan/draw?roundId=${round.id}`)}
+                          className="px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5"
+                        >
+                          <span>Ruang Kocok</span>
+                          <AiOutlineArrowRight />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -557,6 +644,132 @@ export default function ArisanRounds() {
               </button>
             </div>
           </form>
+        </Modal>
+
+        {/* Modal Rincian Iuran Peserta Putaran */}
+        <Modal
+          isOpen={!!selectedRoundForBills}
+          onClose={() => setSelectedRoundForBills(null)}
+          title={`Rincian Iuran — ${selectedRoundForBills?.period || ''}`}
+        >
+          <div className="space-y-4 text-xs">
+            {/* Header Summary */}
+            <div className="p-3 bg-forest-950/80 rounded-xl border border-forest-800 flex items-center justify-between">
+              <div>
+                <span className="text-forest-400 block text-[10px] uppercase font-bold">
+                  Status Pengumpulan Iuran
+                </span>
+                <span className="text-sm font-bold text-white">
+                  {roundBills.filter((b) => b.status === 'paid').length} / {roundBills.length} Peserta Lunas
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-forest-400 block text-[10px] uppercase font-bold">
+                  Target Kas Putaran
+                </span>
+                <span className="text-sm font-bold text-amber-300">
+                  {formatRupiah(selectedRoundForBills?.total_pool_amount)}
+                </span>
+              </div>
+            </div>
+
+            {/* Loading */}
+            {loadingRoundBills && (
+              <div className="py-8 text-center text-forest-400">
+                <div className="h-6 w-6 border-2 border-purple-500 border-t-transparent animate-spin rounded-full mx-auto mb-2" />
+                <span>Memuat data iuran peserta...</span>
+              </div>
+            )}
+
+            {/* Empty Bills (Belum diterbitkan) */}
+            {!loadingRoundBills && roundBills.length === 0 && (
+              <div className="py-6 text-center space-y-3">
+                <p className="text-forest-300">
+                  Tagihan iuran untuk putaran ini belum diterbitkan kepada peserta.
+                </p>
+                {isTenantAdmin && (
+                  <button
+                    type="button"
+                    disabled={generatingBills || isReadOnly}
+                    onClick={() => handleGenerateBills(selectedRoundForBills)}
+                    className="px-4 py-2 bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white font-bold rounded-xl shadow text-xs inline-flex items-center gap-1.5"
+                  >
+                    <span>⚡ Terbitkan Tagihan Iuran Sekarang</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* List Tagihan Peserta */}
+            {!loadingRoundBills && roundBills.length > 0 && (
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {roundBills.map((bill, index) => {
+                  const isPaid = bill.status === 'paid';
+                  const memberName = bill.tenant_members?.full_name || `Peserta #${index + 1}`;
+                  const slotLabel = bill.tenant_units?.label;
+
+                  return (
+                    <div
+                      key={bill.id}
+                      className="p-3 bg-forest-950/70 border border-forest-800 rounded-xl flex items-center justify-between gap-3"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white text-xs">{memberName}</span>
+                          {slotLabel && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-purple-950 text-purple-300 rounded border border-purple-800">
+                              {slotLabel}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-forest-400 block mt-0.5">
+                          Nominal: {formatRupiah(bill.amount)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            isPaid
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                          }`}
+                        >
+                          {isPaid ? 'Lunas' : 'Belum Bayar'}
+                        </span>
+
+                        {!isPaid && isTenantAdmin && (
+                          <button
+                            type="button"
+                            disabled={markingPaidId === bill.id || isReadOnly}
+                            onClick={() => handleMarkPaid(bill.id)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-[10px] transition-colors shadow disabled:opacity-50"
+                            title="Tandai pembayaran tunai/transfer telah diterima"
+                          >
+                            {markingPaidId === bill.id ? 'Memproses...' : 'Tandai Lunas'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Footer Modal */}
+            <div className="pt-3 border-t border-forest-800 flex items-center justify-between">
+              <span className="text-[11px] text-forest-400">
+                Pengocokan siap dilakukan jika seluruh peserta telah lunas.
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedRoundForBills(null)}
+                className="px-4 py-1.5 bg-forest-800 hover:bg-forest-700 text-forest-200 font-bold rounded-xl text-xs"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
         </Modal>
       </div>
     </div>

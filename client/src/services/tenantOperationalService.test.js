@@ -24,6 +24,9 @@ import {
   createArisanRound,
   fetchArisanParticipants,
   enrollArisanParticipants,
+  generateArisanRoundBills,
+  fetchArisanRoundBills,
+  payArisanBillManual,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -467,6 +470,40 @@ describe('tenantOperationalService - Unit Tests', () => {
 
       const emptyRes = await fetchArisanParticipants('');
       expect(emptyRes).toEqual([]);
+    });
+
+    it('generateArisanRoundBills memicu pembuatan tagihan iuran untuk seluruh peserta', async () => {
+      const result = await generateArisanRoundBills('demo-arisan-tenant', 'demo-round-1');
+      expect(result).toBeDefined();
+      expect(result.success).toBe(true);
+      expect(result.total_generated).toBe(10);
+      expect(result.contribution_amount).toBe(300000);
+
+      // Validasi error jika parameter kosong
+      await expect(generateArisanRoundBills('', 'demo-round-1')).rejects.toThrow('Tenant ID wajib disertakan.');
+      await expect(generateArisanRoundBills('demo-arisan-tenant', '')).rejects.toThrow('ID putaran arisan wajib disertakan.');
+    });
+
+    it('fetchArisanRoundBills mengambil daftar tagihan iuran peserta putaran', async () => {
+      const bills = await fetchArisanRoundBills('demo-arisan-tenant', 'demo-round-1');
+      expect(Array.isArray(bills)).toBe(true);
+      expect(bills.length).toBe(2);
+      expect(bills[0].status).toBe('paid');
+      expect(bills[1].status).toBe('unpaid');
+
+      const emptyRes = await fetchArisanRoundBills('');
+      expect(emptyRes).toEqual([]);
+    });
+
+    it('payArisanBillManual memperbarui status tagihan iuran peserta menjadi paid', async () => {
+      const payRes = await payArisanBillManual('demo-arisan-tenant', 'demo-bill-2');
+      expect(payRes).toBeDefined();
+      expect(payRes.success).toBe(true);
+      expect(payRes.status).toBe('paid');
+
+      // Validasi error jika parameter kosong
+      await expect(payArisanBillManual('', 'demo-bill-2')).rejects.toThrow('Tenant ID dan Bill ID wajib diisi.');
+      await expect(payArisanBillManual('demo-arisan-tenant', '')).rejects.toThrow('Tenant ID dan Bill ID wajib diisi.');
     });
   });
 });

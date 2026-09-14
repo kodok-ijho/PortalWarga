@@ -267,7 +267,7 @@ saat kontrak selesai.
   dengan RLS mengikuti pola `useSubscriptionGate()` untuk aksi kocok.
 - [x] **T8.3** -- Buat halaman `ArisanRounds.jsx` -- list periode/putaran, status
   (collecting/ready_to_draw/drawn).
-- [ ] **T8.4** -- Implementasi pengumpulan kontribusi arisan menggunakan `billing_items`
+- [x] **T8.4** -- Implementasi pengumpulan kontribusi arisan menggunakan `billing_items`
   (period sama untuk semua anggota, bukan per-unit).
 - [ ] **T8.5** -- Implementasi fungsi/Edge Function pengocokan sesuai algoritma di Spec §5:
   validasi seluruh peserta lunas -> filter kandidat `has_won = false` -> pilih acak ->
