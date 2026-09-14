@@ -625,4 +625,118 @@ export async function fetchTenantBillingItems(tenantId, { period, status, unitId
   return data || [];
 }
 
+/**
+ * Mengambil dan membentuk matriks tagihan multi-bulan (12 periode) generik untuk sebuah tenant
+ * @param {string} tenantId - UUID tenant
+ * @param {number} year - Tahun buku (misal 2026 -> Jul 2026 s/d Jun 2027)
+ * @param {object} opts - { scopeUnitId }
+ */
+export async function fetchTenantBillMatrix(tenantId, year = 2026, opts = {}) {
+  if (!tenantId) return [];
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    return mock.getBillMatrix(year, opts);
+  }
+
+  // 1. Tentukan 12 periode tahun buku (Juli YYYY s/d Juni YYYY+1)
+  const periods = [
+    `${year}-07`, `${year}-08`, `${year}-09`, `${year}-10`, `${year}-11`, `${year}-12`,
+    `${year + 1}-01`, `${year + 1}-02`, `${year + 1}-03`, `${year + 1}-04`, `${year + 1}-05`, `${year + 1}-06`
+  ];
+
+  // 2. Ambil units
+  let units = await fetchTenantUnits(tenantId);
+  if (opts.scopeUnitId) {
+    units = units.filter((u) => Number(u.id) === Number(opts.scopeUnitId));
+  }
+
+  // 3. Ambil approved members
+  const { data: members } = await supabase
+    .from('tenant_members')
+    .select('id, unit_id, full_name, phone, occupancy_status, role')
+    .eq('tenant_id', tenantId)
+    .eq('status', 'approved');
+
+  const unitMemberMap = new Map();
+  (members || []).forEach((m) => {
+    if (m.unit_id) unitMemberMap.set(m.unit_id, m);
+  });
+
+  // 4. Ambil billing_items untuk rentang 12 periode ini
+  let billQuery = supabase
+    .from('billing_items')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .in('period', periods);
+
+  if (opts.scopeUnitId) {
+    billQuery = billQuery.eq('unit_id', opts.scopeUnitId);
+  }
+
+  const { data: bills } = await billQuery;
+  const billMap = new Map();
+  const billIds = [];
+  (bills || []).forEach((b) => {
+    billMap.set(`${b.unit_id}_${b.period}`, b);
+    billIds.push(b.id);
+  });
+
+  // 5. Ambil payments jika ada billIds
+  const paymentMap = new Map();
+  if (billIds.length > 0) {
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .in('billing_item_id', billIds);
+
+    (payments || []).forEach((p) => {
+      paymentMap.set(p.billing_item_id, p);
+    });
+  }
+
+  // 6. Susun struktur baris matriks sesuai format konsisten PortalWarga
+  const rows = units.map((unit) => {
+    const resident = unitMemberMap.get(unit.id) || null;
+
+    const cells = periods.map((period) => {
+      const bill = billMap.get(`${unit.id}_${period}`) || null;
+      const payment = bill ? paymentMap.get(bill.id) || null : null;
+
+      return {
+        period,
+        status: bill ? bill.status : 'none',
+        bill: bill
+          ? {
+              ...bill,
+              unit_id: unit.id,
+              amount: Number(bill.amount || 0),
+              late_fee: Number(bill.late_fee || 0),
+            }
+          : null,
+        payment: payment || null,
+      };
+    });
+
+    return {
+      unit: {
+        id: unit.id,
+        label: unit.label,
+        block: unit.metadata?.block || unit.label,
+        unit_number: unit.metadata?.unit_number || '',
+        is_occupied: Boolean(resident),
+        occupancy_status: resident?.occupancy_status || (resident ? 'owner_occupied' : 'owner_vacant'),
+      },
+      resident,
+      residents: resident ? [resident] : [],
+      cells,
+    };
+  });
+
+  return rows;
+}
+
+
 

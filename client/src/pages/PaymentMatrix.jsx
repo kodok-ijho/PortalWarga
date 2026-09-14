@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useTenant } from '../hooks/useTenant';
+import { useTenantTemplate } from '../hooks/useTenantTemplate';
 import { useToast } from '../hooks/useToast';
 import { useTour } from '../context/TourContext';
 import Modal from '../components/Modal';
@@ -71,6 +73,8 @@ export function isHangingPayment(payment, bill, cellStatus) {
 
 export default function PaymentMatrix() {
   const { profile, role, session, isReadOnly } = useAuth();
+  const { activeTenantId } = useTenant();
+  const template = useTenantTemplate();
   const { triggerTour } = useTour();
   const toast = useToast();
   const years = [2026, 2027, 2028];
@@ -127,11 +131,11 @@ export default function PaymentMatrix() {
     try {
       const scopedMatrixPromise =
         !IS_DEMO && !isStaff && myUnitId
-          ? fetchBillMatrix(session?.access_token, year, { scopeUnitId: myUnitId }).catch(() => [])
+          ? fetchBillMatrix(session?.access_token, year, { scopeUnitId: myUnitId, tenantId: activeTenantId }).catch(() => [])
           : Promise.resolve([]);
 
       const [data, paymentData, scopedData] = await Promise.all([
-        fetchBillMatrix(session?.access_token, year),
+        fetchBillMatrix(session?.access_token, year, { tenantId: activeTenantId }),
         !IS_DEMO
           ? fetchPayments(session?.access_token, myUnitId ? { scopeUnitId: myUnitId } : {}).catch(() => [])
           : Promise.resolve([]),
@@ -699,11 +703,11 @@ export default function PaymentMatrix() {
       {/* Header & tahun */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-forest-900">Matriks Pembayaran IPL</h2>
+          <h2 className="text-lg font-bold text-forest-900">Matriks Pembayaran {template.billLabel}</h2>
           <p className="text-sm text-forest-500">
             {isStaff
-              ? 'Klik sel belum-bayar untuk memilih, lalu catat pembayaran tunai/transfer bendahara.'
-              : 'Lihat status semua unit. Bayar IPL untuk rumah Anda (baris disorot) secara berurutan — jika ada tunggakan tahun lalu, selesaikan dulu di tahun terkait.'}
+              ? `Klik sel belum-bayar untuk memilih, lalu catat pembayaran tunai/transfer ${template.billLabel}.`
+              : `Lihat status semua ${template.unitLabel.toLowerCase()}. ${template.paymentActionLabel} untuk ${template.unitLabel.toLowerCase()} Anda (baris disorot) secara berurutan — jika ada tunggakan tahun lalu, selesaikan dulu di tahun terkait.`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -954,6 +958,7 @@ export default function PaymentMatrix() {
           bills={payModal}
           total={totalToPay}
           canUseQris={canUseQris}
+          billLabel={template.billLabel}
           onConfirm={confirmPay}
           onClose={() => setPayModal(null)}
         />
@@ -967,6 +972,7 @@ export default function PaymentMatrix() {
           role={role}
           canWrite={canWrite}
           canUseQris={canUseQris}
+          billLabel={template.billLabel}
           onConfirm={confirmManual}
           onClose={() => setManualModal(null)}
         />
@@ -1059,6 +1065,7 @@ export default function PaymentMatrix() {
           profile={profile}
           session={session}
           isHanging={detailModal.isHanging}
+          billLabel={template.billLabel}
           onRefresh={() => setRefreshKey(k => k + 1)}
           onRetry={() => {
             toggleCell(detailModal.bill);
@@ -1238,7 +1245,7 @@ function Cell({ cell, payment: propPayment, isHanging, unitId, isSelected, isSta
 }
 
 // ── Modal pembayaran warga: Transfer Bank (dengan bukti) ────
-function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
+function ResidentPayModal({ bills, total, canUseQris, billLabel = 'IPL', onConfirm, onClose }) {
   const { triggerTour } = useTour();
   const [method, setMethod] = useState('bank_transfer');
   const [receiptFile, setReceiptFile] = useState(null);
@@ -1306,12 +1313,12 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
   };
 
   return (
-    <Modal open onClose={onClose} title="Konfirmasi Pembayaran IPL" size="md">
+    <Modal open onClose={onClose} title={`Konfirmasi Pembayaran ${billLabel}`} size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Ringkasan tagihan */}
         <div className="rounded-lg bg-forest-50 p-3 text-sm border border-forest-100 space-y-1">
           <p className="text-forest-600 text-xs">
-            {isMulti ? `${bills.length} tagihan IPL:` : 'Tagihan IPL:'}
+            {isMulti ? `${bills.length} tagihan ${billLabel}:` : `Tagihan ${billLabel}:`}
           </p>
           <div className="mt-1 space-y-1 max-h-28 overflow-y-auto">
             {bills.map((bill) => (
@@ -1325,7 +1332,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
           {method === 'qris' && (
             <div className="pt-2 border-t border-forest-200 space-y-1 text-xs">
               <div className="flex justify-between text-forest-600">
-                <span>Subtotal IPL:</span>
+                <span>Subtotal {billLabel}:</span>
                 <span>{formatRupiah(total)}</span>
               </div>
               <div className="flex justify-between text-amber-800 font-medium">
@@ -1448,7 +1455,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
 // ── Modal input manual (bendahara, multi-bulan lintas tahun) ───────
 // Staff can record transfer proof for residents who cannot use the app yet.
 // Cash remains limited to bendahara/admin.
-function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm, onClose }) {
+function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, billLabel = 'IPL', onConfirm, onClose }) {
   const canRecordCash = isBendaharaOrAbove(role) && canWrite;
   const canRecordTransfer = canWrite;
   const methodCount = Number(canRecordCash) + Number(canRecordTransfer) + Number(canUseQris);
@@ -1587,7 +1594,7 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
             <p className="text-[11px] text-forest-500 mb-0.5">{unitLabel}</p>
           )}
           <p className="text-forest-600 text-xs">
-            {isMulti ? `${bills.length} tagihan IPL:` : 'Tagihan IPL:'}
+            {isMulti ? `${bills.length} tagihan ${billLabel}:` : `Tagihan ${billLabel}:`}
           </p>
           {/* Daftar periode terpilih (lintas tahun) */}
           <div className="mt-1 space-y-1 max-h-40 overflow-y-auto">
@@ -1620,7 +1627,7 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
           {method === 'qris' && (
             <div className="pt-2 border-t border-forest-200 space-y-1 text-xs">
               <div className="flex justify-between text-forest-600">
-                <span>Subtotal IPL:</span>
+                <span>Subtotal {billLabel}:</span>
                 <span>{formatRupiah(total)}</span>
               </div>
               <div className="flex justify-between text-amber-800 font-medium">
@@ -1834,7 +1841,7 @@ function getResolvedPaymentDate(payment, bill) {
 
 // Modal Detail Pembayaran Lunas
 // Modal Detail / Verifikasi / Revisi Pembayaran
-function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, session, isHanging: initialIsHanging, onRefresh, onRetry, onClose }) {
+function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, session, isHanging: initialIsHanging, billLabel = 'IPL', onRefresh, onRetry, onClose }) {
   const toast = useToast();
   const [asyncPayment, setAsyncPayment] = useState(null);
 
@@ -2135,7 +2142,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
 
   return (
     <>
-    <Modal open onClose={onClose} title={isHanging ? 'Detail & Perbaikan Transaksi IPL' : 'Detail Bukti Pembayaran IPL'} size="md">
+    <Modal open onClose={onClose} title={isHanging ? `Detail & Perbaikan Transaksi ${billLabel}` : `Detail Bukti Pembayaran ${billLabel}`} size="md">
       <div className="space-y-4 text-sm text-forest-900">
         {/* Banner Status */}
         {isHanging && (
@@ -2325,7 +2332,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
                 </p>
               </div>
               <div>
-                <p className="text-xs text-forest-500 font-medium">Periode IPL</p>
+                <p className="text-xs text-forest-500 font-medium">Periode {billLabel}</p>
                 <p className="font-semibold text-forest-800">{formatPeriod(resolvedBill.period)}</p>
               </div>
               <div>

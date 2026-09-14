@@ -219,7 +219,7 @@ sungguhan, bukan hanya tenant kosong.
   bermakna.)*
 - [x] **T6.4** -- Generate tagihan IPL berkala (bulanan) berdasarkan komponen IPL yang
   diinput saat `SetupWizard.jsx` (T6.2) -- reuse logic existing PortalWarga.
-- [ ] **T6.5** -- Adaptasi komponen tagihan existing PortalWarga (`ipl_bills`/matriks
+- [x] **T6.5** -- Adaptasi komponen tagihan existing PortalWarga (`ipl_bills`/matriks
   pembayaran) agar membaca dari `billing_items` generik dan tampil sesuai istilah tenant
   (`billLabel`) dari `tenantTemplates.js` (T2.5).
 - [ ] **T6.6** -- Adaptasi alur verifikasi pembayaran (upload bukti transfer, approval

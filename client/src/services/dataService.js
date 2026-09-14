@@ -549,6 +549,12 @@ export async function generateBills(token, { period, dry_run, tenantId } = {}) {
 }
 
 export async function fetchBillMatrix(token, year, opts = {}) {
+  if (opts?.tenantId) {
+    const { fetchTenantBillMatrix } = await import('./tenantOperationalService');
+    const rows = await fetchTenantBillMatrix(opts.tenantId, year, opts);
+    return normalizeBillMatrixRows(rows);
+  }
+
   if (IS_DEMO) {
     const mock = await getMockData();
     return normalizeBillMatrixRows(mock.getBillMatrix(year, opts));
