@@ -119,7 +119,12 @@ export default function ChooseTenantType({ onCancel, initialType = 'rt_rw', redi
           });
           toast.success(`Layanan "${tenant.name}" berhasil dibuat! Trial 15 hari aktif.`);
           if (redirectOnSuccess) {
-            navigate(`/t/${tenant.id}/dashboard`, { replace: true });
+            const targetType = location.state.type || selectedType;
+            if (targetType === 'rt_rw') {
+              navigate(`/t/${tenant.id}/setup`, { replace: true });
+            } else {
+              navigate(`/t/${tenant.id}/dashboard`, { replace: true });
+            }
           }
         } catch (err) {
           toast.error(err.message || 'Gagal membuat layanan otomatis.');
@@ -164,7 +169,11 @@ export default function ChooseTenantType({ onCancel, initialType = 'rt_rw', redi
       toast.success(`Layanan "${newTenant.name}" berhasil dibuat! Trial 15 hari aktif.`);
 
       if (redirectOnSuccess) {
-        navigate(`/t/${newTenant.id}/dashboard`, { replace: true });
+        if (selectedType === 'rt_rw') {
+          navigate(`/t/${newTenant.id}/setup`, { replace: true });
+        } else {
+          navigate(`/t/${newTenant.id}/dashboard`, { replace: true });
+        }
       }
     } catch (err) {
       // eslint-disable-next-line no-console

@@ -71,6 +71,16 @@ export default function TenantDashboardPlaceholder() {
             </div>
 
             <div className="flex items-center gap-3">
+              {isTenantAdmin && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/t/${tenantId}/setup`)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gold-500/20 hover:bg-gold-500/30 text-gold-300 text-xs font-semibold border border-gold-500/40 transition-colors"
+                >
+                  <AiOutlineSetting className="text-sm" />
+                  <span>Setup Wizard</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => navigate('/account/tenants')}
@@ -110,6 +120,29 @@ export default function TenantDashboardPlaceholder() {
 
         {/* Trial Countdown Banner (T4.3) */}
         <TrialCountdownBanner tenantId={tenantId} />
+
+        {/* Setup Wizard Warning Banner jika belum selesai (T6.2) */}
+        {isTenantAdmin && !activeTenant?.settings?.onboarding_completed && (
+          <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚙️</span>
+              <div>
+                <h4 className="text-sm font-bold text-amber-300">Pengaturan Awal Komplek Belum Selesai</h4>
+                <p className="text-xs text-forest-300 mt-0.5">
+                  Lengkapi daftar rumah/kavling dan rincian komponen tarif IPL untuk mulai mengelola tagihan warga.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(`/t/${tenantId}/setup`)}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-forest-950 text-xs font-bold transition-colors shrink-0"
+            >
+              <span>Mulai Setup Wizard</span>
+              <AiOutlineArrowRight />
+            </button>
+          </div>
+        )}
 
         {/* Status Phase 2 Milestone Banner */}
         <div className="p-6 rounded-2xl bg-forest-950/80 border border-gold-500/40 shadow-xl flex items-start gap-4">

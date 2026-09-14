@@ -41,6 +41,7 @@ const Logs = lazy(() => import('./pages/Logs'));
 const UserApproval = lazy(() => import('./pages/UserApproval'));
 const PaymentVerification = lazy(() => import('./pages/PaymentVerification'));
 const ChooseTenantType = lazy(() => import('./pages/onboarding/ChooseTenantType'));
+const SetupWizard = lazy(() => import('./pages/onboarding/SetupWizard'));
 const MyTenants = lazy(() => import('./pages/account/MyTenants'));
 const AddNewTenant = lazy(() => import('./pages/account/AddNewTenant'));
 const ChoosePlan = lazy(() => import('./pages/account/ChoosePlan'));
@@ -151,7 +152,15 @@ export default function App() {
                   }
                 />
 
-                {/* Tenant Operational Layer (§7, T2.8) */}
+                {/* Tenant Operational Layer (§7, T2.8, T6.2) */}
+                <Route
+                  path="/t/:tenantId/setup"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <SetupWizard />
+                    </Suspense>
+                  }
+                />
                 <Route
                   path="/t/:tenantId/dashboard"
                   element={

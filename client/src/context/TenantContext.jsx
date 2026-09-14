@@ -162,6 +162,9 @@ export function TenantProvider({ children }) {
             name,
             type,
             owner_id,
+            address,
+            contact_phone,
+            settings,
             created_at,
             updated_at
           )
@@ -177,7 +180,7 @@ export function TenantProvider({ children }) {
       // Ambil tenant dari tenants di mana user adalah owner
       const { data: ownedRows, error: ownedErr } = await supabase
         .from('tenants')
-        .select('id, name, type, owner_id, created_at, updated_at')
+        .select('id, name, type, owner_id, address, contact_phone, settings, created_at, updated_at')
         .eq('owner_id', currentUserId);
 
       if (ownedErr) {

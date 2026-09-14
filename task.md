@@ -210,7 +210,7 @@ sungguhan, bukan hanya tenant kosong.
 - [x] **T6.1** -- Lengkapi migration SQL `billing_items`, `payments`, `expenses` (Spec §3)
   yang sempat ditunda dari Phase 1 -- generik dari awal, langsung dipasangi RLS mengikuti
   pola Phase 1/5 (SELECT selalu terbuka utk anggota tenant, tulis diblok saat `read_only`).
-- [ ] **T6.2** -- Buat `SetupWizard.jsx` khusus varian `rt_rw` (nama komplek, jumlah unit,
+- [x] **T6.2** -- Buat `SetupWizard.jsx` khusus varian `rt_rw` (nama komplek, jumlah unit,
   komponen IPL) dan sambungkan ke alur onboarding dari Phase 2. *(Dipindah ke awal karena
   T6.4 membutuhkan komponen IPL yang didefinisikan di wizard ini.)*
 - [ ] **T6.3** -- Implementasi generate link/kode undangan unik per tenant dan halaman
