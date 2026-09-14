@@ -288,7 +288,7 @@ anggota mendapat giliran.
 
 ## Phase 9 -- Template Vertikal: Kelas (Req FR-19)
 
-- [ ] **T9.1** -- Buat `SetupWizard.jsx` varian `kelas` (nama kelas, jumlah siswa, nominal
+- [x] **T9.1** -- Buat `SetupWizard.jsx` varian `kelas` (nama kelas, jumlah siswa, nominal
   iuran).
 - [ ] **T9.2** -- Reuse pola generik dari Phase 6 (RT/RW) untuk billing berkala -- kelas
   tidak butuh mekanisme kocok, jadi sebagian besar adalah konfigurasi ulang istilah, bukan
