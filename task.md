@@ -261,7 +261,7 @@ saat kontrak selesai.
 
 ## Phase 8 -- Template Vertikal: Arisan (Req FR-18; Spec §5)
 
-- [ ] **T8.1** -- Buat `SetupWizard.jsx` varian `arisan` (nama grup, jumlah peserta,
+- [x] **T8.1** -- Buat `SetupWizard.jsx` varian `arisan` (nama grup, jumlah peserta,
   nominal kontribusi, frekuensi kocok).
 - [ ] **T8.2** -- Buat migration SQL: `arisan_rounds`, `arisan_participants` (Spec §5),
   dengan RLS mengikuti pola `useSubscriptionGate()` untuk aksi kocok.

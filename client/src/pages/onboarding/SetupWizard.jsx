@@ -24,6 +24,7 @@ import {
   generateInviteCode,
 } from '../../services/tenantOperationalService';
 import KosSetupWizard from './KosSetupWizard';
+import ArisanSetupWizard from './ArisanSetupWizard';
 
 const DEFAULT_IPL_COMPONENTS = [
   { id: 'comp-1', name: 'Keamanan Lingkungan', amount: 80000 },
@@ -301,6 +302,11 @@ export default function SetupWizard() {
   // Jika Tenant bertipe Kos-kosan, delegasikan ke KosSetupWizard khusus
   if (tenantType === 'kos') {
     return <KosSetupWizard tenantId={tenantId} initialData={tenantDetails} />;
+  }
+
+  // Jika Tenant bertipe Arisan, delegasikan ke ArisanSetupWizard khusus
+  if (tenantType === 'arisan') {
+    return <ArisanSetupWizard tenantId={tenantId} initialData={tenantDetails} />;
   }
 
   // Jika Setup Selesai Tampilkan Layar Sukses
