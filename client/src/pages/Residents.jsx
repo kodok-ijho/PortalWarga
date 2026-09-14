@@ -9,6 +9,8 @@ import {
 } from 'react-icons/ai';
 import Papa from 'papaparse';
 import { useAuth } from '../hooks/useAuth';
+import { useTenant } from '../hooks/useTenant';
+import { useTenantTemplate } from '../hooks/useTenantTemplate';
 import { useToast } from '../hooks/useToast';
 import { useTour } from '../context/TourContext';
 import Modal from '../components/Modal';
@@ -31,6 +33,8 @@ import {
 
 export default function Residents() {
   const { role, session, isReadOnly } = useAuth();
+  const { activeTenant } = useTenant();
+  const template = useTenantTemplate();
   const { triggerTour } = useTour();
   const token = session?.access_token;
   const toast = useToast();
@@ -296,8 +300,8 @@ export default function Residents() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-forest-900">Daftar Penghuni</h2>
-          <p className="text-sm text-forest-500">{filtered.length} dari {profiles.length} penghuni</p>
+          <h2 className="text-lg font-bold text-forest-900">Daftar {template.memberLabel}</h2>
+          <p className="text-sm text-forest-500">{filtered.length} dari {profiles.length} {template.memberLabel.toLowerCase()}</p>
         </div>
         <div className="flex gap-2">
           {canManage && (
@@ -306,7 +310,7 @@ export default function Residents() {
                 <AiOutlineUpload /> Upload CSV
               </button>
               <button onClick={() => setModalAddEdit('add')} className="pv-btn-primary text-xs">
-                <AiOutlinePlus /> Tambah Warga
+                <AiOutlinePlus /> Tambah {template.memberLabel}
               </button>
             </>
           )}
@@ -368,10 +372,10 @@ export default function Residents() {
             <thead>
               <tr className="border-b border-forest-100 bg-forest-800 text-left">
                 <th className="px-4 py-3 text-xs font-semibold text-gold-400 uppercase tracking-wide">Nama</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gold-400 uppercase tracking-wide">Unit</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gold-400 uppercase tracking-wide">{template.unitLabel}</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gold-400 uppercase tracking-wide hidden sm:table-cell">Telepon</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gold-400 uppercase tracking-wide">Status</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gold-400 uppercase tracking-wide hidden lg:table-cell">Status Tinggal</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gold-400 uppercase tracking-wide hidden lg:table-cell">{template.contractLabel || 'Status Tinggal'}</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gold-400 uppercase tracking-wide hidden lg:table-cell">Pemilik</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gold-400 uppercase tracking-wide hidden md:table-cell">Role</th>
               </tr>
@@ -385,14 +389,14 @@ export default function Residents() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
-                      Memuat data penghuni...
+                      Memuat data {template.memberLabel.toLowerCase()}...
                     </div>
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-10 text-center text-forest-400">
-                    Tidak ada penghuni yang cocok.
+                    Tidak ada {template.memberLabel.toLowerCase()} yang cocok.
                   </td>
                 </tr>
               ) : (
@@ -422,8 +426,8 @@ export default function Residents() {
                            </div>
                          </div>
                        </td>
-                       <td className="px-4 py-3 text-forest-700">
-                         {unit ? `${unit.block}/${unit.unit_number}` : '—'}
+                       <td className="px-4 py-3 text-forest-700 font-medium">
+                         {unit ? (unit.label || `${unit.block}/${unit.unit_number}`) : '—'}
                        </td>
                        <td className="px-4 py-3 text-forest-500 hidden sm:table-cell">{p.phone || '—'}</td>
                        <td className="px-4 py-3">
@@ -434,7 +438,7 @@ export default function Residents() {
                        <td className="px-4 py-3 hidden lg:table-cell">
                          {p.occupancy_status ? (
                            <span className={`pv-badge ${occupancyStatusColor(p.occupancy_status)}`}>
-                             {occupancyStatusLabel(p.occupancy_status)}
+                             {occupancyStatusLabel(p.occupancy_status, activeTenant?.type)}
                            </span>
                          ) : (
                            <span className="text-forest-400 text-xs">—</span>
@@ -470,6 +474,8 @@ export default function Residents() {
          <DetailModal
            profile={selected}
            canManage={canManage}
+           template={template}
+           activeTenant={activeTenant}
            getUnitById={getUnitById}
            getUnitOwner={getUnitOwner}
            onClose={() => setSelectedId(null)}
@@ -490,6 +496,8 @@ export default function Residents() {
            isSaving={isSaving}
            units={units}
            currentUserRole={role}
+           template={template}
+           activeTenant={activeTenant}
          />
        )}
  
@@ -507,11 +515,11 @@ export default function Residents() {
  
  // ── Sub-komponen ──────────────────────────────────────────────────
  
- function DetailModal({ profile, canManage, getUnitById, getUnitOwner, onClose, onEdit, onDelete }) {
-   const unit = getUnitById(profile.unit_id);
+ function DetailModal({ profile, canManage, template, activeTenant, getUnitById, getUnitOwner, onClose, onEdit, onDelete }) {
+  const unit = getUnitById(profile.unit_id);
   const owner = profile.occupancy_status === 'tenant' ? getUnitOwner(profile.unit_id) : null;
   return (
-    <Modal open onClose={onClose} title="Detail Penghuni">
+    <Modal open onClose={onClose} title={`Detail ${template?.memberLabel || 'Penghuni'}`}>
       {/* Avatar */}
       <div className="flex items-center gap-4 mb-6">
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-forest-800 text-gold-400 font-bold text-xl">
@@ -528,7 +536,7 @@ export default function Residents() {
             <span className={`pv-badge ${roleColor(profile.role)}`}>{roleLabel(profile.role)}</span>
             {profile.occupancy_status && (
               <span className={`pv-badge ${occupancyStatusColor(profile.occupancy_status)}`}>
-                {occupancyStatusLabel(profile.occupancy_status)}
+                {occupancyStatusLabel(profile.occupancy_status, activeTenant?.type)}
               </span>
             )}
           </div>
@@ -536,13 +544,16 @@ export default function Residents() {
       </div>
       <div className="space-y-3 text-sm">
         <Row label="Telepon" value={profile.phone || '—'} />
-        <Row label="Unit" value={unit ? `Blok ${unit.block} / ${unit.unit_number} (Lt. ${unit.floor || '-'}, ${unit.size}m²)` : 'Tidak ada unit'} />
+        <Row
+          label={template?.unitLabel || 'Unit'}
+          value={unit ? (unit.label || `Blok ${unit.block} / ${unit.unit_number} (Lt. ${unit.floor || '-'}, ${unit.size}m²)`) : `Tidak ada ${template?.unitLabel?.toLowerCase() || 'unit'}`}
+        />
         <Row label="Status" value={profile.is_active ? 'Aktif' : 'Non-aktif'} />
         {profile.occupancy_status && (
-          <Row label="Status Tinggal" value={occupancyStatusLabel(profile.occupancy_status)} />
+          <Row label={template?.contractLabel || 'Status Tinggal'} value={occupancyStatusLabel(profile.occupancy_status, activeTenant?.type)} />
         )}
         {owner && (
-          <Row label="Pemilik Unit" value={owner.full_name} />
+          <Row label={`Pemilik ${template?.unitLabel || 'Unit'}`} value={owner.full_name} />
         )}
       </div>
       {canManage && (
@@ -559,16 +570,17 @@ export default function Residents() {
   );
 }
 
-function ProfileFormModal({ profile, onSave, onClose, isSaving, units, currentUserRole }) {
+function ProfileFormModal({ profile, onSave, onClose, isSaving, units, currentUserRole, template, activeTenant }) {
   const isEdit = !!profile;
+  const isKos = activeTenant?.type === 'kos';
   const [form, setForm] = useState({
     full_name: profile?.full_name || '',
     email: profile?.email || '',
     phone: profile?.phone || '',
     unit_id: profile?.unit_id || '',
-    role: profile?.role || 'warga',
+    role: profile?.role || (isKos ? 'anggota' : 'warga'),
     is_active: profile?.is_active ?? true,
-    occupancy_status: profile?.occupancy_status || '',
+    occupancy_status: profile?.occupancy_status || (isKos ? 'tenant' : ''),
   });
 
   const handleSubmit = (e) => {
@@ -578,7 +590,7 @@ function ProfileFormModal({ profile, onSave, onClose, isSaving, units, currentUs
     if (!finalEmail) {
       const rand = Math.random().toString(36).substring(2, 7);
       const unit = units.find((u) => u.id === Number(form.unit_id));
-      const cleanUnit = unit ? `unit_${unit.block.toLowerCase()}_${unit.unit_number.toLowerCase()}` : `unassigned_${Date.now()}`;
+      const cleanUnit = unit ? `unit_${(unit.label || `${unit.block}_${unit.unit_number}`).toLowerCase().replace(/[^a-z0-9]/g, '_')}` : `unassigned_${Date.now()}`;
       finalEmail = `${cleanUnit}_${rand}@warga.palmvillage.local`;
     }
     onSave({
@@ -594,7 +606,7 @@ function ProfileFormModal({ profile, onSave, onClose, isSaving, units, currentUs
   };
 
   return (
-    <Modal open onClose={onClose} title={isEdit ? 'Edit Warga' : 'Tambah Warga'}>
+    <Modal open onClose={onClose} title={`${isEdit ? 'Edit' : 'Tambah'} ${template?.memberLabel || 'Warga'}`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <fieldset disabled={isSaving} className="space-y-4 border-none p-0 m-0">
           <Field label="Nama Lengkap" required>
@@ -616,7 +628,7 @@ function ProfileFormModal({ profile, onSave, onClose, isSaving, units, currentUs
               placeholder="email@gmail.com (Boleh dikosongkan)"
             />
             <p className="mt-1 text-[11px] text-forest-400">
-              Boleh dikosongkan jika warga belum mendaftar. Sistem otomatis membuat akun sementara yang terhubung saat warga login Google nanti.
+              Boleh dikosongkan jika {template?.memberLabel?.toLowerCase() || 'warga'} belum mendaftar. Sistem otomatis membuat akun sementara yang terhubung saat login Google nanti.
             </p>
           </Field>
           <Field label="Telepon">
@@ -628,21 +640,21 @@ function ProfileFormModal({ profile, onSave, onClose, isSaving, units, currentUs
               placeholder="08xx-xxxx-xxxx"
             />
           </Field>
-          <Field label="Unit">
+          <Field label={template?.unitLabel || 'Unit'}>
             <select
               value={form.unit_id}
               onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
               className="pv-input"
             >
-              <option value="">— Tidak ada unit —</option>
+              <option value="">— Tidak ada {template?.unitLabel?.toLowerCase() || 'unit'} —</option>
               {units.map((u) => (
                 <option key={u.id} value={u.id}>
-                  Blok {u.block} / {u.unit_number}
+                  {u.label || `Blok ${u.block} / ${u.unit_number}`}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Status Tinggal">
+          <Field label={template?.contractLabel || 'Status Tinggal'}>
             <select
               value={form.occupancy_status}
               onChange={(e) => setForm({ ...form, occupancy_status: e.target.value })}
@@ -650,7 +662,7 @@ function ProfileFormModal({ profile, onSave, onClose, isSaving, units, currentUs
             >
               <option value="">— Tidak ada —</option>
               {Object.entries(OCCUPANCY_STATUS).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
+                <option key={key} value={key}>{occupancyStatusLabel(key, activeTenant?.type)}</option>
               ))}
             </select>
           </Field>

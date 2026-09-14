@@ -279,7 +279,18 @@ export function roleColor(role) {
 }
 
 // ── OCCUPANCY STATUS ─────────────────────────────────────────────
-export function occupancyStatusLabel(status) {
+export function occupancyStatusLabel(status, tenantType = 'rt_rw') {
+  if (tenantType === 'kos') {
+    const kosMap = {
+      tenant: 'Penyewa Aktif',
+      owner_occupied: 'Pemilik / Pengelola',
+      owner_rented: 'Kamar Tersewa',
+      owner_vacant: 'Kamar Kosong',
+      checkout: 'Selesai / Checkout',
+      booking: 'Dipesan / Booking',
+    };
+    return kosMap[status] || OCCUPANCY_STATUS[status] || status || '-';
+  }
   return OCCUPANCY_STATUS[status] || status || '-';
 }
 
@@ -289,6 +300,8 @@ export function occupancyStatusColor(status) {
     owner_vacant: 'bg-amber-100 text-amber-700',
     owner_rented: 'bg-blue-100 text-blue-700',
     tenant: 'bg-indigo-100 text-indigo-700',
+    checkout: 'bg-gray-100 text-gray-600',
+    booking: 'bg-amber-100 text-amber-800',
   };
   return map[status] || 'bg-gray-100 text-gray-500';
 }

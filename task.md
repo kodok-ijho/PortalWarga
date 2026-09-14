@@ -247,7 +247,7 @@ berjalan di atas fondasi multi-tenant.
   bulanan selama kontrak aktif.
 - [x] **T7.4** -- Implementasi alur "checkout" -- set `tenant_units.status = 'vacant'`,
   hentikan auto-generate tagihan untuk unit tsb.
-- [ ] **T7.5** -- Sesuaikan `tenantTemplates.js` & UI Members/PaymentMatrix agar istilah
+- [x] **T7.5** -- Sesuaikan `tenantTemplates.js` & UI Members/PaymentMatrix agar istilah
   otomatis berubah jadi Kamar/Penyewa/Sewa untuk tenant tipe `kos`.
 - [ ] **T7.6** -- *(Keputusan terbuka, lihat "Catatan untuk Agent Coding")* Tentukan &
   implementasikan apakah satu pemilik dengan multi-properti kos memakai 1 tenant dengan

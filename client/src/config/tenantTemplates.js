@@ -20,6 +20,10 @@ export const TENANT_TEMPLATES = {
     emptyUnitLabel: 'Rumah Kosong',
     occupiedUnitLabel: 'Dihuni',
     paymentActionLabel: 'Bayar IPL',
+    headerResidentUnit: 'Rumah / Warga',
+    contractLabel: 'Status Huni',
+    feeLabel: 'Iuran IPL',
+    unitPlaceholder: 'Misal: Blok A/12',
     features: {
       hasMultiYearMatrix: true,
       hasRoomStatus: false,
@@ -44,6 +48,10 @@ export const TENANT_TEMPLATES = {
     emptyUnitLabel: 'Kamar Kosong',
     occupiedUnitLabel: 'Tersewa',
     paymentActionLabel: 'Bayar Uang Sewa',
+    headerResidentUnit: 'Kamar / Penyewa',
+    contractLabel: 'Kontrak Sewa',
+    feeLabel: 'Tarif Sewa',
+    unitPlaceholder: 'Misal: Kamar 101',
     features: {
       hasMultiYearMatrix: false,
       hasRoomStatus: true,
@@ -68,6 +76,10 @@ export const TENANT_TEMPLATES = {
     emptyUnitLabel: 'Slot Tersedia',
     occupiedUnitLabel: 'Slot Terisi',
     paymentActionLabel: 'Setor Kontribusi',
+    headerResidentUnit: 'Slot / Peserta',
+    contractLabel: 'Keikutsertaan',
+    feeLabel: 'Kontribusi Arisan',
+    unitPlaceholder: 'Misal: Nomor Undian 01',
     features: {
       hasMultiYearMatrix: false,
       hasRoomStatus: false,
@@ -92,6 +104,10 @@ export const TENANT_TEMPLATES = {
     emptyUnitLabel: 'Slot Terbuka',
     occupiedUnitLabel: 'Siswa Terdaftar',
     paymentActionLabel: 'Bayar Iuran Kursus',
+    headerResidentUnit: 'Slot / Siswa',
+    contractLabel: 'Pendaftaran',
+    feeLabel: 'Iuran SPP',
+    unitPlaceholder: 'Misal: Kursi 01 / Siswa A',
     features: {
       hasMultiYearMatrix: false,
       hasRoomStatus: false,

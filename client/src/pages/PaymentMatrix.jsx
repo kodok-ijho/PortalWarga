@@ -833,7 +833,7 @@ export default function PaymentMatrix() {
             <thead>
               <tr className="bg-forest-800">
                 <th className="sticky left-0 z-20 bg-forest-800 px-3 py-3 text-left text-[11px] font-semibold text-gold-400 uppercase tracking-wide w-[180px]">
-                  Rumah / Warga
+                  {template.headerResidentUnit || `${template.unitLabel} / ${template.memberLabel}`}
                 </th>
                 {matrixMonths.map((m) => (
                   <th
@@ -849,9 +849,9 @@ export default function PaymentMatrix() {
               {matrix.length === 0 ? (
                 <tr>
                   <td colSpan={13} className="px-4 py-10 text-center text-forest-400">
-                    {role === 'warga'
-                      ? 'Anda belum memiliki unit. Hubungi pengelola.'
-                      : 'Belum ada data unit.'}
+                    {role === 'warga' || role === 'anggota'
+                      ? `Anda belum memiliki ${template.unitLabel.toLowerCase()}. Hubungi pengelola.`
+                      : `Belum ada data ${template.unitLabel.toLowerCase()}.`}
                   </td>
                 </tr>
               ) : (
@@ -863,8 +863,8 @@ export default function PaymentMatrix() {
                       : [])
                     .map((resident) => resident?.full_name?.trim())
                     .filter(Boolean);
-                  // Warga hanya bisa interaksi (bayar) untuk unitnya sendiri.
-                  const isMyUnit = role === 'warga' && row.unit.id === myUnitId;
+                  // Warga / penyewa hanya bisa interaksi (bayar) untuk unitnya sendiri.
+                  const isMyUnit = (role === 'warga' || role === 'anggota') && row.unit.id === myUnitId;
                   const canInteract = isStaff || isMyUnit;
                   // Sel belum-bayar unit lain DIKUNCI saat ada unit aktif (hanya
                   // relevan untuk staff — warga hanya punya satu unit sendiri).
@@ -892,10 +892,10 @@ export default function PaymentMatrix() {
                     >
                       <td className={`sticky left-0 z-10 ${stickyBg} px-3 py-2 border-r border-forest-100`}>
                         <p className={`font-medium ${isMyUnit ? 'text-gold-700' : 'text-forest-900'}`}>
-                          Blok {row.unit.block}/{row.unit.unit_number}
+                          {row.unit.label || `Blok ${row.unit.block}/${row.unit.unit_number}`}
                           {isMyUnit && (
                             <span className="ml-1.5 pv-badge bg-gold-500 text-forest-900 text-[8px]">
-                              Rumah Saya
+                              {template.unitLabel} Saya
                             </span>
                           )}
                         </p>
@@ -903,17 +903,15 @@ export default function PaymentMatrix() {
                           className="text-[10px] leading-tight text-forest-500 max-w-[180px] break-words"
                           title={residentNames.join(' / ')}
                         >
-                          {residentNames.length > 0 ? residentNames.join(' / ') : '— Belum Ada Pemilik —'}
+                          {residentNames.length > 0 ? residentNames.join(' / ') : `— Belum Ada ${template.memberLabel} —`}
                         </p>
-                        {row.unit.is_occupied ? (
-                          row.resident?.occupancy_status && (
-                            <span className={`mt-0.5 inline-flex items-center rounded px-1 py-px text-[8px] font-semibold leading-none ${occupancyStatusColor(row.resident.occupancy_status)}`}>
-                              {occupancyStatusLabel(row.resident.occupancy_status)}
-                            </span>
-                          )
+                        {row.unit.is_occupied || row.unit.status === 'occupied' ? (
+                          <span className="mt-0.5 inline-flex items-center rounded px-1.5 py-0.5 text-[8px] font-bold leading-none bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            {template.occupiedUnitLabel}
+                          </span>
                         ) : (
                           <span className="mt-0.5 inline-flex items-center rounded px-1.5 py-0.5 text-[8px] font-bold leading-none bg-amber-100 text-amber-800 border border-amber-300">
-                            Rumah Kosong (IPL Basic)
+                            {template.emptyUnitLabel}
                           </span>
                         )}
                       </td>
@@ -2273,10 +2271,10 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
           <form onSubmit={handleSaveEdit} className="space-y-3.5 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200">
             <div className="flex items-center justify-between pb-1 border-b border-amber-200">
               <h4 className="font-bold text-xs text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
-                <span>✏️</span> Perbaikan Transaksi IPL
+                <span>✏️</span> Perbaikan Transaksi {billLabel}
               </h4>
               <span className="text-[10px] text-amber-700 font-medium">
-                {targetUnit ? `Blok ${targetUnit.block}/${targetUnit.unit_number}` : ''} · {formatPeriod(resolvedBill.period)}
+                {targetUnit?.label || (targetUnit ? `Blok ${targetUnit.block}/${targetUnit.unit_number}` : '')} · {formatPeriod(resolvedBill.period)}
               </span>
             </div>
 
@@ -2415,9 +2413,9 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
           <>
               <div className="grid grid-cols-2 gap-4 rounded-lg bg-forest-50 p-3">
               <div>
-                <p className="text-xs text-forest-500 font-medium">Rumah / Unit</p>
+                <p className="text-xs text-forest-500 font-medium">{template?.unitLabel || 'Rumah / Unit'}</p>
                 <p className="font-semibold text-forest-800">
-                  {targetUnit ? `${targetUnit.block} no ${targetUnit.unit_number}` : '-'}
+                  {targetUnit?.label || (targetUnit ? `${targetUnit.block} no ${targetUnit.unit_number}` : '-')}
                 </p>
               </div>
               <div>
