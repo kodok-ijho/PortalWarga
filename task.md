@@ -311,7 +311,7 @@ teruji di seluruh 4 vertikal sebelum membangun modul add-on lintas tenant ini. M
 adalah pengecualian sengaja terhadap prinsip isolasi tenant yang ditegakkan sejak Phase 1
 -- datanya memang ditujukan publik.
 
-- [ ] **T10.1** -- Buat migration SQL: enum `listing_type`, `listing_status`, tabel
+- [x] **T10.1** -- Buat migration SQL: enum `listing_type`, `listing_status`, tabel
   `public_listings`, `listing_pricing`, `listing_payments`. (Spec §5.1)
 - [ ] **T10.2** -- Terapkan RLS khusus sesuai Spec §6.1 -- SELECT publik untuk siapa saja
   (termasuk anonymous) pada listing berstatus `active`, INSERT dibatasi anggota tenant
