@@ -18,6 +18,7 @@ import {
   updateTenantProfileAndSettings,
   createTenantBillingItem,
   assignRoomContract,
+  autoGenerateKosBilling,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -342,6 +343,66 @@ describe('tenantOperationalService - Unit Tests', () => {
           rentPrice: 1500000,
         })
       ).rejects.toThrow('Tanggal selesai kontrak harus lebih besar dari tanggal mulai kontrak.');
+    });
+
+    it('calculateBillingPreview khusus kos: melewati kamar vacant dan kamar tanpa kontrak aktif', () => {
+      const kosRooms = [
+        { id: 101, label: 'Kamar 101', status: 'vacant', metadata: { default_rent_price: 1200000 } },
+        {
+          id: 102,
+          label: 'Kamar 102',
+          status: 'occupied',
+          metadata: {
+            rent_price: 1300000,
+            contract_start: '2026-08-01',
+            contract_end: '2027-01-31',
+          },
+        },
+        {
+          id: 103,
+          label: 'Kamar 103',
+          status: 'occupied',
+          metadata: {
+            rent_price: 1500000,
+            contract_start: '2026-11-01',
+            contract_end: '2027-04-30',
+          },
+        },
+      ];
+
+      const res = calculateBillingPreview({
+        tenantId: 'demo-tenant-kos',
+        tenantType: 'kos',
+        period: '2026-09',
+        units: kosRooms,
+        settings: { billing_due_day: 5 },
+      });
+
+      // Kamar 101: vacant -> dilewati
+      // Kamar 102: occupied & kontrak aktif (Agustus 2026 - Januari 2027) -> dibuat tagihan
+      // Kamar 103: occupied tapi kontrak baru mulai November 2026 -> dilewati
+      expect(res.preview.length).toBe(1);
+      expect(res.preview[0].unit_id).toBe(102);
+      expect(res.preview[0].amount).toBe(1300000);
+      expect(res.preview[0].due_date).toBe('2026-09-05');
+      expect(res.preview[0].metadata.billing_type).toBe('rent');
+
+      expect(res.skipped.length).toBe(2);
+      expect(res.skipped.find((s) => s.unit_id === 101).reason).toBe('room_vacant');
+      expect(res.skipped.find((s) => s.unit_id === 103).reason).toBe('contract_inactive');
+    });
+
+    it('autoGenerateKosBilling dapat berjalan dan menghasilkan tagihan sewa bulanan', async () => {
+      const res = await autoGenerateKosBilling('demo-tenant-kos', {
+        period: '2026-09',
+      });
+
+      expect(res).toBeDefined();
+      expect(res.success).toBe(true);
+      expect(res.period).toBe('2026-09');
+      expect(typeof res.generated_count).toBe('number');
+      expect(typeof res.skipped_count).toBe('number');
+      expect(Array.isArray(res.items)).toBe(true);
     });
   });
 });

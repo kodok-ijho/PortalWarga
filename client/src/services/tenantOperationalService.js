@@ -472,20 +472,23 @@ export async function rejectTenantMember(memberId) {
  */
 export function calculateBillingPreview({
   tenantId,
+  tenantType = 'rt_rw',
   period,
   units = [],
   settings = {},
   existingUnitIds = new Set(),
   unitMemberMap = new Map(),
 }) {
+  const isKos = tenantType === 'kos';
+
   const iplComponents = settings.ipl_components || [
     { name: 'Keamanan Lingkungan', amount: 80000 },
     { name: 'Kebersihan & Sampah', amount: 30000 },
     { name: 'Kas Paguyuban / RT', amount: 20000 },
     { name: 'Dana Duka Cita (Sosial)', amount: 10000 },
   ];
-  const totalAmount = iplComponents.reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
-  const dueDay = Number(settings.due_day) || 10;
+  const defaultIplAmount = iplComponents.reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
+  const dueDay = Number(isKos ? (settings.billing_due_day || settings.due_day || 5) : (settings.due_day || 10));
   const dueDate = `${period}-${String(dueDay).padStart(2, '0')}`;
 
   const activeUnits = units.filter((u) => u.status !== 'inactive');
@@ -502,6 +505,67 @@ export function calculateBillingPreview({
       return;
     }
 
+    if (isKos) {
+      if (u.status === 'vacant') {
+        skipped.push({
+          unit_id: u.id,
+          label: u.label,
+          reason: 'room_vacant',
+        });
+        return;
+      }
+
+      const meta = u.metadata || {};
+      const cStart = meta.contract_start;
+      const cEnd = meta.contract_end;
+
+      if (!cStart || !cEnd) {
+        skipped.push({
+          unit_id: u.id,
+          label: u.label,
+          reason: 'no_contract',
+        });
+        return;
+      }
+
+      const startMonth = cStart.slice(0, 7);
+      const endMonth = cEnd.slice(0, 7);
+      if (period < startMonth || period > endMonth) {
+        skipped.push({
+          unit_id: u.id,
+          label: u.label,
+          reason: 'contract_inactive',
+        });
+        return;
+      }
+
+      const rentPrice = Number(meta.rent_price || meta.default_rent_price || settings.default_rent_price || 0);
+      const member = unitMemberMap.get(u.id) || null;
+
+      preview.push({
+        tenant_id: tenantId,
+        unit_id: u.id,
+        member_id: member?.id || meta.tenant_member_id || null,
+        period,
+        amount: rentPrice,
+        late_fee: 0,
+        due_date: dueDate,
+        status: 'unpaid',
+        contract_start: cStart,
+        contract_end: cEnd,
+        metadata: {
+          bill_type: 'rent',
+          billing_type: 'rent',
+          auto_generated: true,
+          unit_label: u.label,
+          member_name: member?.full_name || 'Penyewa Kamar',
+        },
+        unit_info: u.label,
+        resident_name: member?.full_name || 'Penyewa Kamar',
+      });
+      return;
+    }
+
     const member = unitMemberMap.get(u.id) || null;
 
     preview.push({
@@ -509,7 +573,7 @@ export function calculateBillingPreview({
       unit_id: u.id,
       member_id: member?.id || null,
       period,
-      amount: totalAmount,
+      amount: defaultIplAmount,
       late_fee: 0,
       due_date: dueDate,
       status: 'unpaid',
@@ -526,7 +590,8 @@ export function calculateBillingPreview({
 
   return {
     period,
-    totalAmount,
+    totalAmount: isKos ? preview.reduce((acc, p) => acc + p.amount, 0) : defaultIplAmount,
+    grandTotalAmount: preview.reduce((acc, p) => acc + p.amount, 0),
     dueDate,
     preview,
     skipped,
@@ -598,6 +663,7 @@ export async function generateTenantBillingItems(tenantId, { period, dry_run = f
 
   const { preview, skipped } = calculateBillingPreview({
     tenantId,
+    tenantType: tenant?.type || 'rt_rw',
     period,
     units,
     settings,
@@ -619,6 +685,8 @@ export async function generateTenantBillingItems(tenantId, { period, dry_run = f
         late_fee: p.late_fee,
         due_date: p.due_date,
         status: p.status,
+        contract_start: p.contract_start || null,
+        contract_end: p.contract_end || null,
         metadata: p.metadata,
       }));
 
@@ -850,6 +918,99 @@ export async function assignRoomContract(tenantId, {
     contractStart,
     contractEnd,
     bill,
+  };
+}
+
+/**
+ * Auto-generate tagihan sewa bulanan untuk tenant bertipe kos.
+ * Memanggil RPC public.auto_generate_kos_billing di Supabase,
+ * atau melakukan perhitungan lokal pada demo/mock mode.
+ * 
+ * @param {string} tenantId - UUID tenant
+ * @param {object} options - { period: 'YYYY-MM', dryRun: boolean }
+ */
+export async function autoGenerateKosBilling(tenantId, { period, dryRun = false } = {}) {
+  if (!tenantId) throw new Error('Tenant ID wajib disertakan.');
+  const targetPeriod = period || new Date().toISOString().slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(targetPeriod)) {
+    throw new Error('Format periode harus YYYY-MM.');
+  }
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const tenant = await fetchTenantDetails(tenantId);
+    const units = await fetchTenantUnits(tenantId);
+    const settings = tenant?.settings || {};
+
+    const dueDay = Number(settings.billing_due_day || settings.due_day || 5);
+    const dueDate = `${targetPeriod}-${String(dueDay).padStart(2, '0')}`;
+
+    let generatedCount = 0;
+    let skippedCount = 0;
+    const items = [];
+
+    units.forEach((u) => {
+      if (u.status !== 'occupied') {
+        skippedCount++;
+        return;
+      }
+
+      const meta = u.metadata || {};
+      const contractStart = meta.contract_start;
+      const contractEnd = meta.contract_end;
+
+      if (!contractStart || !contractEnd) {
+        skippedCount++;
+        return;
+      }
+
+      const startMonth = contractStart.slice(0, 7);
+      const endMonth = contractEnd.slice(0, 7);
+
+      if (targetPeriod < startMonth || targetPeriod > endMonth) {
+        skippedCount++;
+        return;
+      }
+
+      const rentPrice = Number(meta.rent_price || meta.default_rent_price || settings.default_rent_price || 0);
+
+      generatedCount++;
+      items.push({
+        id: `mock-kos-bill-${u.id}-${targetPeriod}`,
+        tenant_id: tenantId,
+        unit_id: u.id,
+        unit_label: u.label,
+        period: targetPeriod,
+        amount: rentPrice,
+        due_date: dueDate,
+        status: 'unpaid',
+      });
+    });
+
+    return {
+      success: true,
+      period: targetPeriod,
+      generated_count: generatedCount,
+      skipped_count: skippedCount,
+      items,
+      dry_run: dryRun,
+    };
+  }
+
+  const { data, error } = await supabase.rpc('auto_generate_kos_billing', {
+    p_period: targetPeriod,
+    p_tenant_id: tenantId,
+  });
+
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] autoGenerateKosBilling error:', error);
+    throw error;
+  }
+
+  return {
+    ...data,
+    dry_run: dryRun,
   };
 }
 

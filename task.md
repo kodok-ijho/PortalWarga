@@ -243,7 +243,7 @@ berjalan di atas fondasi multi-tenant.
   default, siklus tagih).
 - [x] **T7.2** -- Tambah field kontrak (`contract_start`, `contract_end`) pada form
   pembuatan tagihan/unit di `billing_items` (kolom sudah disiapkan di Spec §3).
-- [ ] **T7.3** -- Implementasi job/scheduled function yang auto-generate tagihan sewa
+- [x] **T7.3** -- Implementasi job/scheduled function yang auto-generate tagihan sewa
   bulanan selama kontrak aktif.
 - [ ] **T7.4** -- Implementasi alur "checkout" -- set `tenant_units.status = 'vacant'`,
   hentikan auto-generate tagihan untuk unit tsb.

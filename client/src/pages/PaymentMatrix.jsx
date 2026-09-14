@@ -51,6 +51,7 @@ import {
   downloadDigitalReceipt,
   sendEmailReceipt,
 } from '../services/mockData';
+import { autoGenerateKosBilling } from '../services/tenantOperationalService';
 import { compressImage } from '../utils/imageCompressor';
 import { AiOutlineDownload } from 'react-icons/ai';
 
@@ -74,7 +75,7 @@ export function isHangingPayment(payment, bill, cellStatus) {
 
 export default function PaymentMatrix() {
   const { profile, role, session, isReadOnly } = useAuth();
-  const { activeTenantId } = useTenant();
+  const { activeTenantId, activeTenant } = useTenant();
   const template = useTenantTemplate();
   const { triggerTour } = useTour();
   const toast = useToast();
@@ -119,6 +120,28 @@ export default function PaymentMatrix() {
   const myUnitId = profile?.unit_id;
   const [refreshKey, setRefreshKey] = useState(0);
   const [isCreateBillingOpen, setIsCreateBillingOpen] = useState(false);
+  const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+
+  const handleAutoGenerateBills = async () => {
+    const currentPeriod = new Date().toISOString().slice(0, 7);
+    const confirmMsg = `Buat tagihan sewa bulanan otomatis untuk periode ${currentPeriod}?\n\nHanya kamar berstatus terisi ('occupied') dengan masa kontrak aktif yang akan dibuatkan tagihannya. Tagihan yang sudah ada akan dilewati.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsAutoGenerating(true);
+    try {
+      const res = await autoGenerateKosBilling(activeTenantId, { period: currentPeriod });
+      if (res.generated_count > 0) {
+        toast.success(`Berhasil membuat ${res.generated_count} tagihan sewa untuk periode ${currentPeriod}. (${res.skipped_count} kamar dilewati/sudah memiliki tagihan)`);
+      } else {
+        toast.info(`Tidak ada tagihan baru yang dibuat. (${res.skipped_count} kamar dilewati/sudah memiliki tagihan)`);
+      }
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      toast.error(err.message || 'Gagal membuat tagihan sewa otomatis.');
+    } finally {
+      setIsAutoGenerating(false);
+    }
+  };
 
   const [matrix, setMatrix] = useState([]);
   const [productionPayments, setProductionPayments] = useState([]);
@@ -735,14 +758,28 @@ export default function PaymentMatrix() {
             ))}
           </select>
           {canWrite && (
-            <button
-              type="button"
-              onClick={() => setIsCreateBillingOpen(true)}
-              className="pv-btn bg-forest-800 hover:bg-forest-700 text-gold-300 text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-forest-700"
-            >
-              <span>+</span>
-              <span>{activeTenant?.type === 'kos' ? 'Kontrak & Tagihan Kamar' : `Buat Tagihan ${template.billLabel}`}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {activeTenant?.type === 'kos' && (
+                <button
+                  type="button"
+                  disabled={isAutoGenerating}
+                  onClick={handleAutoGenerateBills}
+                  className="pv-btn bg-forest-700/90 hover:bg-forest-700 text-gold-300 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-forest-600/80 disabled:opacity-50"
+                  title="Generate otomatis tagihan sewa bulanan untuk kamar dengan kontrak aktif pada periode ini"
+                >
+                  <span>⚡</span>
+                  <span>{isAutoGenerating ? 'Memproses...' : 'Auto-Tagih Sewa'}</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsCreateBillingOpen(true)}
+                className="pv-btn bg-forest-800 hover:bg-forest-700 text-gold-300 text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-forest-700"
+              >
+                <span>+</span>
+                <span>{activeTenant?.type === 'kos' ? 'Kontrak & Tagihan Kamar' : `Buat Tagihan ${template.billLabel}`}</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
