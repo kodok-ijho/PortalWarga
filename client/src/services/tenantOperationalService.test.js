@@ -6,6 +6,12 @@ import {
   fetchTenantPayments,
   verifyTenantPayment,
   rejectTenantPayment,
+  fetchTenantExpenses,
+  createTenantExpense,
+  updateTenantExpense,
+  deleteTenantExpense,
+  fetchTenantMonthlyFinance,
+  fetchTenantRunningBalance,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -170,6 +176,43 @@ describe('tenantOperationalService - Unit Tests', () => {
       expect(result).toBeDefined();
       expect(result.success).toBe(true);
       expect(result.status).toBe('rejected');
+    });
+  });
+
+  describe('Expenses and Financial Reports Operations', () => {
+    it('mengambil daftar pengeluaran kas tenant pada mode demo', async () => {
+      const expenses = await fetchTenantExpenses('demo-tenant-rtrw');
+      expect(Array.isArray(expenses)).toBe(true);
+      expect(expenses.length).toBeGreaterThan(0);
+      expect(expenses[0]).toHaveProperty('category');
+      expect(expenses[0]).toHaveProperty('amount');
+    });
+
+    it('berhasil mencatat pengeluaran baru pada mode demo tenant', async () => {
+      const newExpense = await createTenantExpense('demo-tenant-rtrw', {
+        date: '2026-10-01',
+        category: 'Kebersihan',
+        amount: 250000,
+        description: 'Beli sapu dan kantong sampah',
+      });
+      expect(newExpense).toBeDefined();
+      expect(newExpense.amount).toBe(250000);
+      expect(newExpense.category).toBe('Kebersihan');
+    });
+
+    it('menghitung laporan keuangan bulanan dan saldo kas berjalan', async () => {
+      const fin = await fetchTenantMonthlyFinance('demo-tenant-rtrw', { year: 2026, month: 10 });
+      expect(fin).toBeDefined();
+      expect(fin.report).toHaveProperty('total_income');
+      expect(fin.report).toHaveProperty('total_expense');
+      expect(fin.report).toHaveProperty('net_income');
+      expect(Array.isArray(fin.expenses)).toBe(true);
+
+      const bal = await fetchTenantRunningBalance('demo-tenant-rtrw', { year: 2026, month: 10 });
+      expect(bal).toBeDefined();
+      expect(Array.isArray(bal.chain)).toBe(true);
+      expect(bal.chain.length).toBeGreaterThan(0);
+      expect(bal.chain[0]).toHaveProperty('closingBalance');
     });
   });
 });

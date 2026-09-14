@@ -225,7 +225,7 @@ sungguhan, bukan hanya tenant kosong.
 - [x] **T6.6** -- Adaptasi alur verifikasi pembayaran (upload bukti transfer, approval
   bendahara/admin) agar generik terhadap `billing_items`, dan memakai `useSubscriptionGate()`
   dari T5.1 untuk disable saat `read_only`.
-- [ ] **T6.7** -- Adaptasi halaman Laporan Keuangan & Pengeluaran (`expenses`) agar
+- [x] **T6.7** -- Adaptasi halaman Laporan Keuangan & Pengeluaran (`expenses`) agar
   tenant-aware (filter otomatis berdasarkan `tenant_id` dari context, bukan hardcoded).
 - [ ] **T6.8** -- Isi `/t/:tenantId/dashboard` (placeholder dari T2.8) dengan dashboard
   operasional RT/RW sungguhan.

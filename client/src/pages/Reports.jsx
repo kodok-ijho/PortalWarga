@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell as PieCell, Legend,
@@ -17,6 +17,8 @@ import {
 } from 'react-icons/ai';
 import Papa from 'papaparse';
 import { useAuth } from '../hooks/useAuth';
+import { useTenant } from '../context/TenantContext';
+import { useTenantTemplate } from '../hooks/useTenantTemplate';
 import { useToast } from '../hooks/useToast';
 import {
   MONTHS_LONG,
@@ -153,7 +155,11 @@ async function mapWithConcurrency(items, concurrency, mapper) {
 }
 
 export default function Reports() {
+  const params = useParams();
   const { role, session } = useAuth();
+  const { currentTenant, userTenants } = useTenant();
+  const activeTenantId = params.tenantId || currentTenant?.id || userTenants?.[0]?.id || null;
+  const template = useTenantTemplate(currentTenant?.type || 'rt_rw');
   const toast = useToast();
 
   const years = useMemo(() => {
@@ -205,7 +211,7 @@ export default function Reports() {
     try {
       if (reportType === 'monthly' || reportType === 'non_ipl') {
         const [finRes, nonIplRes, eventsRes] = await Promise.all([
-          fetchMonthlyFinance(session?.access_token, { year, month }),
+          fetchMonthlyFinance(session?.access_token, { year, month, tenantId: activeTenantId }),
           fetchNonIplIncomes(session?.access_token, {
             from: `${year}-${String(month).padStart(2, '0')}-01`,
             to: `${year}-${String(month).padStart(2, '0')}-31`,
@@ -220,7 +226,7 @@ export default function Reports() {
         setEvents(Array.isArray(eventsRes) ? eventsRes : []);
 
         try {
-          const balRes = await fetchRunningBalance(session?.access_token, { year, month });
+          const balRes = await fetchRunningBalance(session?.access_token, { year, month, tenantId: activeTenantId });
           setRunningChain(normalizeRunningBalance(balRes));
         } catch (balanceError) {
           if (!isReportApiEmptyResponse(balanceError)) {
@@ -238,7 +244,7 @@ export default function Reports() {
 
         const [results, nonIplYearlyRes, eventsRes] = await Promise.all([
           mapWithConcurrency(periods, YEARLY_REQUEST_CONCURRENCY, ({ year: y, month: m }) => {
-            return fetchMonthlyFinance(session?.access_token, { year: y, month: m });
+            return fetchMonthlyFinance(session?.access_token, { year: y, month: m, tenantId: activeTenantId });
           }),
           fetchNonIplIncomes(session?.access_token, {
             from: `${year}-07-01`,

@@ -1119,3 +1119,303 @@ export async function updateTenantPayment(tenantId, paymentId, { unit_id, amount
 
   return data;
 }
+
+/**
+ * Mengambil daftar pengeluaran kas tenant
+ * @param {string} tenantId - UUID tenant
+ * @param {object} filters - { category, month }
+ */
+export async function fetchTenantExpenses(tenantId, filters = {}) {
+  if (!tenantId) return [];
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    return mock.mockExpenses || [];
+  }
+
+  let query = supabase
+    .from('expenses')
+    .select('id, tenant_id, category, amount, description, receipt_url, recorded_by, metadata, created_at, updated_at')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false });
+
+  if (filters.category) {
+    query = query.eq('category', filters.category);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] fetchTenantExpenses error:', error);
+    throw error;
+  }
+
+  return (data || []).map((exp) => {
+    const meta = exp.metadata || {};
+    const date = meta.date || (exp.created_at ? exp.created_at.substring(0, 10) : '');
+    const receiptFile = exp.receipt_url ? exp.receipt_url.split('/').pop().split('?')[0] : '';
+    return {
+      ...exp,
+      amount: Number(exp.amount || 0),
+      date,
+      expense_date: date,
+      receipt_file_url: exp.receipt_url || '',
+      file_url: exp.receipt_url || '',
+      receipt_file: receiptFile,
+    };
+  });
+}
+
+/**
+ * Mencatat pengeluaran baru untuk tenant
+ * @param {string} tenantId - UUID tenant
+ * @param {object} param1 - { date, category, amount, description, file, recordedBy }
+ */
+export async function createTenantExpense(tenantId, { date, category, amount, description, file, recordedBy } = {}) {
+  if (!tenantId) throw new Error('Tenant ID wajib disertakan.');
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    return mock.addExpense({
+      date,
+      category,
+      amount,
+      description,
+      receipt_file: file ? file.name : null,
+    });
+  }
+
+  const expenseDate = date || new Date().toISOString().substring(0, 10);
+  const payload = {
+    tenant_id: tenantId,
+    category: category || 'Lain-lain',
+    amount: Number(amount || 0),
+    description: description ? description.trim() : null,
+    receipt_url: file ? file.name : null,
+    recorded_by: recordedBy || null,
+    metadata: {
+      date: expenseDate,
+      file_name: file ? file.name : null,
+    },
+    created_at: new Date(expenseDate).toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from('expenses')
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] createTenantExpense error:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * Memperbarui pengeluaran tenant
+ * @param {string} tenantId - UUID tenant
+ * @param {string} expenseId - UUID expense
+ * @param {object} param2 - { date, category, amount, description, file }
+ */
+export async function updateTenantExpense(tenantId, expenseId, { date, category, amount, description, file } = {}) {
+  if (!tenantId || !expenseId) throw new Error('tenantId dan expenseId wajib disertakan.');
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    return mock.updateExpense(expenseId, {
+      date,
+      category,
+      amount,
+      description,
+      receipt_file: file ? file.name : null,
+    });
+  }
+
+  const updateFields = {
+    updated_at: new Date().toISOString(),
+  };
+  if (category) updateFields.category = category;
+  if (amount !== undefined && amount !== '') updateFields.amount = Number(amount);
+  if (description !== undefined) updateFields.description = description ? description.trim() : null;
+  if (file) updateFields.receipt_url = file.name;
+
+  if (date) {
+    updateFields.metadata = { date };
+    updateFields.created_at = new Date(date).toISOString();
+  }
+
+  const { data, error } = await supabase
+    .from('expenses')
+    .update(updateFields)
+    .eq('tenant_id', tenantId)
+    .eq('id', expenseId)
+    .select()
+    .single();
+
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] updateTenantExpense error:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * Menghapus pengeluaran tenant
+ * @param {string} tenantId - UUID tenant
+ * @param {string} expenseId - UUID expense
+ */
+export async function deleteTenantExpense(tenantId, expenseId) {
+  if (!tenantId || !expenseId) throw new Error('tenantId dan expenseId wajib disertakan.');
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    return mock.deleteExpense(expenseId);
+  }
+
+  const { error } = await supabase
+    .from('expenses')
+    .delete()
+    .eq('tenant_id', tenantId)
+    .eq('id', expenseId);
+
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] deleteTenantExpense error:', error);
+    throw error;
+  }
+
+  return { success: true, id: expenseId };
+}
+
+/**
+ * Mengambil ringkasan laporan keuangan bulanan tenant
+ * @param {string} tenantId - UUID tenant
+ * @param {object} param1 - { year, month }
+ */
+export async function fetchTenantMonthlyFinance(tenantId, { year, month }) {
+  if (!tenantId) throw new Error('tenantId wajib disertakan.');
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    const period = `${year}-${String(month).padStart(2, '0')}`;
+    const baseReport = mock.computeReport(period);
+    const expenses = mock.getExpensesForPeriod(period);
+    const totalExpense = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const totalIncome = Number(baseReport?.totalCollected || 0);
+    return {
+      report: {
+        ...baseReport,
+        total_income: totalIncome,
+        total_expense: totalExpense,
+        net_income: totalIncome - totalExpense,
+        cash_inflow: totalIncome,
+        cash_outflow: totalExpense,
+        balance: totalIncome - totalExpense,
+      },
+      expenses,
+      cashPayments: mock.getPaymentsByMonth(year, month),
+    };
+  }
+
+  const periodStr = `${year}-${String(month).padStart(2, '0')}`;
+
+  // 1. Ambil seluruh payment completed/verified pada tenant ini
+  const { data: payments } = await supabase
+    .from('payments')
+    .select(`
+      id,
+      amount,
+      method,
+      status,
+      paid_at,
+      created_at,
+      billing_items:billing_item_id (
+        id,
+        period,
+        unit_id
+      )
+    `)
+    .eq('tenant_id', tenantId)
+    .in('status', ['completed', 'verified']);
+
+  // Filter payments untuk bulan yang bersangkutan
+  const monthlyPayments = (payments || []).filter((p) => {
+    const billPeriod = p.billing_items?.period;
+    const paidMonth = (p.paid_at || p.created_at || '').substring(0, 7);
+    return billPeriod === periodStr || paidMonth === periodStr;
+  });
+
+  const totalIncome = monthlyPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+  // 2. Ambil expenses pada bulan yang bersangkutan
+  const allExpenses = await fetchTenantExpenses(tenantId);
+  const monthlyExpenses = allExpenses.filter((e) => {
+    const expDate = e.date || e.expense_date || (e.created_at ? e.created_at.substring(0, 7) : '');
+    return expDate.startsWith(periodStr);
+  });
+
+  const totalExpense = monthlyExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const netIncome = totalIncome - totalExpense;
+
+  return {
+    report: {
+      period: periodStr,
+      total_income: totalIncome,
+      total_expense: totalExpense,
+      net_income: netIncome,
+      cash_inflow: totalIncome,
+      cash_outflow: totalExpense,
+      balance: netIncome,
+    },
+    expenses: monthlyExpenses,
+    cashPayments: monthlyPayments,
+  };
+}
+
+/**
+ * Mengambil saldo kas berjalan tenant
+ * @param {string} tenantId - UUID tenant
+ * @param {object} param1 - { year, month }
+ */
+export async function fetchTenantRunningBalance(tenantId, { year, month }) {
+  if (!tenantId) throw new Error('tenantId wajib disertakan.');
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const mock = await import('./mockData');
+    return { chain: mock.computeRunningBalance(year, month) };
+  }
+
+  // Sederhanakan kalkulasi chain bulanan dari data tenant
+  const monthly = await fetchTenantMonthlyFinance(tenantId, { year, month });
+  const currentNet = monthly.report?.net_income || 0;
+
+  return {
+    chain: [
+      {
+        month: Number(month),
+        year: Number(year),
+        period: `${year}-${String(month).padStart(2, '0')}`,
+        income: monthly.report?.total_income || 0,
+        totalIncome: monthly.report?.total_income || 0,
+        expense: monthly.report?.total_expense || 0,
+        totalExpense: monthly.report?.total_expense || 0,
+        balance: currentNet,
+        closingBalance: currentNet,
+        openingBalance: 0,
+      },
+    ],
+  };
+}
+

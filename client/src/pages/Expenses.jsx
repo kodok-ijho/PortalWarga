@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import {
   AiOutlinePlus,
   AiOutlineEdit,
@@ -7,6 +7,9 @@ import {
   AiOutlinePaperClip,
 } from 'react-icons/ai';
 import { useAuth } from '../hooks/useAuth';
+import { useTenant } from '../context/TenantContext';
+import { useSubscriptionGate } from '../hooks/useSubscriptionGate';
+import { useTenantTemplate } from '../hooks/useTenantTemplate';
 import { useToast } from '../hooks/useToast';
 import Modal from '../components/Modal';
 import {
@@ -50,7 +53,13 @@ function getGoogleDriveThumbnail(url) {
 }
 
 export default function Expenses() {
-  const { role, profile, session, isReadOnly, isAuthenticated } = useAuth();
+  const params = useParams();
+  const { role, profile, session, isReadOnly: authReadOnly, isAuthenticated } = useAuth();
+  const { currentTenant, userTenants } = useTenant();
+  const activeTenantId = params.tenantId || currentTenant?.id || userTenants?.[0]?.id || null;
+  const { canWrite: subCanWrite, isReadOnly: subReadOnly } = useSubscriptionGate(activeTenantId);
+  const template = useTenantTemplate(currentTenant?.type || 'rt_rw');
+
   const token = session?.access_token;
   const toast = useToast();
   // `null` means capability discovery is still in flight. Do not redirect an
@@ -63,7 +72,7 @@ export default function Expenses() {
     (eventAccess?.events || []).filter((item) => item.can_manage_finance).map((item) => item.event_id)
   ), [eventAccess?.events]);
   const canEdit = canEditGeneral || manageableEventIds.size > 0;
-  const canWrite = (canModifyData(role) || manageableEventIds.size > 0) && !isReadOnly;
+  const canWrite = (canModifyData(role) || manageableEventIds.size > 0) && !authReadOnly && subCanWrite;
 
   const [expenses, setExpenses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,7 +89,7 @@ export default function Expenses() {
       // Keep the existing expense flow independent from the additive event
       // endpoints. This prevents a staged backend rollout from breaking the
       // production Expenses page.
-      const data = await fetchExpenses(token);
+      const data = await fetchExpenses(token, { tenantId: activeTenantId });
       setExpenses(data);
       try {
         const [events, access] = await Promise.all([
@@ -107,7 +116,7 @@ export default function Expenses() {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, profile?.id, role, token, toast]);
+  }, [isAuthenticated, profile?.id, role, token, activeTenantId, toast]);
 
   useEffect(() => {
     loadExpenses();
@@ -145,10 +154,10 @@ export default function Expenses() {
     try {
       setIsLoading(true);
       if (modalForm === 'add') {
-        await createExpense(token, { ...data, file });
+        await createExpense(token, { ...data, file, tenantId: activeTenantId, recordedBy: profile?.id });
         toast.success(`Pengeluaran "${data.category}" berhasil dicatat.`);
       } else {
-        await updateExpense(token, modalForm.id, { ...data, file });
+        await updateExpense(token, modalForm.id, { ...data, file, tenantId: activeTenantId });
         toast.success('Pengeluaran berhasil diperbarui.');
       }
       setModalForm(null);
@@ -161,14 +170,14 @@ export default function Expenses() {
   };
 
   const handleDelete = async (exp) => {
-    if (isReadOnly) {
-      toast.warning('⚠️ Penghapusan pengeluaran dinonaktifkan untuk akun Admin Demo (View-Only).');
+    if (authReadOnly || !canWrite) {
+      toast.warning('⚠️ Tindakan tidak diizinkan dalam mode Read-Only.');
       return;
     }
     if (!confirm(`Hapus pengeluaran "${String(exp.description || '').substring(0, 40)}..."?`)) return;
     try {
       setIsLoading(true);
-      await deleteExpense(token, exp.id);
+      await deleteExpense(token, exp.id, { tenantId: activeTenantId });
       toast.success('Pengeluaran berhasil dihapus.');
       loadExpenses();
     } catch (err) {
@@ -180,6 +189,19 @@ export default function Expenses() {
 
   return (
     <div className="space-y-5">
+      {/* Read-Only Subscription Banner */}
+      {subReadOnly && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 p-3.5 text-sm text-amber-900 flex items-center gap-3">
+          <span className="text-xl">⚠️</span>
+          <div>
+            <p className="font-semibold text-amber-900">Mode Read-Only Aktif</p>
+            <p className="text-xs text-amber-800 mt-0.5">
+              Langganan tenant ini sedang dalam masa tenggang / non-aktif. Anda tetap dapat melihat data pengeluaran, namun penambahan, pengubahan, dan penghapusan pengeluaran dinonaktifkan.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Read-only banner */}
       {!canEdit && (
         <div className="pv-card p-3 bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center gap-2">
@@ -191,7 +213,7 @@ export default function Expenses() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-forest-900">Pengeluaran Bendahara</h2>
+          <h2 className="text-lg font-bold text-forest-900">Pengeluaran Kas {currentTenant?.name || 'Komunitas'}</h2>
           <p className="text-sm text-forest-500">
             {filtered.length} transaksi · Total {formatRupiah(totalAmount)}
           </p>

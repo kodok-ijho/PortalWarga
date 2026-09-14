@@ -198,6 +198,26 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="/t/:tenantId/expenses"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RoleGuard canAccess={canViewExpenses}>
+                        <Expenses />
+                      </RoleGuard>
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/t/:tenantId/reports"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RoleGuard canAccess={canViewFinancialReports}>
+                        <Reports />
+                      </RoleGuard>
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/t/:tenantId/dashboard"
                   element={
                     <Suspense fallback={<PageLoader />}>
