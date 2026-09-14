@@ -20,6 +20,10 @@ import {
   assignRoomContract,
   autoGenerateKosBilling,
   checkoutKosRoom,
+  fetchArisanRounds,
+  createArisanRound,
+  fetchArisanParticipants,
+  enrollArisanParticipants,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -422,6 +426,47 @@ describe('tenantOperationalService - Unit Tests', () => {
       // Validasi error jika parameter tidak lengkap
       await expect(checkoutKosRoom('', { unitId: 2 })).rejects.toThrow('Tenant ID wajib disertakan.');
       await expect(checkoutKosRoom('demo-tenant-kos', {})).rejects.toThrow('Kamar (unitId) wajib ditentukan untuk checkout.');
+    });
+  });
+
+  describe('Arisan Operational Helpers (T8.2)', () => {
+    it('fetchArisanRounds mengembalikan putaran arisan yang valid', async () => {
+      const rounds = await fetchArisanRounds('demo-arisan-tenant');
+      expect(Array.isArray(rounds)).toBe(true);
+      expect(rounds.length).toBeGreaterThan(0);
+      expect(rounds[0].status).toBe('collecting');
+      expect(rounds[0].round_number).toBe(1);
+    });
+
+    it('createArisanRound berhasil membuat putaran arisan baru dengan struktur lengkap', async () => {
+      const newRound = await createArisanRound('demo-arisan-tenant', {
+        round_number: 2,
+        period: 'Putaran 2 - November 2026',
+        total_pool_amount: 5000000,
+      });
+
+      expect(newRound).toBeDefined();
+      expect(newRound.round_number).toBe(2);
+      expect(newRound.period).toBe('Putaran 2 - November 2026');
+      expect(newRound.total_pool_amount).toBe(5000000);
+      expect(newRound.status).toBe('collecting');
+
+      // Validasi error jika tenantId kosong
+      await expect(createArisanRound('', {})).rejects.toThrow('Tenant ID wajib diisi.');
+    });
+
+    it('enrollArisanParticipants dan fetchArisanParticipants menangani peserta arisan', async () => {
+      const mockParticipants = [
+        { member_id: 'member-1', unit_slot_id: 1 },
+        { member_id: 'member-2', unit_slot_id: 2 },
+      ];
+
+      const enrolled = await enrollArisanParticipants('demo-arisan-tenant', mockParticipants);
+      expect(enrolled).toBeDefined();
+      expect(enrolled.length).toBe(2);
+
+      const emptyRes = await fetchArisanParticipants('');
+      expect(emptyRes).toEqual([]);
     });
   });
 });

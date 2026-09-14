@@ -1979,3 +1979,183 @@ export async function fetchTenantDashboardData(tenantId, { role = 'admin', perio
   };
 }
 
+// ── VERTIKAL ARISAN HELPERS (T8.2 - T8.7) ──────────────────────────
+
+/**
+ * Mengambil daftar putaran arisan milik tenant
+ */
+export async function fetchArisanRounds(tenantId) {
+  if (!tenantId) return [];
+
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
+    return [
+      {
+        id: 'demo-round-1',
+        tenant_id: tenantId,
+        round_number: 1,
+        period: 'Putaran 1 - Oktober 2026',
+        status: 'collecting',
+        total_pool_amount: 3000000,
+        winner_member_id: null,
+        drawn_at: null,
+        created_at: new Date().toISOString(),
+      },
+    ];
+  }
+
+  const { data, error } = await supabase
+    .from('arisan_rounds')
+    .select(`
+      id,
+      tenant_id,
+      round_number,
+      period,
+      status,
+      winner_member_id,
+      total_pool_amount,
+      drawn_at,
+      drawn_by,
+      notes,
+      created_at,
+      winner:winner_member_id (
+        id,
+        full_name,
+        phone
+      ),
+      operator:drawn_by (
+        id,
+        full_name
+      )
+    `)
+    .eq('tenant_id', tenantId)
+    .order('round_number', { ascending: true });
+
+  if (error) {
+    console.error('[tenantOperationalService] fetchArisanRounds error:', error);
+    throw new Error(error.message || 'Gagal memuat daftar putaran arisan.');
+  }
+
+  return data || [];
+}
+
+/**
+ * Membuat putaran arisan baru
+ */
+export async function createArisanRound(tenantId, roundData) {
+  if (!tenantId) throw new Error('Tenant ID wajib diisi.');
+
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
+    return {
+      id: `demo-round-${Date.now()}`,
+      tenant_id: tenantId,
+      round_number: roundData.round_number || 1,
+      period: roundData.period || 'Putaran Baru',
+      status: 'collecting',
+      total_pool_amount: roundData.total_pool_amount || 0,
+      created_at: new Date().toISOString(),
+    };
+  }
+
+  const payload = {
+    tenant_id: tenantId,
+    round_number: roundData.round_number || 1,
+    period: roundData.period,
+    status: roundData.status || 'collecting',
+    total_pool_amount: roundData.total_pool_amount || 0,
+    notes: roundData.notes || null,
+  };
+
+  const { data, error } = await supabase
+    .from('arisan_rounds')
+    .insert([payload])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[tenantOperationalService] createArisanRound error:', error);
+    throw new Error(error.message || 'Gagal membuat putaran arisan baru.');
+  }
+
+  return data;
+}
+
+/**
+ * Mengambil daftar peserta arisan beserta status apakah sudah menang
+ */
+export async function fetchArisanParticipants(tenantId) {
+  if (!tenantId) return [];
+
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('arisan_participants')
+    .select(`
+      id,
+      tenant_id,
+      member_id,
+      unit_slot_id,
+      has_won,
+      won_at_round_id,
+      won_at,
+      created_at,
+      member:member_id (
+        id,
+        full_name,
+        phone,
+        role,
+        status
+      ),
+      slot:unit_slot_id (
+        id,
+        label,
+        metadata
+      ),
+      won_round:won_at_round_id (
+        id,
+        period,
+        round_number
+      )
+    `)
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('[tenantOperationalService] fetchArisanParticipants error:', error);
+    throw new Error(error.message || 'Gagal memuat peserta arisan.');
+  }
+
+  return data || [];
+}
+
+/**
+ * Mendaftarkan peserta ke kelompok arisan
+ */
+export async function enrollArisanParticipants(tenantId, participants) {
+  if (!tenantId || !participants?.length) return [];
+
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
+    return participants;
+  }
+
+  const rows = participants.map((p) => ({
+    tenant_id: tenantId,
+    member_id: p.member_id,
+    unit_slot_id: p.unit_slot_id || null,
+    has_won: false,
+  }));
+
+  const { data, error } = await supabase
+    .from('arisan_participants')
+    .upsert(rows, { onConflict: 'tenant_id,member_id' })
+    .select();
+
+  if (error) {
+    console.error('[tenantOperationalService] enrollArisanParticipants error:', error);
+    throw new Error(error.message || 'Gagal mendaftarkan peserta arisan.');
+  }
+
+  return data || [];
+}
+

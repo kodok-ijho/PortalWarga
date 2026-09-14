@@ -263,7 +263,7 @@ saat kontrak selesai.
 
 - [x] **T8.1** -- Buat `SetupWizard.jsx` varian `arisan` (nama grup, jumlah peserta,
   nominal kontribusi, frekuensi kocok).
-- [ ] **T8.2** -- Buat migration SQL: `arisan_rounds`, `arisan_participants` (Spec §5),
+- [x] **T8.2** -- Buat migration SQL: `arisan_rounds`, `arisan_participants` (Spec §5),
   dengan RLS mengikuti pola `useSubscriptionGate()` untuk aksi kocok.
 - [ ] **T8.3** -- Buat halaman `ArisanRounds.jsx` -- list periode/putaran, status
   (collecting/ready_to_draw/drawn).
