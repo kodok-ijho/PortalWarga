@@ -207,7 +207,7 @@ Modul vertikal pertama yang dipasang di atas fondasi -- migrasi fitur PortalWarg
 ke struktur generik. Ini pembuktian bahwa fondasi Phase 1--5 memang bisa menampung produk
 sungguhan, bukan hanya tenant kosong.
 
-- [ ] **T6.1** -- Lengkapi migration SQL `billing_items`, `payments`, `expenses` (Spec §3)
+- [x] **T6.1** -- Lengkapi migration SQL `billing_items`, `payments`, `expenses` (Spec §3)
   yang sempat ditunda dari Phase 1 -- generik dari awal, langsung dipasangi RLS mengikuti
   pola Phase 1/5 (SELECT selalu terbuka utk anggota tenant, tulis diblok saat `read_only`).
 - [ ] **T6.2** -- Buat `SetupWizard.jsx` khusus varian `rt_rw` (nama komplek, jumlah unit,
