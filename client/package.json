@@ -9,6 +9,7 @@
     "build": "vite build",
     "build:uat": "vite build --mode uat",
     "preview": "vite preview",
+    "test": "vitest run",
     "test:uat": "node tests/uat-proxy-config.test.mjs",
     "generate-icons": "node generate-pwa-icons.mjs"
   },
@@ -32,7 +33,8 @@
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
     "vite": "^5.0.0",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^2.1.9"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-arm64-gnu": "^4.63.2"

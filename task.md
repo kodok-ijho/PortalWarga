@@ -143,7 +143,7 @@ Melengkapi fondasi: tenant sekarang bisa benar-benar subscribe dan bayar, trial 
 berakhir jadi `read_only`, dan renewal bisa dilakukan. Setelah phase ini selesai, seluruh
 mesin platform (tanpa fitur RT/RW/kos/arisan/kelas apapun) sudah berfungsi penuh.
 
-- [ ] **T4.1** -- Implementasi util `calculateOptimalBlocks(estimasiUnit, tenantType)`
+- [x] **T4.1** -- Implementasi util `calculateOptimalBlocks(estimasiUnit, tenantType)`
   sesuai Spec §8, lengkap dengan unit test (kasus: kelipatan pas 10, sisa < 5, sisa antara
   5--9, angka sangat kecil seperti 3).
 - [ ] **T4.2** -- Buat halaman `ChoosePlan.jsx` -- tampilkan rekomendasi kombinasi blok

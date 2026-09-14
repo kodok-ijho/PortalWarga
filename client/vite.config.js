@@ -172,5 +172,9 @@ export default defineConfig(({ mode }) => {
     host: proxyConfig.isUat ? '127.0.0.1' : undefined,
     open: !proxyConfig.isUat,
   },
+  test: {
+    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    exclude: ['tests/**', 'node_modules/**', 'dist/**'],
+  },
   };
 });
