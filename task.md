@@ -313,7 +313,7 @@ adalah pengecualian sengaja terhadap prinsip isolasi tenant yang ditegakkan seja
 
 - [x] **T10.1** -- Buat migration SQL: enum `listing_type`, `listing_status`, tabel
   `public_listings`, `listing_pricing`, `listing_payments`. (Spec §5.1)
-- [ ] **T10.2** -- Terapkan RLS khusus sesuai Spec §6.1 -- SELECT publik untuk siapa saja
+- [x] **T10.2** -- Terapkan RLS khusus sesuai Spec §6.1 -- SELECT publik untuk siapa saja
   (termasuk anonymous) pada listing berstatus `active`, INSERT dibatasi anggota tenant
   yang tidak `read_only`, UPDATE dibatasi ke pemilik listing. Tulis test yang memverifikasi
   SELECT memang bisa diakses tanpa autentikasi (berbeda dari seluruh test isolasi tenant
