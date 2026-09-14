@@ -11,6 +11,7 @@ import {
 } from 'react-icons/ai';
 import { useTenant } from '../../hooks/useTenant';
 import { useTenantTemplate } from '../../hooks/useTenantTemplate';
+import TrialCountdownBanner from '../../components/TrialCountdownBanner';
 
 export default function TenantDashboardPlaceholder() {
   const { tenantId } = useParams();
@@ -106,6 +107,9 @@ export default function TenantDashboardPlaceholder() {
             </div>
           </div>
         </div>
+
+        {/* Trial Countdown Banner (T4.3) */}
+        <TrialCountdownBanner tenantId={tenantId} />
 
         {/* Status Phase 2 Milestone Banner */}
         <div className="p-6 rounded-2xl bg-forest-950/80 border border-gold-500/40 shadow-xl flex items-start gap-4">

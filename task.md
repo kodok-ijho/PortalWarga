@@ -146,10 +146,10 @@ mesin platform (tanpa fitur RT/RW/kos/arisan/kelas apapun) sudah berfungsi penuh
 - [x] **T4.1** -- Implementasi util `calculateOptimalBlocks(estimasiUnit, tenantType)`
   sesuai Spec §8, lengkap dengan unit test (kasus: kelipatan pas 10, sisa < 5, sisa antara
   5--9, angka sangat kecil seperti 3).
-- [ ] **T4.2** -- Buat halaman `ChoosePlan.jsx` -- tampilkan rekomendasi kombinasi blok
+- [x] **T4.2** -- Buat halaman `ChoosePlan.jsx` -- tampilkan rekomendasi kombinasi blok
   dari T4.1, izinkan user override manual jumlah blok besar/kecil, pilih durasi periode
   (3/6/12 bulan), tampilkan total harga.
-- [ ] **T4.3** -- Implementasi banner trial countdown di placeholder dashboard tenant
+- [x] **T4.3** -- Implementasi banner trial countdown di placeholder dashboard tenant
   (dari T2.8) -- tampil selama status `trial`, menghitung mundur dari `trial_ends_at`.
 - [ ] **T4.4** -- Buat Edge Function `create-subscription-payment` -- generate QRIS Mayar
   untuk pembayaran subscription sesuai kombinasi blok+periode yang dipilih. (Spec §9)

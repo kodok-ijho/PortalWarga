@@ -43,6 +43,7 @@ const PaymentVerification = lazy(() => import('./pages/PaymentVerification'));
 const ChooseTenantType = lazy(() => import('./pages/onboarding/ChooseTenantType'));
 const MyTenants = lazy(() => import('./pages/account/MyTenants'));
 const AddNewTenant = lazy(() => import('./pages/account/AddNewTenant'));
+const ChoosePlan = lazy(() => import('./pages/account/ChoosePlan'));
 const TenantDashboardPlaceholder = lazy(() => import('./pages/tenant/TenantDashboardPlaceholder'));
 const PlatformLayout = lazy(() => import('./pages/platform/PlatformLayout'));
 const PlatformTenantList = lazy(() => import('./pages/platform/PlatformTenantList'));
@@ -120,6 +121,14 @@ export default function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <AddNewTenant />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/account/choose-plan"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ChoosePlan />
                     </Suspense>
                   }
                 />
