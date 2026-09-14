@@ -629,7 +629,30 @@ export default function TenantDashboard() {
                     Setup &amp; Tarif {template.billLabel}
                   </h4>
                   <p className="text-xs text-forest-300 mt-1">
-                    Sesuaikan rincian kavling rumah, komponen biaya iuran bulanan, dan denda keterlambatan.
+                    Sesuaikan rincian unit, komponen biaya iuran, dan denda keterlambatan.
+                  </p>
+                </div>
+              </Link>
+            )}
+
+            {/* Putaran Arisan (Khusus Arisan) */}
+            {template.features.hasArisanDraw && (
+              <Link
+                to={`/t/${tenantId}/arisan/rounds`}
+                className="p-5 rounded-2xl bg-purple-950/30 hover:bg-purple-950/50 border border-purple-500/40 hover:border-purple-400 transition-all shadow-md group flex flex-col justify-between"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-purple-900/60 text-purple-300 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center text-xl transition-colors">
+                    🎲
+                  </div>
+                  <AiOutlineArrowRight className="text-purple-400 group-hover:text-white transition-colors" />
+                </div>
+                <div className="mt-4">
+                  <h4 className="text-base font-bold text-white group-hover:text-purple-300 transition-colors">
+                    Putaran &amp; Pengocokan Arisan
+                  </h4>
+                  <p className="text-xs text-forest-300 mt-1">
+                    Kelola putaran pengundian, status iuran peserta, dan riwayat pemenang arisan digital.
                   </p>
                 </div>
               </Link>

@@ -265,7 +265,7 @@ saat kontrak selesai.
   nominal kontribusi, frekuensi kocok).
 - [x] **T8.2** -- Buat migration SQL: `arisan_rounds`, `arisan_participants` (Spec §5),
   dengan RLS mengikuti pola `useSubscriptionGate()` untuk aksi kocok.
-- [ ] **T8.3** -- Buat halaman `ArisanRounds.jsx` -- list periode/putaran, status
+- [x] **T8.3** -- Buat halaman `ArisanRounds.jsx` -- list periode/putaran, status
   (collecting/ready_to_draw/drawn).
 - [ ] **T8.4** -- Implementasi pengumpulan kontribusi arisan menggunakan `billing_items`
   (period sama untuk semua anggota, bukan per-unit).

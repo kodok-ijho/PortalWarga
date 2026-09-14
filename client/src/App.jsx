@@ -54,6 +54,7 @@ const PlatformLayout = lazy(() => import('./pages/platform/PlatformLayout'));
 const PlatformTenantList = lazy(() => import('./pages/platform/PlatformTenantList'));
 const PlatformPricingConfig = lazy(() => import('./pages/platform/PlatformPricingConfig'));
 const PlatformRevenue = lazy(() => import('./pages/platform/PlatformRevenue'));
+const ArisanRounds = lazy(() => import('./pages/arisan/ArisanRounds'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center py-20">
@@ -232,6 +233,22 @@ export default function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <TenantDashboard />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/t/:tenantId/arisan/rounds"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ArisanRounds />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/arisan/rounds"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ArisanRounds />
                     </Suspense>
                   }
                 />
