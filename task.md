@@ -277,7 +277,7 @@ saat kontrak selesai.
   semua anggota.
 - [x] **T8.7** -- Implementasi aksi "Mulai Siklus Baru" -- reset `has_won` seluruh peserta
   setelah satu putaran penuh selesai.
-- [ ] **T8.8** -- Tulis test untuk memastikan pemenang tidak pernah terpilih dua kali dalam
+- [x] **T8.8** -- Tulis test untuk memastikan pemenang tidak pernah terpilih dua kali dalam
   satu siklus (unit test terhadap fungsi pemilihan acak, bukan hanya manual test).
 
 **Definition of Done Phase 8:** Tenant tipe `arisan` dapat mengumpulkan kontribusi,
