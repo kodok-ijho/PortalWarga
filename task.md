@@ -249,9 +249,9 @@ berjalan di atas fondasi multi-tenant.
   hentikan auto-generate tagihan untuk unit tsb.
 - [x] **T7.5** -- Sesuaikan `tenantTemplates.js` & UI Members/PaymentMatrix agar istilah
   otomatis berubah jadi Kamar/Penyewa/Sewa untuk tenant tipe `kos`.
-- [ ] **T7.6** -- *(Keputusan terbuka, lihat "Catatan untuk Agent Coding")* Tentukan &
+- [x] **T7.6** -- *(Keputusan terbuka, lihat "Catatan untuk Agent Coding")* Tentukan &
   implementasikan apakah satu pemilik dengan multi-properti kos memakai 1 tenant dengan
-  pengelompokan properti, atau beberapa tenant terpisah.
+  pengelompokan properti, atau beberapa tenant terpisah (ADR-001 di docs/architecture-decisions.md).
 
 **Definition of Done Phase 7:** Tenant tipe `kos` end-to-end: signup -> setup wizard ->
 input kamar & kontrak sewa -> auto-generate tagihan bulanan -> penyewa bayar -> checkout
