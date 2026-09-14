@@ -227,7 +227,7 @@ sungguhan, bukan hanya tenant kosong.
   dari T5.1 untuk disable saat `read_only`.
 - [x] **T6.7** -- Adaptasi halaman Laporan Keuangan & Pengeluaran (`expenses`) agar
   tenant-aware (filter otomatis berdasarkan `tenant_id` dari context, bukan hardcoded).
-- [ ] **T6.8** -- Isi `/t/:tenantId/dashboard` (placeholder dari T2.8) dengan dashboard
+- [x] **T6.8** -- Isi `/t/:tenantId/dashboard` (placeholder dari T2.8) dengan dashboard
   operasional RT/RW sungguhan.
 
 **Definition of Done Phase 6:** Tenant tipe `rt_rw` end-to-end: signup -> setup wizard ->

@@ -49,7 +49,7 @@ const AddNewTenant = lazy(() => import('./pages/account/AddNewTenant'));
 const ChoosePlan = lazy(() => import('./pages/account/ChoosePlan'));
 const SubscriptionStatus = lazy(() => import('./pages/account/SubscriptionStatus'));
 const SubscriptionCheckout = lazy(() => import('./pages/account/SubscriptionCheckout'));
-const TenantDashboardPlaceholder = lazy(() => import('./pages/tenant/TenantDashboardPlaceholder'));
+const TenantDashboard = lazy(() => import('./pages/tenant/TenantDashboard'));
 const PlatformLayout = lazy(() => import('./pages/platform/PlatformLayout'));
 const PlatformTenantList = lazy(() => import('./pages/platform/PlatformTenantList'));
 const PlatformPricingConfig = lazy(() => import('./pages/platform/PlatformPricingConfig'));
@@ -218,10 +218,20 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="/t/:tenantId/payment-matrix"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RoleGuard canAccess={canViewPaymentMatrix}>
+                        <PaymentMatrix />
+                      </RoleGuard>
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/t/:tenantId/dashboard"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <TenantDashboardPlaceholder />
+                      <TenantDashboard />
                     </Suspense>
                   }
                 />
@@ -229,7 +239,7 @@ export default function App() {
                   path="/t/:tenantId"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <TenantDashboardPlaceholder />
+                      <TenantDashboard />
                     </Suspense>
                   }
                 />

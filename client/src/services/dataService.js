@@ -137,7 +137,12 @@ export async function deactivateUser(token, id) {
 // DASHBOARD / HOME
 // =====================================================================
 
-export async function fetchDashboardData(token, { role, period } = {}) {
+export async function fetchDashboardData(token, { role, period, tenantId } = {}) {
+  if (tenantId) {
+    const { fetchTenantDashboardData } = await import('./tenantOperationalService.js');
+    return fetchTenantDashboardData(tenantId, { role, period });
+  }
+
   if (IS_DEMO) {
     const mock = await getMockData();
     return {

@@ -12,6 +12,7 @@ import {
   deleteTenantExpense,
   fetchTenantMonthlyFinance,
   fetchTenantRunningBalance,
+  fetchTenantDashboardData,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -214,5 +215,24 @@ describe('tenantOperationalService - Unit Tests', () => {
       expect(bal.chain.length).toBeGreaterThan(0);
       expect(bal.chain[0]).toHaveProperty('closingBalance');
     });
+
+    it('memuat ringkasan data dashboard operasional tenant RT/RW dengan metrik lengkap', async () => {
+      const dash = await fetchTenantDashboardData('demo-tenant-rtrw', { role: 'admin', period: '2026-10' });
+      expect(dash).toBeDefined();
+      expect(dash.period).toBe('2026-10');
+      expect(dash.year).toBe(2026);
+      expect(dash.month).toBe(10);
+      expect(dash.units).toBeDefined();
+      expect(dash.units.total).toBeGreaterThan(0);
+      expect(dash.members).toBeDefined();
+      expect(dash.finance).toBeDefined();
+      expect(dash.billing).toBeDefined();
+      expect(dash.billing).toHaveProperty('totalBilled');
+      expect(dash.billing).toHaveProperty('totalCollected');
+      expect(dash.billing).toHaveProperty('collectionRate');
+      expect(typeof dash.pendingRegistrationCount).toBe('number');
+      expect(typeof dash.pendingPaymentCount).toBe('number');
+    });
   });
 });
+

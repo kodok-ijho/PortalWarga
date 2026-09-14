@@ -269,7 +269,7 @@ export async function requestJoinTenant({ tenantId, userId, unitId, fullName, ph
 export async function fetchPendingTenantMembers(tenantId) {
   if (!tenantId) return [];
 
-  if (IS_DEMO) {
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
     return [
       {
         id: 'mock-pending-1',
@@ -1416,6 +1416,159 @@ export async function fetchTenantRunningBalance(tenantId, { year, month }) {
         openingBalance: 0,
       },
     ],
+  };
+}
+
+/**
+ * Mengambil ringkasan data operasional & dashboard tenant
+ * @param {string} tenantId - UUID tenant
+ * @param {object} options - { role, period } ('YYYY-MM')
+ */
+export async function fetchTenantDashboardData(tenantId, { role = 'admin', period } = {}) {
+  if (!tenantId) throw new Error('tenantId wajib disertakan.');
+
+  const resolvedPeriod = period || new Date().toISOString().slice(0, 7);
+  const [yearStr, monthStr] = resolvedPeriod.split('-');
+  const year = Number(yearStr) || new Date().getFullYear();
+  const month = Number(monthStr) || new Date().getMonth() + 1;
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+
+  if (isDemoOrMock) {
+    const [units, members, pendingMembers, pendingPayments, monthlyFinance, billMatrix] = await Promise.all([
+      fetchTenantUnits(tenantId),
+      fetchTenantMembers(tenantId),
+      fetchPendingTenantMembers(tenantId),
+      fetchTenantPayments(tenantId, { status: 'pending' }),
+      fetchTenantMonthlyFinance(tenantId, { year, month }),
+      fetchTenantBillMatrix(tenantId, year),
+    ]);
+
+    const totalUnits = units.length;
+    const occupiedUnits = units.filter((u) => u.status === 'active' || u.is_occupied).length;
+    const vacantUnits = totalUnits - occupiedUnits;
+
+    let totalBilled = 0;
+    let totalCollected = 0;
+    let totalOutstanding = 0;
+    let billCount = 0;
+
+    (billMatrix || []).forEach((row) => {
+      const targetCell = row.cells?.find((c) => c?.bill?.period === resolvedPeriod) || row.cells?.[0];
+      if (targetCell?.bill) {
+        billCount++;
+        const amt = Number(targetCell.bill.amount || 0);
+        totalBilled += amt;
+        if (targetCell.status === 'paid' || targetCell.bill.status === 'paid') {
+          totalCollected += amt;
+        } else {
+          totalOutstanding += amt;
+        }
+      }
+    });
+
+    if (billCount === 0 && totalUnits > 0) {
+      billCount = totalUnits;
+    }
+
+    const collectionRate = totalBilled > 0 ? (totalCollected / totalBilled) * 100 : 0;
+
+    return {
+      period: resolvedPeriod,
+      year,
+      month,
+      pendingRegistrationCount: pendingMembers.length,
+      pendingPaymentCount: pendingPayments.length,
+      units: {
+        total: totalUnits,
+        occupied: occupiedUnits,
+        vacant: vacantUnits,
+      },
+      members: {
+        total: members.length,
+      },
+      finance: {
+        totalIncome: monthlyFinance.report?.total_income || 0,
+        totalExpense: monthlyFinance.report?.total_expense || 0,
+        netCashflow: monthlyFinance.report?.net_income || 0,
+      },
+      billing: {
+        totalBilled,
+        totalCollected,
+        totalOutstanding,
+        billCount,
+        collectionRate,
+      },
+      recentPayments: pendingPayments.slice(0, 5),
+    };
+  }
+
+  // Production Mode dengan Supabase
+  const [units, members, pendingMembers, pendingPayments, monthlyFinance, billMatrix] = await Promise.all([
+    fetchTenantUnits(tenantId).catch(() => []),
+    fetchTenantMembers(tenantId).catch(() => []),
+    fetchPendingTenantMembers(tenantId).catch(() => []),
+    fetchTenantPayments(tenantId, { status: 'pending' }).catch(() => []),
+    fetchTenantMonthlyFinance(tenantId, { year, month }).catch(() => ({ report: {} })),
+    fetchTenantBillMatrix(tenantId, year).catch(() => []),
+  ]);
+
+  const totalUnits = units.length;
+  const occupiedUnits = units.filter((u) => u.status === 'active').length;
+  const vacantUnits = totalUnits - occupiedUnits;
+
+  let totalBilled = 0;
+  let totalCollected = 0;
+  let totalOutstanding = 0;
+  let billCount = 0;
+
+  (billMatrix || []).forEach((row) => {
+    const targetCell = row.cells?.find((c) => c?.bill?.period === resolvedPeriod) || row.cells?.[0];
+    if (targetCell?.bill) {
+      billCount++;
+      const amt = Number(targetCell.bill.amount || 0);
+      totalBilled += amt;
+      if (targetCell.status === 'paid' || targetCell.bill.status === 'paid') {
+        totalCollected += amt;
+      } else {
+        totalOutstanding += amt;
+      }
+    }
+  });
+
+  if (billCount === 0 && totalUnits > 0) {
+    billCount = totalUnits;
+  }
+
+  const collectionRate = totalBilled > 0 ? (totalCollected / totalBilled) * 100 : 0;
+
+  return {
+    period: resolvedPeriod,
+    year,
+    month,
+    pendingRegistrationCount: pendingMembers.length,
+    pendingPaymentCount: pendingPayments.length,
+    units: {
+      total: totalUnits,
+      occupied: occupiedUnits,
+      vacant: vacantUnits,
+    },
+    members: {
+      total: members.length,
+    },
+    finance: {
+      totalIncome: monthlyFinance.report?.total_income || 0,
+      totalExpense: monthlyFinance.report?.total_expense || 0,
+      netCashflow: monthlyFinance.report?.net_income || 0,
+    },
+    billing: {
+      totalBilled,
+      totalCollected,
+      totalOutstanding,
+      billCount,
+      collectionRate,
+    },
+    recentPayments: pendingPayments.slice(0, 5),
   };
 }
 
