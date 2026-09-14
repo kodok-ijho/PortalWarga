@@ -7,6 +7,7 @@ import { useTour } from '../context/TourContext';
 import Modal from '../components/Modal';
 import Placeholder from '../components/Placeholder';
 import QrisCheckoutModal from '../components/QrisCheckoutModal';
+import CreateBillingModal from '../components/CreateBillingModal';
 import {
   MONTHS_SHORT,
   MONTHS_LONG,
@@ -117,6 +118,7 @@ export default function PaymentMatrix() {
   const canUseQris = true;
   const myUnitId = profile?.unit_id;
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isCreateBillingOpen, setIsCreateBillingOpen] = useState(false);
 
   const [matrix, setMatrix] = useState([]);
   const [productionPayments, setProductionPayments] = useState([]);
@@ -732,6 +734,16 @@ export default function PaymentMatrix() {
               </option>
             ))}
           </select>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={() => setIsCreateBillingOpen(true)}
+              className="pv-btn bg-forest-800 hover:bg-forest-700 text-gold-300 text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-forest-700"
+            >
+              <span>+</span>
+              <span>{activeTenant?.type === 'kos' ? 'Kontrak & Tagihan Kamar' : `Buat Tagihan ${template.billLabel}`}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1072,6 +1084,16 @@ export default function PaymentMatrix() {
             setDetailModal(null);
           }}
           onClose={() => setDetailModal(null)}
+        />
+      )}
+
+      {isCreateBillingOpen && (
+        <CreateBillingModal
+          open={isCreateBillingOpen}
+          onClose={() => setIsCreateBillingOpen(false)}
+          tenantId={activeTenantId}
+          tenantType={activeTenant?.type || 'rt_rw'}
+          onSuccess={() => loadMatrix({ silent: true })}
         />
       )}
 
@@ -2344,6 +2366,18 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
                 <p className="font-semibold text-forest-800">{resolvedPaidAt ? formatDate(resolvedPaidAt) : '-'}</p>
               </div>
             </div>
+
+            {(resolvedBill?.contract_start || resolvedBill?.contract_end) && (
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-950 space-y-0.5">
+                <span className="font-bold flex items-center gap-1.5 text-emerald-800">
+                  <span>🗓️</span> Masa Kontrak Sewa:
+                </span>
+                <p className="font-medium text-emerald-900 pl-5">
+                  {resolvedBill.contract_start ? formatDate(resolvedBill.contract_start) : '-'} s/d{' '}
+                  {resolvedBill.contract_end ? formatDate(resolvedBill.contract_end) : '-'}
+                </p>
+              </div>
+            )}
 
             <div>
               <p className="text-xs text-forest-500 font-medium mb-1">Metode Pembayaran</p>

@@ -16,6 +16,8 @@ import {
   fetchTenantDetails,
   bulkCreateTenantUnits,
   updateTenantProfileAndSettings,
+  createTenantBillingItem,
+  assignRoomContract,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -291,7 +293,58 @@ describe('tenantOperationalService - Unit Tests', () => {
       expect(updated.settings.default_rent_price).toBe(1350000);
       expect(updated.settings.due_day).toBe(5);
     });
+
+    it('berhasil membuat tagihan sewa baru dengan field contract_start dan contract_end', async () => {
+      const bill = await createTenantBillingItem('demo-tenant-kos', {
+        unit_id: 1,
+        member_id: 'member-kos-1',
+        period: '2026-10',
+        amount: 1200000,
+        due_date: '2026-10-05',
+        contract_start: '2026-10-01',
+        contract_end: '2027-09-30',
+        metadata: { billing_type: 'rent', note: 'Sewa 1 tahun' },
+      });
+
+      expect(bill).toBeDefined();
+      expect(bill.amount).toBe(1200000);
+      expect(bill.period).toBe('2026-10');
+      expect(bill.contract_start).toBe('2026-10-01');
+      expect(bill.contract_end).toBe('2027-09-30');
+      expect(bill.metadata.billing_type).toBe('rent');
+    });
+
+    it('berhasil menetapkan kontrak sewa kamar (assignRoomContract) dan memvalidasi tanggal', async () => {
+      const contract = await assignRoomContract('demo-tenant-kos', {
+        unitId: 2,
+        memberId: 'member-kos-2',
+        contractStart: '2026-11-01',
+        contractEnd: '2027-04-30',
+        rentPrice: 1500000,
+        notes: 'Sewa kamar 6 bulan',
+      });
+
+      expect(contract).toBeDefined();
+      expect(contract.unitId).toBe(2);
+      expect(contract.contractStart).toBe('2026-11-01');
+      expect(contract.contractEnd).toBe('2027-04-30');
+      expect(contract.bill).toBeDefined();
+      expect(contract.bill.contract_start).toBe('2026-11-01');
+      expect(contract.bill.contract_end).toBe('2027-04-30');
+      expect(contract.bill.amount).toBe(1500000);
+
+      // Validasi error jika tanggal selesai lebih kecil/sama dengan tanggal mulai
+      await expect(
+        assignRoomContract('demo-tenant-kos', {
+          unitId: 2,
+          contractStart: '2026-11-01',
+          contractEnd: '2026-10-01',
+          rentPrice: 1500000,
+        })
+      ).rejects.toThrow('Tanggal selesai kontrak harus lebih besar dari tanggal mulai kontrak.');
+    });
   });
 });
+
 
 

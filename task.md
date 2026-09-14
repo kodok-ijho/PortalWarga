@@ -241,7 +241,7 @@ berjalan di atas fondasi multi-tenant.
 
 - [x] **T7.1** -- Buat `SetupWizard.jsx` varian `kos` (nama kos, jumlah kamar, harga sewa
   default, siklus tagih).
-- [ ] **T7.2** -- Tambah field kontrak (`contract_start`, `contract_end`) pada form
+- [x] **T7.2** -- Tambah field kontrak (`contract_start`, `contract_end`) pada form
   pembuatan tagihan/unit di `billing_items` (kolom sudah disiapkan di Spec §3).
 - [ ] **T7.3** -- Implementasi job/scheduled function yang auto-generate tagihan sewa
   bulanan selama kontrak aktif.

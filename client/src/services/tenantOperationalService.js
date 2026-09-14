@@ -651,7 +651,7 @@ export async function generateTenantBillingItems(tenantId, { period, dry_run = f
 export async function fetchTenantBillingItems(tenantId, { period, status, unitId } = {}) {
   if (!tenantId) return [];
 
-  if (IS_DEMO) {
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
     return [];
   }
 
@@ -668,6 +668,8 @@ export async function fetchTenantBillingItems(tenantId, { period, status, unitId
       due_date,
       status,
       qris_ref,
+      contract_start,
+      contract_end,
       metadata,
       created_at,
       tenant_units:unit_id (
@@ -695,6 +697,160 @@ export async function fetchTenantBillingItems(tenantId, { period, status, unitId
   }
 
   return data || [];
+}
+
+/**
+ * Membuat satu baris tagihan baru di billing_items
+ * Mendukung penetapan kontrak sewa (contract_start, contract_end) untuk vertikal kos
+ * 
+ * @param {string} tenantId - UUID tenant
+ * @param {object} payload - { unit_id, member_id, period, amount, late_fee, due_date, status, contract_start, contract_end, metadata }
+ */
+export async function createTenantBillingItem(tenantId, payload = {}) {
+  if (!tenantId) throw new Error('Tenant ID wajib disertakan.');
+  if (!payload.period || !/^\d{4}-\d{2}$/.test(payload.period)) {
+    throw new Error('Periode tagihan wajib diisi dengan format YYYY-MM.');
+  }
+  if (payload.amount === undefined || Number(payload.amount) < 0) {
+    throw new Error('Nominal tagihan harus berupa angka positif atau nol.');
+  }
+
+  const row = {
+    tenant_id: tenantId,
+    unit_id: payload.unit_id ? Number(payload.unit_id) : null,
+    member_id: payload.member_id || null,
+    period: payload.period,
+    amount: Number(payload.amount),
+    late_fee: Number(payload.late_fee || 0),
+    due_date: payload.due_date || null,
+    status: payload.status || 'unpaid',
+    contract_start: payload.contract_start || null,
+    contract_end: payload.contract_end || null,
+    metadata: payload.metadata || {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    return {
+      id: `mock-bill-${Date.now()}`,
+      ...row,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('billing_items')
+    .insert([row])
+    .select(`
+      id,
+      tenant_id,
+      unit_id,
+      member_id,
+      period,
+      amount,
+      late_fee,
+      due_date,
+      status,
+      qris_ref,
+      contract_start,
+      contract_end,
+      metadata,
+      created_at
+    `)
+    .single();
+
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] createTenantBillingItem error:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * Menetapkan penyewa ke kamar kos dan mengaktifkan kontrak sewa
+ * Memperbarui status unit (vacant -> occupied), menyimpan metadata kontrak,
+ * serta membuat tagihan sewa awal di billing_items dengan contract_start & contract_end.
+ * 
+ * @param {string} tenantId - UUID tenant
+ * @param {object} params - { unitId, memberId, contractStart, contractEnd, rentPrice, dueDate, notes }
+ */
+export async function assignRoomContract(tenantId, {
+  unitId,
+  memberId,
+  contractStart,
+  contractEnd,
+  rentPrice,
+  dueDate,
+  notes,
+} = {}) {
+  if (!tenantId) throw new Error('Tenant ID wajib disertakan.');
+  if (!unitId) throw new Error('Kamar (unitId) wajib dipilih.');
+  if (!contractStart || !contractEnd) {
+    throw new Error('Tanggal mulai dan selesai kontrak sewa wajib diisi.');
+  }
+
+  const startDate = new Date(contractStart);
+  const endDate = new Date(contractEnd);
+  if (endDate <= startDate) {
+    throw new Error('Tanggal selesai kontrak harus lebih besar dari tanggal mulai kontrak.');
+  }
+
+  const period = contractStart.slice(0, 7);
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+
+  // 1. Update unit status menjadi 'occupied' beserta metadata kontrak
+  if (!isDemoOrMock) {
+    const { data: currentUnit } = await supabase
+      .from('tenant_units')
+      .select('metadata')
+      .eq('id', unitId)
+      .single();
+
+    const currentMeta = currentUnit?.metadata || {};
+    const updatedMeta = {
+      ...currentMeta,
+      contract_start: contractStart,
+      contract_end: contractEnd,
+      tenant_member_id: memberId || null,
+      rent_price: Number(rentPrice || currentMeta.default_rent_price || 0),
+      notes: notes || '',
+    };
+
+    await supabase
+      .from('tenant_units')
+      .update({
+        status: 'occupied',
+        metadata: updatedMeta,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', unitId);
+  }
+
+  // 2. Buat billing_item sewa untuk periode awal kontrak
+  const bill = await createTenantBillingItem(tenantId, {
+    unit_id: unitId,
+    member_id: memberId || null,
+    period,
+    amount: Number(rentPrice || 0),
+    due_date: dueDate || contractStart,
+    contract_start: contractStart,
+    contract_end: contractEnd,
+    metadata: {
+      billing_type: 'rent',
+      notes: notes || 'Kontrak sewa kamar',
+    },
+  });
+
+  return {
+    unitId,
+    memberId,
+    contractStart,
+    contractEnd,
+    bill,
+  };
 }
 
 /**
