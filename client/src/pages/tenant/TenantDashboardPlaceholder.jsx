@@ -72,14 +72,24 @@ export default function TenantDashboardPlaceholder() {
 
             <div className="flex items-center gap-3">
               {isTenantAdmin && (
-                <button
-                  type="button"
-                  onClick={() => navigate(`/t/${tenantId}/setup`)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gold-500/20 hover:bg-gold-500/30 text-gold-300 text-xs font-semibold border border-gold-500/40 transition-colors"
-                >
-                  <AiOutlineSetting className="text-sm" />
-                  <span>Setup Wizard</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/t/${tenantId}/approval`)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-gold-300 text-xs font-semibold border border-forest-700 transition-colors"
+                  >
+                    <AiOutlineTeam className="text-sm" />
+                    <span>Persetujuan Warga</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/t/${tenantId}/setup`)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gold-500/20 hover:bg-gold-500/30 text-gold-300 text-xs font-semibold border border-gold-500/40 transition-colors"
+                  >
+                    <AiOutlineSetting className="text-sm" />
+                    <span>Setup Wizard</span>
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -144,6 +154,29 @@ export default function TenantDashboardPlaceholder() {
           </div>
         )}
 
+        {/* Invite Link Card (T6.3) */}
+        {activeTenant?.settings?.invite_code && (
+          <div className="p-4 rounded-2xl bg-forest-950/80 border border-forest-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">🔗</span>
+              <div>
+                <span className="text-forest-400">Kode Undangan Warga: </span>
+                <strong className="font-mono text-gold-300 text-sm tracking-wide">
+                  {activeTenant.settings.invite_code}
+                </strong>
+              </div>
+            </div>
+            <Link
+              to={`/join/${activeTenant.settings.invite_code}`}
+              target="_blank"
+              className="text-gold-400 hover:text-gold-300 inline-flex items-center gap-1.5 font-bold"
+            >
+              <span>Buka Formulir Pendaftaran Warga</span>
+              <AiOutlineArrowRight />
+            </Link>
+          </div>
+        )}
+
         {/* Status Phase 2 Milestone Banner */}
         <div className="p-6 rounded-2xl bg-forest-950/80 border border-gold-500/40 shadow-xl flex items-start gap-4">
           <div className="w-10 h-10 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center shrink-0 border border-gold-500/40 text-xl">
@@ -161,6 +194,15 @@ export default function TenantDashboardPlaceholder() {
             </p>
 
             <div className="flex flex-wrap items-center gap-3 mt-4 pt-3 border-t border-forest-800/80">
+              {isTenantAdmin && (
+                <Link
+                  to={`/t/${tenantId}/approval`}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition-colors shadow-sm"
+                >
+                  <AiOutlineTeam />
+                  <span>Persetujuan Warga Baru</span>
+                </Link>
+              )}
               <Link
                 to="/"
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-forest-800 hover:bg-forest-700 text-xs font-semibold text-white transition-colors"

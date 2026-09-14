@@ -42,6 +42,8 @@ const UserApproval = lazy(() => import('./pages/UserApproval'));
 const PaymentVerification = lazy(() => import('./pages/PaymentVerification'));
 const ChooseTenantType = lazy(() => import('./pages/onboarding/ChooseTenantType'));
 const SetupWizard = lazy(() => import('./pages/onboarding/SetupWizard'));
+const JoinTenant = lazy(() => import('./pages/public/JoinTenant'));
+const TenantMemberApproval = lazy(() => import('./pages/tenant/TenantMemberApproval'));
 const MyTenants = lazy(() => import('./pages/account/MyTenants'));
 const AddNewTenant = lazy(() => import('./pages/account/AddNewTenant'));
 const ChoosePlan = lazy(() => import('./pages/account/ChoosePlan'));
@@ -101,6 +103,14 @@ export default function App() {
                     </Suspense>
                   }
                 />
+                <Route
+                  path="/join/:inviteCode?"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <JoinTenant />
+                    </Suspense>
+                  }
+                />
 
                 {/* Tenant Owner Dashboard Layer (§7.2, T2.6, T2.7) */}
                 <Route
@@ -152,12 +162,28 @@ export default function App() {
                   }
                 />
 
-                {/* Tenant Operational Layer (§7, T2.8, T6.2) */}
+                {/* Tenant Operational Layer (§7, T2.8, T6.2, T6.3) */}
                 <Route
                   path="/t/:tenantId/setup"
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <SetupWizard />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/t/:tenantId/approval"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <TenantMemberApproval />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/t/:tenantId/members/pending"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <TenantMemberApproval />
                     </Suspense>
                   }
                 />

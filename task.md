@@ -213,7 +213,7 @@ sungguhan, bukan hanya tenant kosong.
 - [x] **T6.2** -- Buat `SetupWizard.jsx` khusus varian `rt_rw` (nama komplek, jumlah unit,
   komponen IPL) dan sambungkan ke alur onboarding dari Phase 2. *(Dipindah ke awal karena
   T6.4 membutuhkan komponen IPL yang didefinisikan di wizard ini.)*
-- [ ] **T6.3** -- Implementasi generate link/kode undangan unik per tenant dan halaman
+- [x] **T6.3** -- Implementasi generate link/kode undangan unik per tenant dan halaman
   approval anggota (reuse pola invite code existing bila ada, sesuaikan tenant-aware).
   *(Dipindah ke awal karena warga/anggota harus ada sebelum tagihan dan matriks pembayaran
   bermakna.)*
