@@ -239,7 +239,7 @@ berjalan di atas fondasi multi-tenant.
 
 ## Phase 7 -- Template Vertikal: Kos-kosan (Req FR-17)
 
-- [ ] **T7.1** -- Buat `SetupWizard.jsx` varian `kos` (nama kos, jumlah kamar, harga sewa
+- [x] **T7.1** -- Buat `SetupWizard.jsx` varian `kos` (nama kos, jumlah kamar, harga sewa
   default, siklus tagih).
 - [ ] **T7.2** -- Tambah field kontrak (`contract_start`, `contract_end`) pada form
   pembuatan tagihan/unit di `billing_items` (kolom sudah disiapkan di Spec §3).

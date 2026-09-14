@@ -30,6 +30,29 @@ export async function fetchTenantDetails(tenantId) {
   if (!tenantId) return null;
 
   if (IS_DEMO || String(tenantId).startsWith('demo-')) {
+    const isKos = String(tenantId).includes('kos');
+    if (isKos) {
+      return {
+        id: tenantId,
+        name: 'Kos Melati Harmoni',
+        type: 'kos',
+        address: 'Jl. Melati Raya No. 12, Sleman',
+        contact_phone: '081234567891',
+        settings: {
+          default_rent_price: 1200000,
+          billing_cycle: 'monthly',
+          due_day: 1,
+          bank_account: {
+            bank_name: 'BCA',
+            account_number: '8830998877',
+            account_holder: 'Pengelola Kos Melati',
+          },
+          invite_code: 'RW-KOS-2026',
+          onboarding_completed: false,
+        },
+      };
+    }
+
     return {
       id: tenantId,
       name: 'Palm Village RT 05',
@@ -85,7 +108,7 @@ export async function updateTenantProfileAndSettings(tenantId, { name, address, 
   if (contact_phone !== undefined) payload.contact_phone = contact_phone ? contact_phone.trim() : null;
   if (settings !== undefined) payload.settings = settings;
 
-  if (IS_DEMO) {
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
     return { id: tenantId, ...payload };
   }
 
@@ -158,7 +181,7 @@ export async function bulkCreateTenantUnits(tenantId, unitsList = []) {
     metadata: u.metadata || {},
   }));
 
-  if (IS_DEMO) {
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
     const existing = demoTenantUnitsMap.get(tenantId) || [];
     const newItems = rows.map((r, idx) => ({
       ...r,

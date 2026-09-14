@@ -13,6 +13,9 @@ import {
   fetchTenantMonthlyFinance,
   fetchTenantRunningBalance,
   fetchTenantDashboardData,
+  fetchTenantDetails,
+  bulkCreateTenantUnits,
+  updateTenantProfileAndSettings,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -234,5 +237,61 @@ describe('tenantOperationalService - Unit Tests', () => {
       expect(typeof dash.pendingPaymentCount).toBe('number');
     });
   });
+
+  describe('Kos Vertical Setup & Operational Unit Tests (T7.1)', () => {
+    it('mengambil data tenant kos dengan tipe dan konfigurasi sewa yang tepat', async () => {
+      const tenant = await fetchTenantDetails('demo-tenant-kos');
+      expect(tenant).toBeDefined();
+      expect(tenant.type).toBe('kos');
+      expect(tenant.name).toBe('Kos Melati Harmoni');
+      expect(tenant.settings).toBeDefined();
+      expect(tenant.settings.default_rent_price).toBe(1200000);
+      expect(tenant.settings.billing_cycle).toBe('monthly');
+    });
+
+    it('berhasil melakukan inisiasi kamar kos dengan status awal vacant dan metadata', async () => {
+      const roomsToCreate = [
+        {
+          label: 'Kamar 101',
+          status: 'vacant',
+          metadata: { facilities: ['AC', 'Kamar Mandi Dalam'], price: 1200000 },
+        },
+        {
+          label: 'Kamar 102',
+          status: 'vacant',
+          metadata: { facilities: ['AC', 'WiFi'], price: 1200000 },
+        },
+      ];
+
+      const created = await bulkCreateTenantUnits('demo-tenant-kos', roomsToCreate);
+      expect(Array.isArray(created)).toBe(true);
+      expect(created.length).toBe(2);
+      expect(created[0].label).toBe('Kamar 101');
+      expect(created[0].status).toBe('vacant');
+      expect(created[1].label).toBe('Kamar 102');
+      expect(created[1].status).toBe('vacant');
+    });
+
+    it('berhasil menyimpan profil dan settings wizard kos', async () => {
+      const updated = await updateTenantProfileAndSettings('demo-tenant-kos', {
+        name: 'Kos Melati Harmoni Sleman',
+        address: 'Jl. Kaliurang KM 5',
+        contact_phone: '081299887766',
+        settings: {
+          onboarding_completed: true,
+          default_rent_price: 1350000,
+          billing_cycle: 'monthly',
+          due_day: 5,
+        },
+      });
+
+      expect(updated).toBeDefined();
+      expect(updated.name).toBe('Kos Melati Harmoni Sleman');
+      expect(updated.settings.onboarding_completed).toBe(true);
+      expect(updated.settings.default_rent_price).toBe(1350000);
+      expect(updated.settings.due_day).toBe(5);
+    });
+  });
 });
+
 

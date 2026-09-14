@@ -120,7 +120,7 @@ export default function ChooseTenantType({ onCancel, initialType = 'rt_rw', redi
           toast.success(`Layanan "${tenant.name}" berhasil dibuat! Trial 15 hari aktif.`);
           if (redirectOnSuccess) {
             const targetType = location.state.type || selectedType;
-            if (targetType === 'rt_rw') {
+            if (targetType === 'rt_rw' || targetType === 'kos') {
               navigate(`/t/${tenant.id}/setup`, { replace: true });
             } else {
               navigate(`/t/${tenant.id}/dashboard`, { replace: true });
@@ -169,7 +169,7 @@ export default function ChooseTenantType({ onCancel, initialType = 'rt_rw', redi
       toast.success(`Layanan "${newTenant.name}" berhasil dibuat! Trial 15 hari aktif.`);
 
       if (redirectOnSuccess) {
-        if (selectedType === 'rt_rw') {
+        if (selectedType === 'rt_rw' || selectedType === 'kos') {
           navigate(`/t/${newTenant.id}/setup`, { replace: true });
         } else {
           navigate(`/t/${newTenant.id}/dashboard`, { replace: true });

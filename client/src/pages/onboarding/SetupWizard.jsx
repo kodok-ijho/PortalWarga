@@ -23,6 +23,7 @@ import {
   bulkCreateTenantUnits,
   generateInviteCode,
 } from '../../services/tenantOperationalService';
+import KosSetupWizard from './KosSetupWizard';
 
 const DEFAULT_IPL_COMPONENTS = [
   { id: 'comp-1', name: 'Keamanan Lingkungan', amount: 80000 },
@@ -44,6 +45,8 @@ export default function SetupWizard() {
   const [setupFinished, setSetupFinished] = useState(false);
   const [generatedInviteCode, setGeneratedInviteCode] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
+  const [tenantType, setTenantType] = useState('rt_rw');
+  const [tenantDetails, setTenantDetails] = useState(null);
 
   // Step 1: Identitas Komplek
   const [complexName, setComplexName] = useState('');
@@ -82,6 +85,10 @@ export default function SetupWizard() {
         setLoadingInitial(true);
         const tenantData = await fetchTenantDetails(tenantId);
         if (mounted && tenantData) {
+          const resolvedType = tenantData.type || activeTenant?.type || 'rt_rw';
+          setTenantType(resolvedType);
+          setTenantDetails(tenantData);
+
           setComplexName(tenantData.name || '');
           setAddress(tenantData.address || '');
           setContactPhone(tenantData.contact_phone || '');
@@ -289,6 +296,11 @@ export default function SetupWizard() {
         </div>
       </div>
     );
+  }
+
+  // Jika Tenant bertipe Kos-kosan, delegasikan ke KosSetupWizard khusus
+  if (tenantType === 'kos') {
+    return <KosSetupWizard tenantId={tenantId} initialData={tenantDetails} />;
   }
 
   // Jika Setup Selesai Tampilkan Layar Sukses
