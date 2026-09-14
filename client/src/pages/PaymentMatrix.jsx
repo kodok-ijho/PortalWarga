@@ -8,6 +8,7 @@ import Modal from '../components/Modal';
 import Placeholder from '../components/Placeholder';
 import QrisCheckoutModal from '../components/QrisCheckoutModal';
 import CreateBillingModal from '../components/CreateBillingModal';
+import CheckoutRoomModal from '../components/CheckoutRoomModal';
 import {
   MONTHS_SHORT,
   MONTHS_LONG,
@@ -120,6 +121,8 @@ export default function PaymentMatrix() {
   const myUnitId = profile?.unit_id;
   const [refreshKey, setRefreshKey] = useState(0);
   const [isCreateBillingOpen, setIsCreateBillingOpen] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [checkoutUnitId, setCheckoutUnitId] = useState(null);
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
 
   const handleAutoGenerateBills = async () => {
@@ -760,16 +763,30 @@ export default function PaymentMatrix() {
           {canWrite && (
             <div className="flex items-center gap-2">
               {activeTenant?.type === 'kos' && (
-                <button
-                  type="button"
-                  disabled={isAutoGenerating}
-                  onClick={handleAutoGenerateBills}
-                  className="pv-btn bg-forest-700/90 hover:bg-forest-700 text-gold-300 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-forest-600/80 disabled:opacity-50"
-                  title="Generate otomatis tagihan sewa bulanan untuk kamar dengan kontrak aktif pada periode ini"
-                >
-                  <span>⚡</span>
-                  <span>{isAutoGenerating ? 'Memproses...' : 'Auto-Tagih Sewa'}</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    disabled={isAutoGenerating}
+                    onClick={handleAutoGenerateBills}
+                    className="pv-btn bg-forest-700/90 hover:bg-forest-700 text-gold-300 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-forest-600/80 disabled:opacity-50"
+                    title="Generate otomatis tagihan sewa bulanan untuk kamar dengan kontrak aktif pada periode ini"
+                  >
+                    <span>⚡</span>
+                    <span>{isAutoGenerating ? 'Memproses...' : 'Auto-Tagih Sewa'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCheckoutUnitId(null);
+                      setIsCheckoutModalOpen(true);
+                    }}
+                    className="pv-btn bg-amber-700/90 hover:bg-amber-600 text-amber-200 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-amber-600/60"
+                    title="Checkout penyewa dari kamar dan hentikan tagihan sewa"
+                  >
+                    <span>🚪</span>
+                    <span>Checkout Kamar</span>
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -1130,6 +1147,19 @@ export default function PaymentMatrix() {
           onClose={() => setIsCreateBillingOpen(false)}
           tenantId={activeTenantId}
           tenantType={activeTenant?.type || 'rt_rw'}
+          onSuccess={() => loadMatrix({ silent: true })}
+        />
+      )}
+
+      {isCheckoutModalOpen && (
+        <CheckoutRoomModal
+          isOpen={isCheckoutModalOpen}
+          onClose={() => {
+            setIsCheckoutModalOpen(false);
+            setCheckoutUnitId(null);
+          }}
+          tenantId={activeTenantId}
+          initialUnitId={checkoutUnitId}
           onSuccess={() => loadMatrix({ silent: true })}
         />
       )}

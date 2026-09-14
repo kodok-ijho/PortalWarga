@@ -245,7 +245,7 @@ berjalan di atas fondasi multi-tenant.
   pembuatan tagihan/unit di `billing_items` (kolom sudah disiapkan di Spec §3).
 - [x] **T7.3** -- Implementasi job/scheduled function yang auto-generate tagihan sewa
   bulanan selama kontrak aktif.
-- [ ] **T7.4** -- Implementasi alur "checkout" -- set `tenant_units.status = 'vacant'`,
+- [x] **T7.4** -- Implementasi alur "checkout" -- set `tenant_units.status = 'vacant'`,
   hentikan auto-generate tagihan untuk unit tsb.
 - [ ] **T7.5** -- Sesuaikan `tenantTemplates.js` & UI Members/PaymentMatrix agar istilah
   otomatis berubah jadi Kamar/Penyewa/Sewa untuk tenant tipe `kos`.

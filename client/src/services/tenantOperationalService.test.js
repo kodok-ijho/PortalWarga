@@ -19,6 +19,7 @@ import {
   createTenantBillingItem,
   assignRoomContract,
   autoGenerateKosBilling,
+  checkoutKosRoom,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -403,6 +404,24 @@ describe('tenantOperationalService - Unit Tests', () => {
       expect(typeof res.generated_count).toBe('number');
       expect(typeof res.skipped_count).toBe('number');
       expect(Array.isArray(res.items)).toBe(true);
+    });
+
+    it('checkoutKosRoom berhasil mengubah status kamar menjadi vacant dan mencatat riwayat checkout', async () => {
+      const res = await checkoutKosRoom('demo-tenant-kos', {
+        unitId: 2,
+        checkoutDate: '2026-11-20',
+        reason: 'Penyewa selesai kontrak dan mengembalikan kunci',
+      });
+
+      expect(res).toBeDefined();
+      expect(res.success).toBe(true);
+      expect(res.unit_id).toBe(2);
+      expect(res.status).toBe('vacant');
+      expect(res.checkout_date).toBe('2026-11-20');
+
+      // Validasi error jika parameter tidak lengkap
+      await expect(checkoutKosRoom('', { unitId: 2 })).rejects.toThrow('Tenant ID wajib disertakan.');
+      await expect(checkoutKosRoom('demo-tenant-kos', {})).rejects.toThrow('Kamar (unitId) wajib ditentukan untuk checkout.');
     });
   });
 });

@@ -1015,6 +1015,73 @@ export async function autoGenerateKosBilling(tenantId, { period, dryRun = false 
 }
 
 /**
+ * Melakukan proses checkout penyewa dari kamar kos.
+ * Mengubah status unit menjadi 'vacant', membersihkan metadata kontrak aktif,
+ * melepaskan penugasan unit dari penyewa, dan membatalkan tagihan belum bayar di masa depan.
+ * 
+ * @param {string} tenantId - UUID tenant (kos)
+ * @param {object} params - { unitId, checkoutDate, reason, cancelFutureBills }
+ */
+export async function checkoutKosRoom(tenantId, {
+  unitId,
+  checkoutDate = new Date().toISOString().slice(0, 10),
+  reason = '',
+  cancelFutureBills = true,
+} = {}) {
+  if (!tenantId) throw new Error('Tenant ID wajib disertakan.');
+  if (!unitId) throw new Error('Kamar (unitId) wajib ditentukan untuk checkout.');
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+  if (isDemoOrMock) {
+    const units = await fetchTenantUnits(tenantId);
+    const targetUnit = units.find((u) => String(u.id) === String(unitId));
+    if (targetUnit) {
+      targetUnit.status = 'vacant';
+      const meta = targetUnit.metadata || {};
+      targetUnit.metadata = {
+        ...meta,
+        last_checkout: {
+          checkout_date: checkoutDate,
+          reason: reason || 'Checkout penyewa',
+          previous_member_id: meta.tenant_member_id || null,
+          previous_contract_start: meta.contract_start || null,
+          previous_contract_end: meta.contract_end || null,
+        },
+      };
+      delete targetUnit.metadata.contract_start;
+      delete targetUnit.metadata.contract_end;
+      delete targetUnit.metadata.tenant_member_id;
+      delete targetUnit.metadata.notes;
+    }
+
+    return {
+      success: true,
+      unit_id: Number(unitId),
+      unit_label: targetUnit?.label || `Kamar ${unitId}`,
+      status: 'vacant',
+      checkout_date: checkoutDate,
+      cancelled_future_bills: 0,
+    };
+  }
+
+  const { data, error } = await supabase.rpc('checkout_kos_room', {
+    p_tenant_id: tenantId,
+    p_unit_id: Number(unitId),
+    p_checkout_date: checkoutDate,
+    p_reason: reason || null,
+    p_cancel_future_bills: cancelFutureBills,
+  });
+
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] checkoutKosRoom error:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+/**
  * Mengambil dan membentuk matriks tagihan multi-bulan (12 periode) generik untuk sebuah tenant
  * @param {string} tenantId - UUID tenant
  * @param {number} year - Tahun buku (misal 2026 -> Jul 2026 s/d Jun 2027)
