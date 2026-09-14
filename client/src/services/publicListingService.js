@@ -6,6 +6,7 @@
  */
 
 import { supabase } from './supabaseClient';
+import { mockListingPricing } from './mockData';
 
 /**
  * Memeriksa apakah sebuah listing memenuhi syarat untuk dilihat oleh publik (termasuk anonim)
@@ -97,6 +98,13 @@ export function filterPublicListings(listings = [], options = {}, referenceTime 
   });
 }
 
+function isSupabaseConfigured() {
+  if (typeof import.meta === 'undefined' || !import.meta.env) return false;
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+  return Boolean(url && key && !url.includes('placeholder'));
+}
+
 /**
  * Fetch katalog listing publik dari Supabase (bebas diakses tanpa login)
  * 
@@ -104,7 +112,9 @@ export function filterPublicListings(listings = [], options = {}, referenceTime 
  * @returns {Promise<Array<Object>>}
  */
 export async function fetchPublicListings(filters = {}) {
-  if (!supabase) {
+  const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
+
+  if (!isSupabaseConfigured() || isDemo) {
     return [];
   }
 
@@ -133,20 +143,51 @@ export async function fetchPublicListings(filters = {}) {
 }
 
 /**
+ * Mencari tarif spesifik dari katalog listing_pricing
+ * 
+ * @param {Array<Object>} pricingList - Array tarif dari listing_pricing
+ * @param {Object} criteria - { listingType, isFeatured, durationDays }
+ * @returns {Object|null}
+ */
+export function getPricingForListing(pricingList = [], { listingType, isFeatured = false, durationDays = 30 } = {}) {
+  if (!Array.isArray(pricingList) || !listingType) return null;
+  return (
+    pricingList.find(
+      (p) =>
+        p.listing_type === listingType &&
+        Boolean(p.is_featured) === Boolean(isFeatured) &&
+        Number(p.duration_days) === Number(durationDays)
+    ) || null
+  );
+}
+
+/**
  * Fetch daftar tarif listing untuk publik (katalog pricing listing)
  * 
+ * @param {Object} [options={}] - { listingType }
  * @returns {Promise<Array<Object>>}
  */
-export async function fetchListingPricing() {
-  if (!supabase) {
-    return [];
+export async function fetchListingPricing(options = {}) {
+  const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
+
+  if (!isSupabaseConfigured() || isDemo) {
+    let result = [...mockListingPricing];
+    if (options.listingType) {
+      result = result.filter((p) => p.listing_type === options.listingType);
+    }
+    return result;
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('listing_pricing')
     .select('*')
     .order('price', { ascending: true });
 
+  if (options.listingType) {
+    query = query.eq('listing_type', options.listingType);
+  }
+
+  const { data, error } = await query;
   if (error) {
     throw new Error(`Gagal memuat tarif listing: ${error.message}`);
   }

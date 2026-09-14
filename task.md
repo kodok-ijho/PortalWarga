@@ -318,7 +318,7 @@ adalah pengecualian sengaja terhadap prinsip isolasi tenant yang ditegakkan seja
   yang tidak `read_only`, UPDATE dibatasi ke pemilik listing. Tulis test yang memverifikasi
   SELECT memang bisa diakses tanpa autentikasi (berbeda dari seluruh test isolasi tenant
   sebelumnya).
-- [ ] **T10.3** -- Seed data awal `listing_pricing` (harga listing biasa vs featured per
+- [x] **T10.3** -- Seed data awal `listing_pricing` (harga listing biasa vs featured per
   jenis, angka sementara/dummy -- lihat catatan angka final di akhir dokumen).
 - [ ] **T10.4** -- Buat halaman `PostListing.jsx` di dalam dashboard tenant (`/t/:tenantId/*`):
   - Untuk tipe `kos`: prefill dari `tenant_units` yang berstatus `vacant`

@@ -4,6 +4,8 @@ import {
   canMemberPostListing,
   canUserManageListing,
   filterPublicListings,
+  getPricingForListing,
+  fetchListingPricing,
 } from './publicListingService';
 
 describe('publicListingService - Unit Tests (T10.2: RLS & Public Access)', () => {
@@ -216,6 +218,73 @@ describe('publicListingService - Unit Tests (T10.2: RLS & Public Access)', () =>
       const featured = filterPublicListings(rawListings, { featuredOnly: true }, mockNow);
       expect(featured).toHaveLength(1);
       expect(featured[0].id).toBe('1');
+    });
+  });
+
+  describe('Listing Pricing Catalogue & Helpers (T10.3)', () => {
+    const samplePricing = [
+      { id: 'p1', listing_type: 'room_vacancy', is_featured: false, duration_days: 30, price: 15000 },
+      { id: 'p2', listing_type: 'room_vacancy', is_featured: true, duration_days: 30, price: 35000 },
+      { id: 'p3', listing_type: 'umkm', is_featured: false, duration_days: 30, price: 10000 },
+      { id: 'p4', listing_type: 'umkm', is_featured: true, duration_days: 30, price: 25000 },
+    ];
+
+    it('getPricingForListing menemukan tarif yang tepat untuk kamar kos biasa (Rp 15.000)', () => {
+      const priceItem = getPricingForListing(samplePricing, {
+        listingType: 'room_vacancy',
+        isFeatured: false,
+        durationDays: 30,
+      });
+      expect(priceItem).toBeDefined();
+      expect(priceItem.price).toBe(15000);
+    });
+
+    it('getPricingForListing menemukan tarif yang tepat untuk kamar kos featured (Rp 35.000)', () => {
+      const priceItem = getPricingForListing(samplePricing, {
+        listingType: 'room_vacancy',
+        isFeatured: true,
+        durationDays: 30,
+      });
+      expect(priceItem).toBeDefined();
+      expect(priceItem.price).toBe(35000);
+    });
+
+    it('getPricingForListing menemukan tarif yang tepat untuk UMKM biasa (Rp 10.000) dan featured (Rp 25.000)', () => {
+      const regularUmkm = getPricingForListing(samplePricing, {
+        listingType: 'umkm',
+        isFeatured: false,
+      });
+      expect(regularUmkm.price).toBe(10000);
+
+      const featuredUmkm = getPricingForListing(samplePricing, {
+        listingType: 'umkm',
+        isFeatured: true,
+      });
+      expect(featuredUmkm.price).toBe(25000);
+    });
+
+    it('getPricingForListing mengembalikan null jika kombinasi tidak ditemukan', () => {
+      const notFound = getPricingForListing(samplePricing, {
+        listingType: 'room_vacancy',
+        isFeatured: false,
+        durationDays: 90, // tidak ada paket 90 hari
+      });
+      expect(notFound).toBeNull();
+    });
+
+    it('fetchListingPricing mengembalikan seluruh data pricing mock di mode demo', async () => {
+      const pricing = await fetchListingPricing();
+      expect(Array.isArray(pricing)).toBe(true);
+      expect(pricing.length).toBeGreaterThanOrEqual(4);
+      expect(pricing.some((p) => p.listing_type === 'room_vacancy')).toBe(true);
+      expect(pricing.some((p) => p.listing_type === 'umkm')).toBe(true);
+    });
+
+    it('fetchListingPricing dapat memfilter berdasarkan tipe listing', async () => {
+      const kosPricing = await fetchListingPricing({ listingType: 'room_vacancy' });
+      expect(Array.isArray(kosPricing)).toBe(true);
+      expect(kosPricing.every((p) => p.listing_type === 'room_vacancy')).toBe(true);
+      expect(kosPricing.length).toBe(2); // regular & featured
     });
   });
 });

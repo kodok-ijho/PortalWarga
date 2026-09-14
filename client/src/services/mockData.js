@@ -1727,3 +1727,37 @@ export function sendEmailReceipt({ bill, unit, owner, occupant }) {
     }, 600);
   });
 }
+
+/**
+ * Mock Listing Pricing Catalogue (T10.3 / Demo Mode)
+ */
+export const mockListingPricing = [
+  {
+    id: 'mock-price-kos-regular',
+    listing_type: 'room_vacancy',
+    is_featured: false,
+    duration_days: 30,
+    price: 15000,
+  },
+  {
+    id: 'mock-price-kos-featured',
+    listing_type: 'room_vacancy',
+    is_featured: true,
+    duration_days: 30,
+    price: 35000,
+  },
+  {
+    id: 'mock-price-umkm-regular',
+    listing_type: 'umkm',
+    is_featured: false,
+    duration_days: 30,
+    price: 10000,
+  },
+  {
+    id: 'mock-price-umkm-featured',
+    listing_type: 'umkm',
+    is_featured: true,
+    duration_days: 30,
+    price: 25000,
+  },
+];
