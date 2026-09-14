@@ -290,7 +290,7 @@ anggota mendapat giliran.
 
 - [x] **T9.1** -- Buat `SetupWizard.jsx` varian `kelas` (nama kelas, jumlah siswa, nominal
   iuran).
-- [ ] **T9.2** -- Reuse pola generik dari Phase 6 (RT/RW) untuk billing berkala -- kelas
+- [x] **T9.2** -- Reuse pola generik dari Phase 6 (RT/RW) untuk billing berkala -- kelas
   tidak butuh mekanisme kocok, jadi sebagian besar adalah konfigurasi ulang istilah, bukan
   fitur baru.
 - [ ] **T9.3** -- Sesuaikan `tenantTemplates.js` & UI agar istilah otomatis berubah jadi

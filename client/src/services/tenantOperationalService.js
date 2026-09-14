@@ -480,6 +480,7 @@ export function calculateBillingPreview({
   unitMemberMap = new Map(),
 }) {
   const isKos = tenantType === 'kos';
+  const isKelas = tenantType === 'kelas';
 
   const iplComponents = settings.ipl_components || [
     { name: 'Keamanan Lingkungan', amount: 80000 },
@@ -566,6 +567,35 @@ export function calculateBillingPreview({
       return;
     }
 
+    if (isKelas) {
+      const sppPrice = Number(u.metadata?.expected_spp || settings.spp_amount || 200000);
+      const member = unitMemberMap.get(u.id) || null;
+
+      preview.push({
+        tenant_id: tenantId,
+        unit_id: u.id,
+        member_id: member?.id || null,
+        period,
+        amount: sppPrice,
+        late_fee: 0,
+        due_date: dueDate,
+        status: 'unpaid',
+        metadata: {
+          bill_type: 'spp',
+          billing_type: 'spp',
+          class_type: settings.class_type || 'reguler',
+          subject: settings.subject || '',
+          instructor_name: settings.instructor_name || '',
+          unit_label: u.label,
+          member_name: member?.full_name || 'Slot Siswa',
+          auto_generated: true,
+        },
+        unit_info: u.label,
+        resident_name: member?.full_name || 'Slot Siswa',
+      });
+      return;
+    }
+
     const member = unitMemberMap.get(u.id) || null;
 
     preview.push({
@@ -590,7 +620,7 @@ export function calculateBillingPreview({
 
   return {
     period,
-    totalAmount: isKos ? preview.reduce((acc, p) => acc + p.amount, 0) : defaultIplAmount,
+    totalAmount: isKos || isKelas ? preview.reduce((acc, p) => acc + p.amount, 0) : defaultIplAmount,
     grandTotalAmount: preview.reduce((acc, p) => acc + p.amount, 0),
     dueDate,
     preview,
@@ -2432,5 +2462,15 @@ export async function startNewArisanCycle(tenantId, operatorMemberId = null, for
 
   return data;
 }
+
+/**
+ * Menghasilkan tagihan SPP berkala untuk tenant tipe kelas (T9.2)
+ * @param {string} tenantId - UUID tenant kelas
+ * @param {object} options - { period: 'YYYY-MM', dry_run: boolean }
+ */
+export async function generateKelasSppBilling(tenantId, { period, dry_run = false } = {}) {
+  return generateTenantBillingItems(tenantId, { period, dry_run });
+}
+
 
 

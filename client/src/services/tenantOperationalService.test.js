@@ -30,6 +30,7 @@ import {
   fetchArisanCandidates,
   drawArisanWinner,
   startNewArisanCycle,
+  generateKelasSppBilling,
 } from './tenantOperationalService';
 
 describe('tenantOperationalService - Unit Tests', () => {
@@ -545,6 +546,64 @@ describe('tenantOperationalService - Unit Tests', () => {
 
       // Validasi error jika tenantId kosong
       await expect(startNewArisanCycle('', 'demo-admin-id')).rejects.toThrow('Tenant ID wajib disertakan.');
+    });
+  });
+
+  describe('Kelas Vertical SPP Billing Unit Tests (T9.2)', () => {
+    it('calculateBillingPreview menghasilkan tagihan SPP berkala untuk tenant tipe kelas', () => {
+      const mockUnits = [
+        { id: 'seat-1', label: 'Siswa #01', status: 'active', metadata: { expected_spp: 250000 } },
+        { id: 'seat-2', label: 'Siswa #02', status: 'active', metadata: {} },
+        { id: 'seat-3', label: 'Siswa #03', status: 'inactive' }, // tidak boleh ditagih
+      ];
+
+      const mockSettings = {
+        class_type: 'reguler',
+        subject: 'Matematika',
+        instructor_name: 'Ibu Rina',
+        spp_amount: 200000,
+        due_day: 10,
+      };
+
+      const previewResult = calculateBillingPreview({
+        tenantId: 'tenant-kelas-123',
+        tenantType: 'kelas',
+        period: '2026-10',
+        units: mockUnits,
+        settings: mockSettings,
+        existingUnitIds: new Set(),
+      });
+
+      expect(previewResult).toBeDefined();
+      expect(previewResult.dueDate).toBe('2026-10-10');
+      expect(previewResult.preview).toHaveLength(2); // hanya 2 unit aktif
+
+      // Slot 1 menggunakan expected_spp dari metadata
+      expect(previewResult.preview[0].amount).toBe(250000);
+      expect(previewResult.preview[0].metadata.bill_type).toBe('spp');
+      expect(previewResult.preview[0].metadata.subject).toBe('Matematika');
+
+      // Slot 2 fallback ke spp_amount dari settings kelas
+      expect(previewResult.preview[1].amount).toBe(200000);
+      expect(previewResult.preview[1].metadata.bill_type).toBe('spp');
+
+      // Grand total = 250.000 + 200.000 = 450.000
+      expect(previewResult.grandTotalAmount).toBe(450000);
+    });
+
+    it('generateKelasSppBilling memanggil pembuatan tagihan berkala SPP dengan validasi yang benar', async () => {
+      const result = await generateKelasSppBilling('demo-tenant-id', {
+        period: '2026-11',
+        dry_run: true,
+      });
+
+      expect(result).toBeDefined();
+      expect(result.period).toBe('2026-11');
+      expect(Array.isArray(result.preview)).toBe(true);
+
+      // Validasi error jika tenantId atau period tidak valid
+      await expect(generateKelasSppBilling('', { period: '2026-11' })).rejects.toThrow('Tenant ID wajib disertakan.');
+      await expect(generateKelasSppBilling('demo-tenant-id', { period: 'invalid' })).rejects.toThrow('Format periode harus YYYY-MM.');
     });
   });
 });
