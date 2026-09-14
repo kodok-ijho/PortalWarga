@@ -637,25 +637,47 @@ export default function TenantDashboard() {
 
             {/* Putaran Arisan (Khusus Arisan) */}
             {template.features.hasArisanDraw && (
-              <Link
-                to={`/t/${tenantId}/arisan/rounds`}
-                className="p-5 rounded-2xl bg-purple-950/30 hover:bg-purple-950/50 border border-purple-500/40 hover:border-purple-400 transition-all shadow-md group flex flex-col justify-between"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-purple-900/60 text-purple-300 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center text-xl transition-colors">
-                    🎲
+              <>
+                <Link
+                  to={`/t/${tenantId}/arisan/rounds`}
+                  className="p-5 rounded-2xl bg-purple-950/30 hover:bg-purple-950/50 border border-purple-500/40 hover:border-purple-400 transition-all shadow-md group flex flex-col justify-between"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-10 h-10 rounded-xl bg-purple-900/60 text-purple-300 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center text-xl transition-colors">
+                      📋
+                    </div>
+                    <AiOutlineArrowRight className="text-purple-400 group-hover:text-white transition-colors" />
                   </div>
-                  <AiOutlineArrowRight className="text-purple-400 group-hover:text-white transition-colors" />
-                </div>
-                <div className="mt-4">
-                  <h4 className="text-base font-bold text-white group-hover:text-purple-300 transition-colors">
-                    Putaran &amp; Pengocokan Arisan
-                  </h4>
-                  <p className="text-xs text-forest-300 mt-1">
-                    Kelola putaran pengundian, status iuran peserta, dan riwayat pemenang arisan digital.
-                  </p>
-                </div>
-              </Link>
+                  <div className="mt-4">
+                    <h4 className="text-base font-bold text-white group-hover:text-purple-300 transition-colors">
+                      Kelola Putaran Arisan
+                    </h4>
+                    <p className="text-xs text-forest-300 mt-1">
+                      Kelola putaran pengundian, tagihan iuran peserta, dan kesiapan putaran.
+                    </p>
+                  </div>
+                </Link>
+
+                <Link
+                  to={`/t/${tenantId}/arisan/draw`}
+                  className="p-5 rounded-2xl bg-gradient-to-br from-purple-950/40 to-amber-950/30 hover:from-purple-900/50 hover:to-amber-900/40 border border-amber-500/40 hover:border-amber-400 transition-all shadow-md group flex flex-col justify-between"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 group-hover:bg-amber-500 group-hover:text-white flex items-center justify-center text-xl transition-colors">
+                      🎲
+                    </div>
+                    <AiOutlineArrowRight className="text-amber-400 group-hover:text-white transition-colors" />
+                  </div>
+                  <div className="mt-4">
+                    <h4 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors">
+                      Ruang Pengocokan &amp; Undian
+                    </h4>
+                    <p className="text-xs text-forest-300 mt-1">
+                      Kocok pemenang putaran, pantau kandidat berhak undi, dan riwayat pemenang.
+                    </p>
+                  </div>
+                </Link>
+              </>
             )}
           </div>
         </div>

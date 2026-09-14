@@ -554,20 +554,42 @@ export default function ArisanRounds() {
                           type="button"
                           disabled={isReadOnly}
                           onClick={() => navigate(`/t/${tenantId}/arisan/draw?roundId=${round.id}`)}
-                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow flex items-center gap-1.5 animate-pulse"
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow flex items-center gap-1.5 animate-pulse disabled:opacity-50"
                         >
                           <span>🎲 Kocok Sekarang</span>
                           <AiOutlineArrowRight />
                         </button>
                       )}
 
-                      {round.status === 'collecting' && isTenantAdmin && (
+                      {isReadyToDraw && !isTenantAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/t/${tenantId}/arisan/draw?roundId=${round.id}`)}
+                          className="px-3.5 py-2 rounded-xl bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5"
+                        >
+                          <span>🎲 Ruang Kocok</span>
+                          <AiOutlineArrowRight />
+                        </button>
+                      )}
+
+                      {round.status === 'collecting' && (
                         <button
                           type="button"
                           onClick={() => navigate(`/t/${tenantId}/arisan/draw?roundId=${round.id}`)}
                           className="px-3.5 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold transition-colors flex items-center gap-1.5"
                         >
                           <span>Ruang Kocok</span>
+                          <AiOutlineArrowRight />
+                        </button>
+                      )}
+
+                      {isDrawn && (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/t/${tenantId}/arisan/draw?roundId=${round.id}`)}
+                          className="px-3.5 py-2 rounded-xl bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 hover:text-white border border-amber-500/40 text-xs font-bold transition-colors flex items-center gap-1.5"
+                        >
+                          <span>🏆 Hasil Undian</span>
                           <AiOutlineArrowRight />
                         </button>
                       )}

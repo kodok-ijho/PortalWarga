@@ -272,7 +272,7 @@ saat kontrak selesai.
 - [x] **T8.5** -- Implementasi fungsi/Edge Function pengocokan sesuai algoritma di Spec §5:
   validasi seluruh peserta lunas -> filter kandidat `has_won = false` -> pilih acak ->
   catat pemenang.
-- [ ] **T8.6** -- Buat halaman `ArisanDraw.jsx` -- tombol "Jalankan Kocok" (disabled saat
+- [x] **T8.6** -- Buat halaman `ArisanDraw.jsx` -- tombol "Jalankan Kocok" (disabled saat
   `read_only` via `useSubscriptionGate()`), tampilan hasil kocok, riwayat transparan untuk
   semua anggota.
 - [ ] **T8.7** -- Implementasi aksi "Mulai Siklus Baru" -- reset `has_won` seluruh peserta
