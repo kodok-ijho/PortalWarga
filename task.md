@@ -151,19 +151,19 @@ mesin platform (tanpa fitur RT/RW/kos/arisan/kelas apapun) sudah berfungsi penuh
   (3/6/12 bulan), tampilkan total harga.
 - [x] **T4.3** -- Implementasi banner trial countdown di placeholder dashboard tenant
   (dari T2.8) -- tampil selama status `trial`, menghitung mundur dari `trial_ends_at`.
-- [ ] **T4.4** -- Buat Edge Function `create-subscription-payment` -- generate QRIS Mayar
+- [x] **T4.4** -- Buat Edge Function `create-subscription-payment` -- generate QRIS Mayar
   untuk pembayaran subscription sesuai kombinasi blok+periode yang dipilih. (Spec §9)
-- [ ] **T4.5** -- Buat Edge Function `verify-subscription-payment` -- webhook handler
+- [x] **T4.5** -- Buat Edge Function `verify-subscription-payment` -- webhook handler
   Mayar, update `subscription_payments.status`, lalu update `tenant_subscriptions` (status
   -> `active`, set `current_period_start`/`current_period_end` sesuai `period_id`).
-- [ ] **T4.6** -- Buat scheduled job (Supabase cron/Edge Function) yang mengecek
+- [x] **T4.6** -- Buat scheduled job (Supabase cron/Edge Function) yang mengecek
   `tenant_subscriptions` setiap hari:
   - Jika `trial` dan `trial_ends_at` terlewati tanpa subscription baru -> set `read_only`
   - Jika `active` dan `current_period_end` terlewati tanpa renewal -> set `read_only`
-- [ ] **T4.7** -- Buat halaman `SubscriptionStatus.jsx` (Spec §7.2) -- status berjalan,
+- [x] **T4.7** -- Buat halaman `SubscriptionStatus.jsx` (Spec §7.2) -- status berjalan,
   kapasitas terpakai vs dibeli, riwayat pembayaran subscription, dan form renewal (bebas
   pilih ulang blok & periode sesuai FR-11).
-- [ ] **T4.8** -- Kembali ke `PlatformRevenue.jsx` (T3.3) -- validasi ulang dengan data
+- [x] **T4.8** -- Kembali ke `PlatformRevenue.jsx` (T3.3) -- validasi ulang dengan data
   transaksi sungguhan dari langkah T4.4--T4.5.
 
 **Definition of Done Phase 4 (= Fondasi Platform Selesai):** Tenant baru otomatis trial 15
