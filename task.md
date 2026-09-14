@@ -293,7 +293,7 @@ anggota mendapat giliran.
 - [x] **T9.2** -- Reuse pola generik dari Phase 6 (RT/RW) untuk billing berkala -- kelas
   tidak butuh mekanisme kocok, jadi sebagian besar adalah konfigurasi ulang istilah, bukan
   fitur baru.
-- [ ] **T9.3** -- Sesuaikan `tenantTemplates.js` & UI agar istilah otomatis berubah jadi
+- [x] **T9.3** -- Sesuaikan `tenantTemplates.js` & UI agar istilah otomatis berubah jadi
   Siswa/Iuran untuk tenant tipe `kelas`.
 
 **Definition of Done Phase 9:** Tenant tipe `kelas` end-to-end: signup -> setup wizard ->

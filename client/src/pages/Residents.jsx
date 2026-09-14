@@ -458,7 +458,7 @@ export default function Residents() {
                            })()}
                        </td>
                        <td className="px-4 py-3 hidden md:table-cell">
-                         <span className={`pv-badge ${roleColor(p.role)}`}>{roleLabel(p.role)}</span>
+                         <span className={`pv-badge ${roleColor(p.role)}`}>{roleLabel(p.role, activeTenant?.type)}</span>
                        </td>
                      </tr>
                    );
@@ -533,7 +533,7 @@ export default function Residents() {
             <p className="text-xs text-forest-500">{profile.email}</p>
           )}
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            <span className={`pv-badge ${roleColor(profile.role)}`}>{roleLabel(profile.role)}</span>
+            <span className={`pv-badge ${roleColor(profile.role)}`}>{roleLabel(profile.role, activeTenant?.type)}</span>
             {profile.occupancy_status && (
               <span className={`pv-badge ${occupancyStatusColor(profile.occupancy_status)}`}>
                 {occupancyStatusLabel(profile.occupancy_status, activeTenant?.type)}
@@ -573,14 +573,15 @@ export default function Residents() {
 function ProfileFormModal({ profile, onSave, onClose, isSaving, units, currentUserRole, template, activeTenant }) {
   const isEdit = !!profile;
   const isKos = activeTenant?.type === 'kos';
+  const isKelas = activeTenant?.type === 'kelas';
   const [form, setForm] = useState({
     full_name: profile?.full_name || '',
     email: profile?.email || '',
     phone: profile?.phone || '',
     unit_id: profile?.unit_id || '',
-    role: profile?.role || (isKos ? 'anggota' : 'warga'),
+    role: profile?.role || (isKos || isKelas ? 'anggota' : 'warga'),
     is_active: profile?.is_active ?? true,
-    occupancy_status: profile?.occupancy_status || (isKos ? 'tenant' : ''),
+    occupancy_status: profile?.occupancy_status || (isKos || isKelas ? 'tenant' : ''),
   });
 
   const handleSubmit = (e) => {
@@ -680,7 +681,7 @@ function ProfileFormModal({ profile, onSave, onClose, isSaving, units, currentUs
                     ? ['warga', 'bendahara']
                     : ['warga', 'pengurus'];
                   return allowedRoles.map((r) => (
-                    <option key={r} value={r}>{roleLabel(r)}</option>
+                    <option key={r} value={r}>{roleLabel(r, activeTenant?.type)}</option>
                   ));
                 })()}
               </select>

@@ -23,6 +23,7 @@ import {
 } from 'react-icons/ai';
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
 import { useTenant } from '../hooks/useTenant';
+import { useTenantTemplate } from '../hooks/useTenantTemplate';
 import { useToast } from '../hooks/useToast';
 import { useTour } from '../context/TourContext';
 import TenantSwitcher from './TenantSwitcher';
@@ -44,7 +45,8 @@ const APP_VERSION = `v${pkg.version || '1.4.3'}`;
 
 export default function Header() {
   const { isAuthenticated, profile, role, isReadOnly, signOut, updateProfile, session } = useAuth();
-  const { isPlatformAdmin } = useTenant();
+  const { isPlatformAdmin, activeTenant } = useTenant();
+  const template = useTenantTemplate();
   const { startTour } = useTour();
   const canWrite = canModifyData(role) && !isReadOnly;
   const location = useLocation();
@@ -158,12 +160,12 @@ export default function Header() {
     },
     {
       key: 'keuangan',
-      label: 'Keuangan & IPL',
+      label: `Keuangan & ${template.billLabel}`,
       icon: AiOutlineWallet,
       badgeCount: isStaffRole(role) ? pendingPayCount : 0,
       activePaths: ['/payment-matrix', '/payment-verification', '/expenses', '/reports', '/events', '/incomes'],
       items: [
-        { to: '/payment-matrix', label: 'Matriks Bayar', icon: AiOutlineTable, desc: 'Matriks pembayaran IPL unit' },
+        { to: '/payment-matrix', label: `Matriks ${template.billLabel}`, icon: AiOutlineTable, desc: `Matriks pembayaran ${template.billLabel.toLowerCase()}` },
         ...(canViewPaymentVerification(role)
           ? [
               {
@@ -171,13 +173,13 @@ export default function Header() {
                 label: 'Verifikasi Bayar',
                 icon: AiOutlineCheckCircle,
                 badge: pendingPayCount,
-                desc: 'Verifikasi bukti transfer warga',
+                desc: `Verifikasi bukti transfer ${template.memberLabel.toLowerCase()}`,
               },
             ]
           : []),
         ...(isStaffRole(role)
           ? [
-              { to: '/expenses', label: 'Pengeluaran', icon: AiOutlineWallet, desc: 'Catat & kelola pengeluaran' },
+              { to: '/expenses', label: 'Pengeluaran', icon: AiOutlineWallet, desc: `Catat & kelola pengeluaran ${template.communityLabel.toLowerCase()}` },
             ]
           : []),
         ...(canViewFinancialReports(role)
@@ -201,27 +203,27 @@ export default function Header() {
     },
     {
       key: 'warga',
-      label: 'Warga & Rumah',
+      label: `${template.memberLabel} & ${template.unitLabel}`,
       icon: AiOutlineTeam,
       badgeCount: isStaffRole(role) ? pendingRegCount : 0,
       activePaths: ['/residents', '/houses', '/user-approval', '/users'],
       items: [
-        { to: '/residents', label: 'Daftar Penghuni', icon: AiOutlineUser, desc: 'Direktori penghuni kompleks' },
+        { to: '/residents', label: `Daftar ${template.memberLabel}`, icon: AiOutlineUser, desc: `Direktori ${template.memberLabel.toLowerCase()}` },
         ...(canViewHouses(role)
           ? [
-              { to: '/houses', label: 'Daftar Rumah', icon: AiOutlineHome, desc: isStaffRole(role) ? 'Maintain data unit & mapsite' : 'Data nomor rumah & status hunian' },
+              { to: '/houses', label: `Daftar ${template.unitLabel}`, icon: AiOutlineHome, desc: isStaffRole(role) ? `Maintain data ${template.unitLabel.toLowerCase()}` : `Data status ${template.unitLabel.toLowerCase()}` },
             ]
           : []),
         ...(isStaffRole(role)
           ? [
               {
                 to: '/user-approval',
-                label: 'Approval User',
+                label: `Approval ${template.memberLabel}`,
                 icon: AiOutlineUserAdd,
                 badge: pendingRegCount,
-                desc: 'Verifikasi pendaftaran warga baru',
+                desc: `Verifikasi pendaftaran ${template.memberLabel.toLowerCase()} baru`,
               },
-              { to: '/users', label: 'Kelola User', icon: AiOutlineTeam, desc: 'Hak akses & edit profil warga' },
+              { to: '/users', label: `Kelola ${template.memberLabel}`, icon: AiOutlineTeam, desc: `Hak akses profil ${template.memberLabel.toLowerCase()}` },
             ]
           : []),
       ],
@@ -236,7 +238,7 @@ export default function Header() {
             items: [
               ...(isStaffRole(role)
                 ? [
-                    { to: '/settings', label: 'Pengaturan', icon: AiOutlineSetting, desc: 'Atur tarif IPL dan denda' },
+                    { to: '/settings', label: 'Pengaturan', icon: AiOutlineSetting, desc: `Atur tarif ${template.billLabel} dan preferensi` },
                     ...(canViewLogs(role)
                       ? [{ to: '/logs', label: 'Log Sistem', icon: AiOutlineFileText, desc: 'Audit log aktivitas portal' }]
                       : []),
@@ -460,7 +462,7 @@ export default function Header() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-white leading-tight group-hover:text-gold-400 transition-colors">{profile.full_name}</p>
-                      <p className="text-[10px] text-gold-400 font-medium uppercase tracking-wider">{roleLabel(role)}</p>
+                      <p className="text-[10px] text-gold-400 font-medium uppercase tracking-wider">{roleLabel(role, activeTenant?.type)}</p>
                     </div>
                   </div>
                   <AiOutlineEdit className="text-forest-300 group-hover:text-gold-400 transition-colors text-sm ml-1" />
@@ -536,7 +538,7 @@ export default function Header() {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-white">{profile.full_name}</p>
-                    <p className="text-xs text-gold-400 mt-0.5">{roleLabel(role)}</p>
+                    <p className="text-xs text-gold-400 mt-0.5">{roleLabel(role, activeTenant?.type)}</p>
                     {profile.phone && <p className="text-[11px] text-forest-300 mt-0.5">📞 {profile.phone}</p>}
                   </div>
                 </div>
@@ -691,16 +693,16 @@ export default function Header() {
                 </button>
               </div>
 
-              {/* Status & Identitas Rumah Terdaftar */}
+              {/* Status & Identitas Terdaftar */}
               <div className="mb-4 p-3 rounded-xl bg-forest-900/80 border border-forest-700/60 grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-[10px] font-semibold text-forest-400 uppercase tracking-wider block">Role Akun</span>
                   <span className="font-bold text-gold-300 inline-flex items-center gap-1 mt-0.5">
-                    🏛️ {roleLabel(role)}
+                    🏛️ {roleLabel(role, activeTenant?.type)}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-semibold text-forest-400 uppercase tracking-wider block">Status Warga</span>
+                  <span className="text-[10px] font-semibold text-forest-400 uppercase tracking-wider block">Status {template.memberLabel}</span>
                   <span className="font-semibold text-emerald-300 inline-flex items-center gap-1 mt-0.5">
                     ✅ Terdaftar Aktif
                   </span>

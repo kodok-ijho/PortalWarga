@@ -52,7 +52,7 @@ import {
   downloadDigitalReceipt,
   sendEmailReceipt,
 } from '../services/mockData';
-import { autoGenerateKosBilling } from '../services/tenantOperationalService';
+import { autoGenerateKosBilling, generateKelasSppBilling } from '../services/tenantOperationalService';
 import { compressImage } from '../utils/imageCompressor';
 import { AiOutlineDownload } from 'react-icons/ai';
 
@@ -141,6 +141,27 @@ export default function PaymentMatrix() {
       setRefreshKey((k) => k + 1);
     } catch (err) {
       toast.error(err.message || 'Gagal membuat tagihan sewa otomatis.');
+    } finally {
+      setIsAutoGenerating(false);
+    }
+  };
+
+  const handleAutoGenerateKelasBills = async () => {
+    const currentPeriod = new Date().toISOString().slice(0, 7);
+    const confirmMsg = `Buat tagihan ${template.billLabel} bulanan otomatis untuk periode ${currentPeriod}?\n\nTagihan akan dibuatkan untuk seluruh slot siswa aktif. Tagihan yang sudah ada akan dilewati.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsAutoGenerating(true);
+    try {
+      const res = await generateKelasSppBilling(activeTenantId, { period: currentPeriod });
+      if (res.generated_count > 0) {
+        toast.success(`Berhasil membuat ${res.generated_count} tagihan ${template.billLabel} untuk periode ${currentPeriod}. (${res.skipped_count} slot dilewati/sudah memiliki tagihan)`);
+      } else {
+        toast.info(`Tidak ada tagihan baru yang dibuat. (${res.skipped_count} slot dilewati/sudah memiliki tagihan)`);
+      }
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      toast.error(err.message || `Gagal membuat tagihan ${template.billLabel} otomatis.`);
     } finally {
       setIsAutoGenerating(false);
     }
@@ -787,6 +808,18 @@ export default function PaymentMatrix() {
                     <span>Checkout Kamar</span>
                   </button>
                 </>
+              )}
+              {activeTenant?.type === 'kelas' && (
+                <button
+                  type="button"
+                  disabled={isAutoGenerating}
+                  onClick={handleAutoGenerateKelasBills}
+                  className="pv-btn bg-forest-700/90 hover:bg-forest-700 text-gold-300 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-forest-600/80 disabled:opacity-50"
+                  title="Generate otomatis tagihan SPP bulanan untuk seluruh siswa aktif pada periode ini"
+                >
+                  <span>⚡</span>
+                  <span>{isAutoGenerating ? 'Memproses...' : 'Auto-Generate SPP'}</span>
+                </button>
               )}
               <button
                 type="button"

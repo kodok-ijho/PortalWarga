@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { getTenantTemplate, TENANT_TEMPLATES } from './tenantTemplates';
-import { occupancyStatusLabel, occupancyStatusColor } from '../services/dataHelpers';
+import { occupancyStatusLabel, occupancyStatusColor, roleLabel } from '../services/dataHelpers';
 
-describe('tenantTemplates & Dynamic Naming (T7.5)', () => {
+describe('tenantTemplates & Dynamic Naming (T7.5 & T9.3)', () => {
   describe('Template Vertikal Kos-kosan', () => {
     it('mengembalikan istilah Kamar, Penyewa, dan Sewa untuk tipe kos', () => {
       const kosTemplate = getTenantTemplate('kos');
@@ -38,6 +38,51 @@ describe('tenantTemplates & Dynamic Naming (T7.5)', () => {
       const fallbackTemplate = getTenantTemplate('unknown_type');
       expect(fallbackTemplate.type).toBe('rt_rw');
       expect(fallbackTemplate.unitLabel).toBe('Rumah');
+    });
+  });
+
+  describe('Template Vertikal Kelas (T9.3)', () => {
+    it('mengembalikan istilah Slot, Siswa, dan Iuran/SPP untuk tipe kelas', () => {
+      const kelasTemplate = getTenantTemplate('kelas');
+
+      expect(kelasTemplate).toBeDefined();
+      expect(kelasTemplate.type).toBe('kelas');
+      expect(kelasTemplate.name).toBe('Kelas & Kursus');
+      expect(kelasTemplate.unitLabel).toBe('Slot');
+      expect(kelasTemplate.unitPluralLabel).toBe('Slot Siswa');
+      expect(kelasTemplate.memberLabel).toBe('Siswa');
+      expect(kelasTemplate.memberPluralLabel).toBe('Daftar Siswa');
+      expect(kelasTemplate.billLabel).toBe('Iuran');
+      expect(kelasTemplate.billPluralLabel).toBe('SPP & Iuran Kelas');
+      expect(kelasTemplate.adminLabel).toBe('Pengajar / Pengelola');
+      expect(kelasTemplate.treasurerLabel).toBe('Bendahara Kelas');
+      expect(kelasTemplate.communityLabel).toBe('Kelas Belajar');
+      expect(kelasTemplate.emptyUnitLabel).toBe('Slot Terbuka');
+      expect(kelasTemplate.occupiedUnitLabel).toBe('Siswa Terdaftar');
+      expect(kelasTemplate.paymentActionLabel).toBe('Bayar Iuran / SPP');
+      expect(kelasTemplate.headerResidentUnit).toBe('Slot / Siswa');
+      expect(kelasTemplate.contractLabel).toBe('Status Pendaftaran');
+      expect(kelasTemplate.feeLabel).toBe('Iuran SPP');
+      expect(kelasTemplate.features.hasStudentAttendance).toBe(true);
+      expect(kelasTemplate.features.hasArisanDraw).toBe(false);
+    });
+
+    it('menghasilkan label status hunian yang disesuaikan untuk kelas', () => {
+      expect(occupancyStatusLabel('tenant', 'kelas')).toBe('Siswa Terdaftar');
+      expect(occupancyStatusLabel('student', 'kelas')).toBe('Siswa Terdaftar');
+      expect(occupancyStatusLabel('owner_occupied', 'kelas')).toBe('Pengajar / Wali Kelas');
+      expect(occupancyStatusLabel('owner_rented', 'kelas')).toBe('Slot Terisi');
+      expect(occupancyStatusLabel('owner_vacant', 'kelas')).toBe('Slot Terbuka');
+      expect(occupancyStatusLabel('checkout', 'kelas')).toBe('Lulus / Selesai');
+      expect(occupancyStatusLabel('booking', 'kelas')).toBe('Calon Siswa / Dipesan');
+    });
+
+    it('menghasilkan roleLabel yang disesuaikan untuk kelas', () => {
+      expect(roleLabel('warga', 'kelas')).toBe('Siswa / Wali Murid');
+      expect(roleLabel('anggota', 'kelas')).toBe('Siswa / Wali Murid');
+      expect(roleLabel('admin', 'kelas')).toBe('Pengajar / Pengelola');
+      expect(roleLabel('bendahara', 'kelas')).toBe('Bendahara Kelas');
+      expect(roleLabel('pengurus', 'kelas')).toBe('Staf Pengajar');
     });
   });
 
