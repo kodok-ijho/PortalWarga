@@ -1,0 +1,126 @@
+import { describe, it, expect } from 'vitest';
+import {
+  generateInviteCode,
+  calculateBillingPreview,
+  generateTenantBillingItems,
+} from './tenantOperationalService';
+
+describe('tenantOperationalService - Unit Tests', () => {
+  describe('generateInviteCode', () => {
+    it('menghasilkan kode undangan dengan prefix yang tepat', () => {
+      const code1 = generateInviteCode('Palm Village');
+      expect(code1).toMatch(/^RW-PALM-[A-Z0-9]{4}$/);
+
+      const code2 = generateInviteCode('Bougenville');
+      expect(code2).toMatch(/^RW-BOUG-[A-Z0-9]{4}$/);
+
+      const codeEmpty = generateInviteCode('');
+      expect(codeEmpty).toMatch(/^RW-RW-[A-Z0-9]{4}$/);
+    });
+  });
+
+  describe('calculateBillingPreview (Pure Calculation Engine)', () => {
+    const sampleUnits = [
+      { id: 1, label: 'Blok A-01', status: 'active' },
+      { id: 2, label: 'Blok A-02', status: 'active' },
+      { id: 3, label: 'Blok A-03', status: 'inactive' }, // inactive harus di-filter
+    ];
+
+    const sampleSettings = {
+      ipl_components: [
+        { name: 'Keamanan', amount: 90000 },
+        { name: 'Kebersihan', amount: 35000 },
+        { name: 'Kas RT', amount: 25000 },
+      ],
+      due_day: 15,
+    };
+
+    it('menghitung total nominal tagihan dari penjumlahan seluruh komponen IPL', () => {
+      const result = calculateBillingPreview({
+        tenantId: 'tenant-test-1',
+        period: '2026-10',
+        units: sampleUnits,
+        settings: sampleSettings,
+      });
+
+      // 90.000 + 35.000 + 25.000 = 150.000
+      expect(result.totalAmount).toBe(150000);
+      expect(result.dueDate).toBe('2026-10-15');
+      // Hanya 2 unit aktif (Blok A-01, Blok A-02), unit 3 inactive dilewati
+      expect(result.preview.length).toBe(2);
+      expect(result.preview[0].amount).toBe(150000);
+      expect(result.preview[0].status).toBe('unpaid');
+    });
+
+    it('melewati (skip) unit yang sudah memiliki tagihan pada periode yang sama', () => {
+      const existing = new Set([1]); // Unit 1 sudah ada tagihan
+
+      const result = calculateBillingPreview({
+        tenantId: 'tenant-test-1',
+        period: '2026-10',
+        units: sampleUnits,
+        settings: sampleSettings,
+        existingUnitIds: existing,
+      });
+
+      // Hanya unit 2 yang siap dibuat
+      expect(result.preview.length).toBe(1);
+      expect(result.preview[0].unit_id).toBe(2);
+
+      // Unit 1 masuk ke list skipped
+      expect(result.skipped.length).toBe(1);
+      expect(result.skipped[0].unit_id).toBe(1);
+      expect(result.skipped[0].reason).toBe('already_exists');
+    });
+
+    it('memasangkan nama warga jika ada di unitMemberMap', () => {
+      const memberMap = new Map();
+      memberMap.set(2, { id: 'mem-2', full_name: 'Pak Bambang' });
+
+      const result = calculateBillingPreview({
+        tenantId: 'tenant-test-1',
+        period: '2026-10',
+        units: sampleUnits,
+        settings: sampleSettings,
+        unitMemberMap: memberMap,
+      });
+
+      const billUnit2 = result.preview.find((p) => p.unit_id === 2);
+      expect(billUnit2.member_id).toBe('mem-2');
+      expect(billUnit2.resident_name).toBe('Pak Bambang');
+
+      const billUnit1 = result.preview.find((p) => p.unit_id === 1);
+      expect(billUnit1.member_id).toBeNull();
+      expect(billUnit1.resident_name).toBe('Belum Terdaftar / Kosong');
+    });
+  });
+
+  describe('generateTenantBillingItems Validation', () => {
+    it('melempar error jika tenantId atau periode tidak disediakan', async () => {
+      await expect(generateTenantBillingItems('', { period: '2026-10' })).rejects.toThrow(
+        'Tenant ID wajib disertakan.'
+      );
+
+      await expect(generateTenantBillingItems('demo-tenant-1', { period: 'invalid-period' })).rejects.toThrow(
+        'Format periode harus YYYY-MM.'
+      );
+    });
+
+    it('menghasilkan dry run preview tagihan untuk seluruh unit aktif di demo mode', async () => {
+      const result = await generateTenantBillingItems('demo-tenant-rtrw', {
+        period: '2026-10',
+        dry_run: true,
+      });
+
+      expect(result).toBeDefined();
+      expect(result.dry_run).toBe(true);
+      expect(result.period).toBe('2026-10');
+      expect(result.total_preview).toBeGreaterThan(0);
+      expect(result.generated_count).toBe(0); // Dry run tidak menyimpan
+      expect(result.preview[0]).toHaveProperty('amount');
+      expect(result.preview[0]).toHaveProperty('due_date');
+      expect(result.preview[0].due_date).toMatch(/^2026-10-\d{2}$/);
+      expect(result.preview[0].metadata).toHaveProperty('components');
+    });
+  });
+});

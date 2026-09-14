@@ -29,7 +29,7 @@ export function generateInviteCode(tenantName = '') {
 export async function fetchTenantDetails(tenantId) {
   if (!tenantId) return null;
 
-  if (IS_DEMO) {
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
     return {
       id: tenantId,
       name: 'Palm Village RT 05',
@@ -111,7 +111,7 @@ export async function updateTenantProfileAndSettings(tenantId, { name, address, 
 export async function fetchTenantUnits(tenantId) {
   if (!tenantId) return [];
 
-  if (IS_DEMO) {
+  if (IS_DEMO || String(tenantId).startsWith('demo-')) {
     if (demoTenantUnitsMap.has(tenantId)) {
       return demoTenantUnitsMap.get(tenantId);
     }
@@ -394,4 +394,235 @@ export async function rejectTenantMember(memberId) {
 
   return data;
 }
+
+/**
+ * Pure calculation helper untuk menyusun preview tagihan bulanan
+ */
+export function calculateBillingPreview({
+  tenantId,
+  period,
+  units = [],
+  settings = {},
+  existingUnitIds = new Set(),
+  unitMemberMap = new Map(),
+}) {
+  const iplComponents = settings.ipl_components || [
+    { name: 'Keamanan Lingkungan', amount: 80000 },
+    { name: 'Kebersihan & Sampah', amount: 30000 },
+    { name: 'Kas Paguyuban / RT', amount: 20000 },
+    { name: 'Dana Duka Cita (Sosial)', amount: 10000 },
+  ];
+  const totalAmount = iplComponents.reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
+  const dueDay = Number(settings.due_day) || 10;
+  const dueDate = `${period}-${String(dueDay).padStart(2, '0')}`;
+
+  const activeUnits = units.filter((u) => u.status !== 'inactive');
+  const preview = [];
+  const skipped = [];
+
+  activeUnits.forEach((u) => {
+    if (existingUnitIds.has(u.id)) {
+      skipped.push({
+        unit_id: u.id,
+        label: u.label,
+        reason: 'already_exists',
+      });
+      return;
+    }
+
+    const member = unitMemberMap.get(u.id) || null;
+
+    preview.push({
+      tenant_id: tenantId,
+      unit_id: u.id,
+      member_id: member?.id || null,
+      period,
+      amount: totalAmount,
+      late_fee: 0,
+      due_date: dueDate,
+      status: 'unpaid',
+      metadata: {
+        bill_type: 'ipl',
+        components: iplComponents,
+        unit_label: u.label,
+        member_name: member?.full_name || 'Belum Terdaftar / Kosong',
+      },
+      unit_info: u.label,
+      resident_name: member?.full_name || 'Belum Terdaftar / Kosong',
+    });
+  });
+
+  return {
+    period,
+    totalAmount,
+    dueDate,
+    preview,
+    skipped,
+  };
+}
+
+/**
+ * Generate tagihan berkala (IPL bulanan) untuk seluruh unit aktif dalam sebuah tenant.
+ * Membaca komponen IPL dan due_day yang telah diinputkan pada SetupWizard (tenants.settings).
+ * 
+ * @param {string} tenantId - UUID tenant
+ * @param {object} options - { period: 'YYYY-MM', dry_run: boolean }
+ */
+export async function generateTenantBillingItems(tenantId, { period, dry_run = false } = {}) {
+  if (!tenantId) throw new Error('Tenant ID wajib disertakan.');
+  if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+    throw new Error('Format periode harus YYYY-MM.');
+  }
+
+  const isDemoOrMock = IS_DEMO || String(tenantId).startsWith('demo-');
+
+  // 1. Ambil detail tenant (settings: ipl_components, due_day)
+  const tenant = await fetchTenantDetails(tenantId);
+  const settings = tenant?.settings || {};
+
+  // 2. Ambil seluruh unit aktif milik tenant
+  const units = await fetchTenantUnits(tenantId);
+
+  // 3. Ambil data anggota yang menempati unit (approved members)
+  let unitMemberMap = new Map();
+  if (isDemoOrMock) {
+    // Demo mock mapping
+    units.forEach((u) => {
+      unitMemberMap.set(u.id, {
+        id: `mock-member-${u.id}`,
+        full_name: `Penghuni ${u.label}`,
+      });
+    });
+  } else {
+    const { data: members, error: memErr } = await supabase
+      .from('tenant_members')
+      .select('id, unit_id, full_name, role, status')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'approved')
+      .not('unit_id', 'is', null);
+
+    if (!memErr && members) {
+      members.forEach((m) => {
+        unitMemberMap.set(m.unit_id, m);
+      });
+    }
+  }
+
+  // 4. Periksa tagihan yang sudah ada untuk periode ini agar tidak duplikat
+  let existingUnitIds = new Set();
+  if (!isDemoOrMock) {
+    const { data: existingBills, error: billErr } = await supabase
+      .from('billing_items')
+      .select('unit_id')
+      .eq('tenant_id', tenantId)
+      .eq('period', period);
+
+    if (!billErr && existingBills) {
+      existingBills.forEach((b) => {
+        if (b.unit_id) existingUnitIds.add(b.unit_id);
+      });
+    }
+  }
+
+  const { preview, skipped } = calculateBillingPreview({
+    tenantId,
+    period,
+    units,
+    settings,
+    existingUnitIds,
+    unitMemberMap,
+  });
+
+  // 5. Simpan ke database jika bukan dry_run
+  if (!dry_run && preview.length > 0) {
+    if (isDemoOrMock) {
+      // Pada demo mode, preview dianggap berhasil dibuat
+    } else {
+      const rowsToInsert = preview.map((p) => ({
+        tenant_id: p.tenant_id,
+        unit_id: p.unit_id,
+        member_id: p.member_id,
+        period: p.period,
+        amount: p.amount,
+        late_fee: p.late_fee,
+        due_date: p.due_date,
+        status: p.status,
+        metadata: p.metadata,
+      }));
+
+      const { error: insertErr } = await supabase
+        .from('billing_items')
+        .insert(rowsToInsert);
+
+      if (insertErr) {
+        // eslint-disable-next-line no-console
+        console.error('[tenantOperationalService] generateTenantBillingItems insert error:', insertErr);
+        throw new Error(insertErr.message || 'Gagal menyimpan tagihan ke database.');
+      }
+    }
+  }
+
+  return {
+    dry_run,
+    period,
+    total_preview: preview.length,
+    generated_count: dry_run ? 0 : preview.length,
+    preview,
+    skipped_count: skipped.length,
+    skipped,
+  };
+}
+
+/**
+ * Mengambil daftar billing_items milik tenant (dengan filter period, status, unitId)
+ */
+export async function fetchTenantBillingItems(tenantId, { period, status, unitId } = {}) {
+  if (!tenantId) return [];
+
+  if (IS_DEMO) {
+    return [];
+  }
+
+  let query = supabase
+    .from('billing_items')
+    .select(`
+      id,
+      tenant_id,
+      unit_id,
+      member_id,
+      period,
+      amount,
+      late_fee,
+      due_date,
+      status,
+      qris_ref,
+      metadata,
+      created_at,
+      tenant_units:unit_id (
+        id,
+        label
+      ),
+      tenant_members:member_id (
+        id,
+        full_name,
+        phone
+      )
+    `)
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false });
+
+  if (period) query = query.eq('period', period);
+  if (status) query = query.eq('status', status);
+  if (unitId) query = query.eq('unit_id', unitId);
+
+  const { data, error } = await query;
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[tenantOperationalService] fetchTenantBillingItems error:', error);
+    throw error;
+  }
+
+  return data || [];
+}
+
 

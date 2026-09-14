@@ -11,6 +11,7 @@ import {
   AiOutlineSave,
 } from 'react-icons/ai';
 import { useAuth } from '../hooks/useAuth';
+import { useTenant } from '../hooks/useTenant';
 import { useToast } from '../hooks/useToast';
 import {
   formatRupiah,
@@ -872,6 +873,7 @@ function PaymentSmokeTestPanel({ session, value, onChange, onRefresh }) {
 // Inner helper component to keep Settings component clean
 function BillingGenerator({ session }) {
   const toast = useToast();
+  const { activeTenantId } = useTenant();
   const now = new Date();
   const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   
@@ -885,6 +887,7 @@ function BillingGenerator({ session }) {
       const data = await import('../services/dataService').then(m => m.generateBills(session?.access_token, {
         period,
         dry_run: dryRun,
+        tenantId: activeTenantId,
       }));
       setResult(data);
       if (dryRun) {

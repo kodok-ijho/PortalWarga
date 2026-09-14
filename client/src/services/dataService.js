@@ -483,7 +483,12 @@ export async function runPaymentSmokeTest(token) {
   return portalApiPost('/monitoring/payment-smoke/run', { token });
 }
 
-export async function generateBills(token, { period, dry_run }) {
+export async function generateBills(token, { period, dry_run, tenantId } = {}) {
+  if (tenantId) {
+    const { generateTenantBillingItems } = await import('./tenantOperationalService');
+    return generateTenantBillingItems(tenantId, { period, dry_run });
+  }
+
   if (IS_DEMO) {
     const mock = await getMockData();
     const existing = mock.mockIPLBills.filter(b => b.period === period);

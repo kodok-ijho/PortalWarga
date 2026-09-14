@@ -217,7 +217,7 @@ sungguhan, bukan hanya tenant kosong.
   approval anggota (reuse pola invite code existing bila ada, sesuaikan tenant-aware).
   *(Dipindah ke awal karena warga/anggota harus ada sebelum tagihan dan matriks pembayaran
   bermakna.)*
-- [ ] **T6.4** -- Generate tagihan IPL berkala (bulanan) berdasarkan komponen IPL yang
+- [x] **T6.4** -- Generate tagihan IPL berkala (bulanan) berdasarkan komponen IPL yang
   diinput saat `SetupWizard.jsx` (T6.2) -- reuse logic existing PortalWarga.
 - [ ] **T6.5** -- Adaptasi komponen tagihan existing PortalWarga (`ipl_bills`/matriks
   pembayaran) agar membaca dari `billing_items` generik dan tampil sesuai istilah tenant
