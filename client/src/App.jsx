@@ -58,6 +58,10 @@ const ArisanRounds = lazy(() => import('./pages/arisan/ArisanRounds'));
 const ArisanDraw = lazy(() => import('./pages/arisan/ArisanDraw'));
 const PostListing = lazy(() => import('./pages/tenant/PostListing'));
 const MyListings = lazy(() => import('./pages/tenant/MyListings'));
+const RoomListingDirectory = lazy(() => import('./pages/public/RoomListingDirectory'));
+const RoomListingDetail = lazy(() => import('./pages/public/RoomListingDetail'));
+const UmkmListingDirectory = lazy(() => import('./pages/public/UmkmListingDirectory'));
+const UmkmListingDetail = lazy(() => import('./pages/public/UmkmListingDetail'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center py-20">
@@ -112,6 +116,44 @@ export default function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <JoinTenant />
+                    </Suspense>
+                  }
+                />
+
+                {/* Modul Listing Publik — Akses Bebas Tanpa Login & Tanpa Tenant Context (§7.3, T10.8, T10.9) */}
+                <Route
+                  path="/listing"
+                  element={<Navigate to="/listing/kos" replace />}
+                />
+                <Route
+                  path="/listing/kos"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RoomListingDirectory />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/listing/kos/:id"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RoomListingDetail />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/listing/umkm"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <UmkmListingDirectory />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/listing/umkm/:id"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <UmkmListingDetail />
                     </Suspense>
                   }
                 />

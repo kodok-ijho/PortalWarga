@@ -115,7 +115,17 @@ export async function fetchPublicListings(filters = {}) {
   const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
 
   if (!isSupabaseConfigured() || isDemo) {
-    return [];
+    let result = filterPublicListings(inMemoryListings, {
+      type: filters.type,
+      featuredOnly: filters.is_featured,
+      query: filters.query,
+    });
+    result.sort((a, b) => {
+      if (a.is_featured && !b.is_featured) return -1;
+      if (!a.is_featured && b.is_featured) return 1;
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
+    return result;
   }
 
   let query = supabase
@@ -140,6 +150,36 @@ export async function fetchPublicListings(filters = {}) {
   }
 
   return data || [];
+}
+
+/**
+ * Fetch detail satu listing publik berdasarkan ID (tanpa login)
+ * 
+ * @param {string} id
+ * @returns {Promise<Object|null>}
+ */
+export async function fetchPublicListingById(id) {
+  if (!id) return null;
+  const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
+
+  if (!isSupabaseConfigured() || isDemo || String(id).startsWith('mock-') || String(id).startsWith('listing-')) {
+    const found = inMemoryListings.find((l) => String(l.id) === String(id));
+    return found || null;
+  }
+
+  const { data, error } = await supabase
+    .from('public_listings')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.warn(`[fetchPublicListingById] Error: ${error.message}`);
+    return null;
+  }
+
+  return data;
 }
 
 /**

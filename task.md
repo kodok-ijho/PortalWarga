@@ -331,11 +331,11 @@ adalah pengecualian sengaja terhadap prinsip isolasi tenant yang ditegakkan seja
   `listing_payments`, update `public_listings.status`/`is_featured` setelah bayar sukses).
 - [x] **T10.7** -- Buat scheduled job harian yang menandai `public_listings` berstatus
   `expired` saat `expires_at` terlewati (pola sama seperti T4.6).
-- [ ] **T10.8** -- Buat 4 halaman publik TANPA tenant context (routing `/listing/*`,
+- [x] **T10.8** -- Buat 4 halaman publik TANPA tenant context (routing `/listing/*`,
   Spec §7.3): `RoomListingDirectory.jsx`, `RoomListingDetail.jsx`,
   `UmkmListingDirectory.jsx`, `UmkmListingDetail.jsx`. Pastikan halaman-halaman ini bisa
   diakses tanpa login sama sekali (uji dalam mode incognito/tanpa sesi).
-- [ ] **T10.9** -- Implementasi tampilan prioritas untuk listing `is_featured = true` pada
+- [x] **T10.9** -- Implementasi tampilan prioritas untuk listing `is_featured = true` pada
   kedua halaman direktori (tampil di posisi awal atau dengan penanda visual berbeda).
 - [x] **T10.10** -- Terapkan `useSubscriptionGate()` (dari T5.1) pada `PostListing.jsx` --
   tenant berstatus `read_only` tidak dapat membuat listing baru, sesuai FR-26.

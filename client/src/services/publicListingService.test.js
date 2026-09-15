@@ -15,6 +15,8 @@ import {
   verifyListingPayment,
   fetchListingPaymentStatus,
   checkListingExpirations,
+  fetchPublicListings,
+  fetchPublicListingById,
 } from './publicListingService';
 
 describe('publicListingService - Unit Tests (T10.2: RLS & Public Access)', () => {
@@ -575,7 +577,48 @@ describe('publicListingService - Unit Tests (T10.2: RLS & Public Access)', () =>
       expect(target.featured_until).toBeNull();
     });
   });
+
+  describe('publicListingService - Unit Tests (T10.8 & T10.9: Public Directory & Featured Priority)', () => {
+    it('fetchPublicListings mengembalikan kamar kos aktif dengan listing is_featured di posisi teratas', async () => {
+      const kosListings = await fetchPublicListings({ type: 'room_vacancy' });
+      expect(kosListings).toBeDefined();
+      expect(Array.isArray(kosListings)).toBe(true);
+
+      if (kosListings.length > 1) {
+        // Verifikasi bahwa listing pertama adalah featured jika ada setidaknya satu featured listing
+        const hasFeatured = kosListings.some((l) => l.is_featured);
+        if (hasFeatured) {
+          expect(kosListings[0].is_featured).toBe(true);
+        }
+      }
+    });
+
+    it('fetchPublicListings mengembalikan listing UMKM sesuai filter type', async () => {
+      const umkmListings = await fetchPublicListings({ type: 'umkm' });
+      expect(umkmListings).toBeDefined();
+      expect(Array.isArray(umkmListings)).toBe(true);
+      expect(umkmListings.every((l) => l.type === 'umkm')).toBe(true);
+    });
+
+    it('fetchPublicListingById berhasil mengembalikan detail single listing', async () => {
+      const item = await createPublicListing('demo-tenant-rtrw', {
+        title: 'Kue Lapis Legit Nyonya',
+        contact_phone: '08123456789',
+        type: 'umkm',
+      });
+
+      const detail = await fetchPublicListingById(item.id);
+      expect(detail).toBeDefined();
+      expect(detail.id).toBe(item.id);
+      expect(detail.title).toBe('Kue Lapis Legit Nyonya');
+
+      // Mengembalikan null jika id kosong atau tidak ada
+      expect(await fetchPublicListingById('')).toBeNull();
+      expect(await fetchPublicListingById('non-existent-id-999')).toBeNull();
+    });
+  });
 });
+
 
 
 
