@@ -33,106 +33,10 @@ const DEMO_ACCOUNTS = {
       is_superadmin: true,
     },
   },
-  'admin@palmvillage.id': {
-    password: 'demo123',
-    profile: {
-      id: 'demo-admin',
-      full_name: 'Pak Hendra (Admin)',
-      phone: '0812-1000-0001',
-      role: 'admin',
-      unit_id: null,
-      occupancy_status: null,
-      is_active: true,
-      email: 'admin@palmvillage.id',
-    },
-  },
-  'admin.viewer@palmvillage.id': {
-    password: 'demo123',
-    profile: {
-      id: 'demo-admin-viewer',
-      full_name: 'Admin Viewer (Read Only)',
-      phone: '0812-1000-0099',
-      role: 'admin_viewer',
-      unit_id: null,
-      occupancy_status: null,
-      is_active: true,
-      email: 'admin.viewer@palmvillage.id',
-    },
-  },
-  'bendahara@palmvillage.id': {
-    password: 'demo123',
-    profile: {
-      id: 'demo-bendahara',
-      full_name: 'Budi Santoso (Bendahara)',
-      phone: '0813-2000-0002',
-      role: 'bendahara',
-      unit_id: 1,
-      occupancy_status: 'owner_occupied',
-      is_active: true,
-      email: 'bendahara@palmvillage.id',
-    },
-  },
-  'pengurus@palmvillage.id': {
-    password: 'demo123',
-    profile: {
-      id: 'demo-pengurus',
-      full_name: 'Ibu Ratna (Pengurus RT)',
-      phone: '0814-3000-0003',
-      role: 'pengurus',
-      unit_id: 6,
-      occupancy_status: 'owner_occupied',
-      is_active: true,
-      email: 'pengurus@palmvillage.id',
-    },
-  },
-  'warga@palmvillage.id': {
-    password: 'demo123',
-    profile: {
-      id: 'demo-warga',
-      full_name: 'Siti Rahayu',
-      phone: '0812-3000-0003',
-      role: 'warga',
-      unit_id: 2,
-      occupancy_status: 'owner_occupied',
-      is_active: true,
-      email: 'warga@palmvillage.id',
-    },
-  },
 };
 
-// Generate 50 new accounts dynamically for demo
-const indonesianNames = [
-  "Ahmad Fauzi", "Budi Wijaya", "Cici Amalia", "Dedi Setiadi", "Endang Sri",
-  "Fahmi Idris", "Gita Gutawa", "Hendra Wijaya", "Indah Permata", "Joko Susilo",
-  "Kartika Sari", "Lukman Hakim", "Maria Ulfah", "Novianti", "Oki Setiana",
-  "Prabowo Subianto", "Qori Sandioriva", "Rian d'Masiv", "Siti Badriah", "Taufik Hidayat",
-  "Umar Shihab", "Vicky Shu", "Wulan Guritno", "Xena Aliyah", "Yuni Shara",
-  "Zaskia Adya", "Andi Pratama", "Dewi Sartika", "Eko Yuli", "Fitri Carlina",
-  "Guntur Saputra", "Harianto", "Irmawati", "Junaidi", "Kurniawan",
-  "Lestari", "Mulyadi", "Ningsih", "Oktavianus", "Putra",
-  "Qadir", "Rahmat", "Sari", "Tri", "Utami",
-  "Wahyudi", "Yuliana", "Zulkifli", "Agung", "Bambang"
-];
+const DEMO_USERS = [];
 
-for (let i = 1; i <= 50; i++) {
-  const id = 18 + i;
-  const email = `warga${i}@palmvillage.id`;
-  DEMO_ACCOUNTS[email] = {
-    password: 'demo123',
-    profile: {
-      id: `p-${id}`,
-      full_name: indonesianNames[i - 1],
-      phone: `0812-${String(1000 + i).padStart(4, '0')}-00${id}`,
-      role: 'warga',
-      unit_id: id,
-      occupancy_status: 'owner_occupied',
-      is_active: true,
-      email,
-    }
-  };
-}
-
-const DEMO_USERS = Object.values(DEMO_ACCOUNTS).map((a) => a.profile);
 
 // ====== Demo auth (mock, tanpa Supabase) ======
 function useDemoAuth() {

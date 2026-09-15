@@ -104,28 +104,15 @@ export function TenantProvider({ children }) {
     setLoading(true);
     setError(null);
 
-    // ── DEMO MODE ───────────────────────────────────────────────────
-    if (IS_DEMO) {
-      const demoRole = profile?.role || 'admin';
-      const tenants = DEMO_TENANTS.map((t) => ({
-        ...t,
-        role: demoRole,
-      }));
-      setUserTenants(tenants);
+    const currentEmail = (user?.email || profile?.email || '').toLowerCase();
+    const isSuperAdminEmail = currentEmail === 'dyudhiantoro@gmail.com';
+    const currentUserId = user?.id || profile?.id;
+    const isRealUserSession = Boolean(currentUserId && !String(currentUserId).startsWith('demo-'));
 
-      // Cek apakah ada saved tenant di localStorage yang cocok
-      const savedId = localStorage.getItem(ACTIVE_TENANT_KEY);
-      const matched = tenants.find((t) => t.id === savedId);
-      if (matched) {
-        setActiveTenantIdState(matched.id);
-      } else if (tenants.length > 0) {
-        setActiveTenantIdState(tenants[0].id);
-        localStorage.setItem(ACTIVE_TENANT_KEY, tenants[0].id);
-      }
-
-      const currentEmail = (user?.email || profile?.email || '').toLowerCase();
-      const isSuperAdminEmail = currentEmail === 'dyudhiantoro@gmail.com';
-      setIsPlatformAdmin(demoRole === 'admin' || isSuperAdminEmail);
+    // ── DEMO MODE HANYA UNTUK SESI DEMO MURNI TANPA SUPABASE ───────
+    if (IS_DEMO && !isRealUserSession && !isSuperAdminEmail) {
+      setUserTenants([]);
+      setIsPlatformAdmin(false);
       setLoading(false);
       return;
     }

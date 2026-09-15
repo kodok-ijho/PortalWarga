@@ -3,12 +3,11 @@ import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   useAuth,
   IS_DEMO_MODE,
-  DEMO_ACCOUNT_LIST,
   GOOGLE_AUTH_READY,
   GOOGLE_OAUTH_CLIENT_ID,
 } from '../hooks/useAuth';
-import { mockUnits, roleLabel, roleColor } from '../services/mockData';
-import { AiOutlineSafetyCertificate, AiOutlineCloudSync, AiOutlineClose, AiOutlineHome } from 'react-icons/ai';
+import { mockUnits } from '../services/mockData';
+import { AiOutlineSafetyCertificate, AiOutlineClose, AiOutlineHome } from 'react-icons/ai';
 import { FcGoogle } from 'react-icons/fc';
 import pkg from '../../package.json';
 
@@ -330,109 +329,68 @@ export default function Login() {
 
           {!IS_DEMO_MODE || mode === 'login' ? (
             <div className="space-y-5">
-              {/* Tombol Utama Google OAuth */}
-              {IS_DEMO_MODE ? (
-                <div className="space-y-2.5">
-                  <button
-                    type="button"
-                    onClick={() => handleGoogleLoginDemo('dyudhiantoro@gmail.com')}
-                    disabled={submitting}
-                    className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-gradient-to-r from-gold-500 to-amber-400 hover:from-gold-400 hover:to-amber-300 text-forest-950 font-bold rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 group border border-gold-400"
-                  >
-                    <span className="text-lg">👑</span>
-                    <span className="text-sm">Masuk sebagai Superadmin (dyudhiantoro@gmail.com)</span>
-                  </button>
+              {/* Tombol Masuk dengan Akun Google */}
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setError('');
+                    setSubmitting(true);
+                    try {
+                      await signInWithSupabaseGoogle({ redirectTo: window.location.origin });
+                    } catch (err) {
+                      setError(err.message || 'Gagal memulai login Google.');
+                      setSubmitting(false);
+                    }
+                  }}
+                  disabled={submitting}
+                  className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-white hover:bg-gray-50 text-gray-800 font-bold rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 border border-gray-300"
+                >
+                  <FcGoogle className="w-5 h-5 shrink-0" />
+                  <span className="text-sm">Masuk dengan Akun Google</span>
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={() => handleGoogleLoginDemo('warga@palmvillage.id')}
-                    disabled={submitting}
-                    className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white hover:bg-gray-100 text-gray-800 font-medium rounded-xl shadow transition-all group border border-gray-200"
-                  >
-                    <FcGoogle className="w-5 h-5 shrink-0" />
-                    <span className="text-sm">Masuk sebagai Warga Demo</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setError('');
-                      setSubmitting(true);
-                      try {
-                        await signInWithSupabaseGoogle({ redirectTo: window.location.origin });
-                      } catch (err) {
-                        setError(err.message || 'Gagal memulai login Google.');
-                        setSubmitting(false);
-                      }
-                    }}
-                    disabled={submitting}
-                    className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-white hover:bg-gray-50 text-gray-800 font-bold rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 border border-gray-300"
-                  >
-                    <FcGoogle className="w-5 h-5 shrink-0" />
-                    <span className="text-sm">Masuk dengan Akun Google</span>
-                  </button>
+                {GOOGLE_AUTH_READY && (
+                  <div className="rounded-xl bg-white p-2 shadow-lg">
+                    <div ref={googleButtonRef} className="min-h-[44px] w-full flex items-center justify-center" />
+                    {!googleButtonReady && (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full flex items-center justify-center gap-3 py-3 px-4 text-sm font-semibold text-gray-500"
+                      >
+                        <FcGoogle className="text-xl" />
+                        Memuat Google...
+                      </button>
+                    )}
+                  </div>
+                )}
 
-                  {GOOGLE_AUTH_READY && (
-                    <div className="rounded-xl bg-white p-2 shadow-lg">
-                      <div ref={googleButtonRef} className="min-h-[44px] w-full flex items-center justify-center" />
-                      {!googleButtonReady && (
-                        <button
-                          type="button"
-                          disabled
-                          className="w-full flex items-center justify-center gap-3 py-3 px-4 text-sm font-semibold text-gray-500"
-                        >
-                          <FcGoogle className="text-xl" />
-                          Memuat Google...
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+                {IS_DEMO_MODE && (
+                  <div className="pt-2 border-t border-forest-800/80">
+                    <button
+                      type="button"
+                      onClick={() => handleGoogleLoginDemo('dyudhiantoro@gmail.com')}
+                      disabled={submitting}
+                      className="w-full flex items-center justify-center gap-2.5 py-3 px-4 bg-gradient-to-r from-gold-500 to-amber-400 hover:from-gold-400 hover:to-amber-300 text-forest-950 font-bold rounded-xl shadow transition-all text-xs border border-gold-400"
+                    >
+                      <span>👑</span>
+                      <span>Masuk sebagai Superadmin (dyudhiantoro@gmail.com)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
 
-              {/* Info Keamanan JWT & Supabase */}
+              {/* Info Keamanan Akses Portal */}
               <div className="bg-forest-950/80 border border-forest-800 rounded-xl p-3.5 text-xs text-forest-300 space-y-2">
                 <div className="flex items-center gap-2 text-gold-400 font-semibold">
                   <AiOutlineSafetyCertificate className="text-base shrink-0" />
-                  <span>{IS_DEMO_MODE ? 'Mode Uji Coba' : 'Keamanan Akses Portal'}</span>
+                  <span>Keamanan Akses RuangWarga</span>
                 </div>
                 <p className="text-[11px] leading-relaxed text-forest-400">
-                  {IS_DEMO_MODE
-                    ? 'Ini adalah simulasi sistem portal warga. Data yang Anda masukkan bersifat sementara.'
-                    : 'Akses masuk diamankan menggunakan sistem autentikasi terverifikasi.'}
+                  Akses masuk diamankan menggunakan otentikasi Google OAuth terverifikasi dengan enkripsi data dan isolasi tenant (RLS).
                 </p>
               </div>
-
-              {/* Demo Admin View-Only Button (Controlled via .env) */}
-              {enableDemoAdmin && (
-                <div className="pt-2 text-center border-t border-forest-800/80">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setError('');
-                      setSubmitting(true);
-                      try {
-                        await loginDemoAdmin();
-                        navigate(from, { replace: true });
-                      } catch (err) {
-                        setError(err.message || 'Gagal masuk sebagai Admin Demo.');
-                      } finally {
-                        setSubmitting(false);
-                      }
-                    }}
-                    disabled={submitting}
-                    className="w-full py-2.5 px-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/40 text-amber-300 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 transition shadow-sm"
-                  >
-                    <span>👁️</span>
-                    <span>Masuk sebagai Admin Demo (View Only)</span>
-                  </button>
-                  <p className="mt-1.5 text-[10px] text-forest-400">
-                    Mode pratinjau hak akses Admin tanpa izin pengubahan/penghapusan data.
-                  </p>
-                </div>
-              )}
             </div>
           ) : (
             <form onSubmit={handleGoogleRegisterSubmit} className="space-y-4">
@@ -521,45 +479,7 @@ export default function Login() {
             </div>
           )}
 
-          {/* Simulator JWT untuk Evaluasi / Demo Mode */}
-          {IS_DEMO_MODE && (
-            <div className="mt-6 pt-5 border-t border-forest-800">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-bold text-gold-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <AiOutlineCloudSync className="text-sm" /> Pilih Akun Cepat (Uji Coba)
-                </span>
-                <span className="text-[9px] bg-forest-800 text-forest-300 px-2 py-0.5 rounded-full border border-forest-700">
-                  Demo Mandiri
-                </span>
-              </div>
-              <p className="text-[11px] text-forest-400 mb-3 leading-tight">
-                Klik nama warga atau peran di bawah ini untuk langsung masuk secara otomatis tanpa kata sandi:
-              </p>
-              <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto pr-1">
-                {DEMO_ACCOUNT_LIST.map((acc) => (
-                  <button
-                    key={acc.id}
-                    type="button"
-                    onClick={() => handleGoogleLoginDemo(acc.email)}
-                    className="w-full flex items-center justify-between text-left rounded-xl bg-forest-950/80 hover:bg-forest-800 px-3.5 py-2.5 text-xs transition-all border border-forest-800 hover:border-gold-500/50 group shadow"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-7 w-7 rounded-lg bg-forest-800 text-gold-400 flex items-center justify-center font-bold text-xs shrink-0 group-hover:bg-gold-500 group-hover:text-forest-950 transition-colors">
-                        G
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-white truncate">{acc.full_name}</p>
-                        <p className="text-[10px] text-forest-400 truncate">{acc.email}</p>
-                      </div>
-                    </div>
-                    <span className={`pv-badge text-[10px] shrink-0 ${roleColor(acc.role)}`}>
-                      {roleLabel(acc.role)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+
         </div>
 
         {/* Banner Registrasi Tenant Baru (Multi-tenant Onboarding T2.3) */}
