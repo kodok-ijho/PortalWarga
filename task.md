@@ -349,7 +349,7 @@ listing dari lintas tenant; listing otomatis kedaluwarsa sesuai masa aktifnya.
 
 ## Phase 11 -- QA, Migrasi, & Rilis
 
-- [ ] **T11.1** -- Regression test seluruh 4 vertikal (rt_rw, kos, arisan, kelas) dari
+- [x] **T11.1** -- Regression test seluruh 4 vertikal (rt_rw, kos, arisan, kelas) dari
   signup sampai transaksi pertama berhasil.
 - [ ] **T11.2** -- Regression test fondasi platform (Phase 1--5): trial expiry, read_only,
   renewal, isolasi tenant, akses Platform Owner Dashboard.
