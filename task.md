@@ -356,7 +356,7 @@ listing dari lintas tenant; listing otomatis kedaluwarsa sesuai masa aktifnya.
 - [x] **T11.3** -- Regression test Modul Listing (Phase 10): posting listing kos & umkm,
   halaman publik dapat diakses tanpa login, listing lintas tenant tampil dengan benar,
   listing expired otomatis tersembunyi dari direktori publik.
-- [ ] **T11.4** -- Siapkan script migrasi opsional untuk instance PortalWarga single-tenant
+- [x] **T11.4** -- Siapkan script migrasi opsional untuk instance PortalWarga single-tenant
   existing (bila ada pelanggan lama) ke struktur multi-tenant baru -- pemetaan data lama
   ke `tenants`/`tenant_units`/`tenant_members`/`billing_items`.
 - [ ] **T11.5** -- Review keamanan RLS menyeluruh (checklist: setiap tabel punya RLS aktif
