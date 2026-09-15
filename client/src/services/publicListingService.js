@@ -292,3 +292,131 @@ export async function fetchTenantListings(tenantId) {
 
   return data || [];
 }
+
+/**
+ * Memperbarui status tayang listing (misal: tandai rented_or_sold atau reaktifkan)
+ * 
+ * @param {string} listingId
+ * @param {'active' | 'rented_or_sold' | 'expired'} newStatus
+ * @returns {Promise<Object>}
+ */
+export async function updateListingStatus(listingId, newStatus) {
+  if (!listingId) {
+    throw new Error('Listing ID wajib disertakan.');
+  }
+
+  const validStatuses = ['active', 'rented_or_sold', 'expired'];
+  if (!validStatuses.includes(newStatus)) {
+    throw new Error(`Status tidak valid. Harus salah satu dari: ${validStatuses.join(', ')}`);
+  }
+
+  const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
+
+  if (!isSupabaseConfigured() || isDemo || String(listingId).startsWith('listing-') || String(listingId).startsWith('mock-')) {
+    const idx = inMemoryListings.findIndex((l) => String(l.id) === String(listingId));
+    if (idx !== -1) {
+      inMemoryListings[idx] = {
+        ...inMemoryListings[idx],
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      };
+      return inMemoryListings[idx];
+    }
+    return { id: listingId, status: newStatus };
+  }
+
+  const { data, error } = await supabase
+    .from('public_listings')
+    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .eq('id', listingId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Gagal memperbarui status listing: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Memperpanjang masa aktif postingan listing (FR-28, FR-29)
+ * 
+ * @param {string} listingId
+ * @param {Object} [options={}] - { durationDays, isFeatured }
+ * @returns {Promise<Object>}
+ */
+export async function renewListing(listingId, { durationDays = 30, isFeatured = false } = {}) {
+  if (!listingId) {
+    throw new Error('Listing ID wajib disertakan.');
+  }
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+
+  const updateData = {
+    status: 'active',
+    expires_at: expiresAt,
+    is_featured: Boolean(isFeatured),
+    featured_until: Boolean(isFeatured) ? expiresAt : null,
+    updated_at: now.toISOString(),
+  };
+
+  const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
+
+  if (!isSupabaseConfigured() || isDemo || String(listingId).startsWith('listing-') || String(listingId).startsWith('mock-')) {
+    const idx = inMemoryListings.findIndex((l) => String(l.id) === String(listingId));
+    if (idx !== -1) {
+      inMemoryListings[idx] = {
+        ...inMemoryListings[idx],
+        ...updateData,
+      };
+      return inMemoryListings[idx];
+    }
+    return { id: listingId, ...updateData };
+  }
+
+  const { data, error } = await supabase
+    .from('public_listings')
+    .update(updateData)
+    .eq('id', listingId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Gagal memperpanjang listing: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Menghapus postingan listing
+ * 
+ * @param {string} listingId
+ * @returns {Promise<boolean>}
+ */
+export async function deleteListing(listingId) {
+  if (!listingId) {
+    throw new Error('Listing ID wajib disertakan.');
+  }
+
+  const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
+
+  if (!isSupabaseConfigured() || isDemo || String(listingId).startsWith('listing-') || String(listingId).startsWith('mock-')) {
+    inMemoryListings = inMemoryListings.filter((l) => String(l.id) !== String(listingId));
+    return true;
+  }
+
+  const { error } = await supabase
+    .from('public_listings')
+    .delete()
+    .eq('id', listingId);
+
+  if (error) {
+    throw new Error(`Gagal menghapus listing: ${error.message}`);
+  }
+
+  return true;
+}
+

@@ -8,6 +8,9 @@ import {
   fetchListingPricing,
   createPublicListing,
   fetchTenantListings,
+  updateListingStatus,
+  renewListing,
+  deleteListing,
 } from './publicListingService';
 
 describe('publicListingService - Unit Tests (T10.2: RLS & Public Access)', () => {
@@ -360,6 +363,77 @@ describe('publicListingService - Unit Tests (T10.2: RLS & Public Access)', () =>
       expect(tenantListings.length).toBeGreaterThan(0);
       expect(tenantListings.every((l) => l.tenant_id === 'demo-tenant-kos')).toBe(true);
     });
+
+    it('updateListingStatus berhasil mengubah status menjadi rented_or_sold dan active', async () => {
+      // Buat item untuk dites
+      const item = await createPublicListing('demo-tenant-kos', {
+        title: 'Kamar Siap Diuji Status',
+        contact_phone: '08123456789',
+        type: 'room_vacancy',
+      });
+
+      // Tandai rented_or_sold
+      const updatedSold = await updateListingStatus(item.id, 'rented_or_sold');
+      expect(updatedSold).toBeDefined();
+      expect(updatedSold.status).toBe('rented_or_sold');
+
+      // Aktifkan kembali
+      const updatedActive = await updateListingStatus(item.id, 'active');
+      expect(updatedActive.status).toBe('active');
+
+      // Error jika status tidak valid
+      await expect(updateListingStatus(item.id, 'invalid_status')).rejects.toThrow(
+        'Status tidak valid'
+      );
+      await expect(updateListingStatus('', 'active')).rejects.toThrow(
+        'Listing ID wajib disertakan.'
+      );
+    });
+
+    it('renewListing berhasil memperpanjang masa aktif 30 hari dan mengubah status ke active', async () => {
+      const item = await createPublicListing('demo-tenant-rtrw', {
+        title: 'Catering Segera Kedaluwarsa',
+        contact_phone: '08123456789',
+        type: 'umkm',
+        status: 'expired',
+      });
+
+      const renewed = await renewListing(item.id, {
+        durationDays: 30,
+        isFeatured: true,
+      });
+
+      expect(renewed).toBeDefined();
+      expect(renewed.status).toBe('active');
+      expect(renewed.is_featured).toBe(true);
+      expect(renewed.featured_until).toBeDefined();
+
+      const createdDate = new Date();
+      const expiryDate = new Date(renewed.expires_at);
+      const diffDays = Math.round((expiryDate - createdDate) / (1000 * 60 * 60 * 24));
+      expect(diffDays).toBe(30);
+
+      // Validasi error jika listingId kosong
+      await expect(renewListing('')).rejects.toThrow('Listing ID wajib disertakan.');
+    });
+
+    it('deleteListing berhasil menghapus listing dari daftar', async () => {
+      const item = await createPublicListing('demo-tenant-rtrw', {
+        title: 'Listing Untuk Dihapus',
+        contact_phone: '08123456789',
+        type: 'umkm',
+      });
+
+      const deleteRes = await deleteListing(item.id);
+      expect(deleteRes).toBe(true);
+
+      const remaining = await fetchTenantListings('demo-tenant-rtrw');
+      expect(remaining.some((l) => l.id === item.id)).toBe(false);
+
+      // Validasi error jika listingId kosong
+      await expect(deleteListing('')).rejects.toThrow('Listing ID wajib disertakan.');
+    });
   });
 });
+
 

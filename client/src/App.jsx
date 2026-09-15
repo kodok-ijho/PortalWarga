@@ -57,6 +57,7 @@ const PlatformRevenue = lazy(() => import('./pages/platform/PlatformRevenue'));
 const ArisanRounds = lazy(() => import('./pages/arisan/ArisanRounds'));
 const ArisanDraw = lazy(() => import('./pages/arisan/ArisanDraw'));
 const PostListing = lazy(() => import('./pages/tenant/PostListing'));
+const MyListings = lazy(() => import('./pages/tenant/MyListings'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center py-20">
@@ -271,10 +272,34 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="/t/:tenantId/listings"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <MyListings />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/t/:tenantId/my-listings"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <MyListings />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/post-listing"
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PostListing />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/my-listings"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <MyListings />
                     </Suspense>
                   }
                 />

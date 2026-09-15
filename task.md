@@ -324,7 +324,7 @@ adalah pengecualian sengaja terhadap prinsip isolasi tenant yang ditegakkan seja
   - Untuk tipe `kos`: prefill dari `tenant_units` yang berstatus `vacant`
   - Untuk tipe `rt_rw`: form kosong diisi manual oleh warga
   - Tampilkan harga dari `listing_pricing` sebelum lanjut ke pembayaran
-- [ ] **T10.5** -- Buat halaman `MyListings.jsx` -- kelola listing milik tenant/anggota ybs,
+- [x] **T10.5** -- Buat halaman `MyListings.jsx` -- kelola listing milik tenant/anggota ybs,
   tombol perpanjang, tombol tandai `rented_or_sold`.
 - [ ] **T10.6** -- Buat Edge Function pembayaran listing (reuse pola
   `create-subscription-payment`/`verify-subscription-payment` dari Phase 4, target tabel
