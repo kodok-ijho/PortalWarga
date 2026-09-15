@@ -362,7 +362,7 @@ listing dari lintas tenant; listing otomatis kedaluwarsa sesuai masa aktifnya.
 - [x] **T11.5** -- Review keamanan RLS menyeluruh (checklist: setiap tabel punya RLS aktif
   dan sesuai maksudnya -- termasuk memverifikasi ulang bahwa `public_listings` memang
   SENGAJA terbuka publik dan bukan tabel lain yang ke-skip secara tidak sengaja).
-- [ ] **T11.6** -- Deploy ke Supabase production project & Vercel, smoke test di production.
+- [x] **T11.6** -- Deploy ke Supabase production project & Vercel, smoke test di production.
 
 **Definition of Done Phase 11:** Aplikasi multi-tenant live, minimal 1 tenant per vertikal
 berhasil dibuat & dites end-to-end di production, Modul Listing berfungsi dan dapat diakses
