@@ -163,6 +163,10 @@ export function canViewFinancialReports(role) {
   return ['pengurus', 'bendahara', 'admin', 'admin_viewer'].includes(role);
 }
 
+export function canViewPaymentMatrix(role) {
+  return Boolean(role);
+}
+
 export function isAdminRole(role) {
   return role === 'admin';
 }
