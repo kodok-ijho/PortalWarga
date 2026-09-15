@@ -27,6 +27,8 @@ import {
   deleteListing,
   fetchListingPricing,
   getPricingForListing,
+  createListingPayment,
+  verifyListingPayment,
 } from '../../services/publicListingService';
 import Modal from '../../components/Modal';
 
@@ -156,10 +158,22 @@ export default function MyListings() {
 
     setIsRenewing(true);
     try {
-      await renewListing(renewTarget.id, {
+      // 1. Buat record invoice pembayaran perpanjangan (T10.6)
+      const payRes = await createListingPayment(renewTarget.id, {
         durationDays: 30,
         isFeatured: renewFeatured,
       });
+
+      // 2. Verifikasi pembayaran & perpanjang masa tayang
+      if (payRes?.paymentId) {
+        await verifyListingPayment(payRes.paymentId, payRes.gatewayRef);
+      } else {
+        await renewListing(renewTarget.id, {
+          durationDays: 30,
+          isFeatured: renewFeatured,
+        });
+      }
+
       toast.success('Masa aktif iklan berhasil diperpanjang 30 hari!');
       setRenewTarget(null);
       loadData();

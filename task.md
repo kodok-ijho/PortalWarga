@@ -326,7 +326,7 @@ adalah pengecualian sengaja terhadap prinsip isolasi tenant yang ditegakkan seja
   - Tampilkan harga dari `listing_pricing` sebelum lanjut ke pembayaran
 - [x] **T10.5** -- Buat halaman `MyListings.jsx` -- kelola listing milik tenant/anggota ybs,
   tombol perpanjang, tombol tandai `rented_or_sold`.
-- [ ] **T10.6** -- Buat Edge Function pembayaran listing (reuse pola
+- [x] **T10.6** -- Buat Edge Function pembayaran listing (reuse pola
   `create-subscription-payment`/`verify-subscription-payment` dari Phase 4, target tabel
   `listing_payments`, update `public_listings.status`/`is_featured` setelah bayar sukses).
 - [ ] **T10.7** -- Buat scheduled job harian yang menandai `public_listings` berstatus

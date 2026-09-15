@@ -197,6 +197,7 @@ export async function fetchListingPricing(options = {}) {
 
 // In-memory list untuk demo mode
 let inMemoryListings = [...mockPublicListings];
+let inMemoryListingPayments = [];
 
 /**
  * Membuat postingan listing publik baru (FR-25, FR-27, FR-28, FR-29)
@@ -418,5 +419,235 @@ export async function deleteListing(listingId) {
   }
 
   return true;
+}
+
+/**
+ * Membuat transaksi pembayaran/invoice QRIS untuk postingan listing (FR-25, FR-29, T10.6)
+ * Memanggil Edge Function `create-listing-payment` atau direct Supabase / mock fallback
+ * 
+ * @param {string} listingId
+ * @param {Object} [options={}] - { isFeatured, durationDays }
+ * @returns {Promise<Object>}
+ */
+export async function createListingPayment(listingId, { isFeatured = false, durationDays = 30 } = {}) {
+  if (!listingId) {
+    throw new Error('Listing ID wajib disertakan untuk pembayaran.');
+  }
+
+  const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
+
+  if (!isSupabaseConfigured() || isDemo || String(listingId).startsWith('listing-') || String(listingId).startsWith('mock-')) {
+    const paymentId = `pay-lst-${Date.now()}`;
+    const gatewayRef = `MYR-LST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const targetListing = inMemoryListings.find((l) => String(l.id) === String(listingId));
+    const listingType = targetListing?.type || 'room_vacancy';
+    const amount = listingType === 'room_vacancy'
+      ? (isFeatured ? 35000 : 15000)
+      : (isFeatured ? 25000 : 10000);
+
+    const paymentRecord = {
+      id: paymentId,
+      listing_id: listingId,
+      amount,
+      status: 'pending',
+      is_featured: Boolean(isFeatured),
+      duration_days: Number(durationDays),
+      qris_ref: gatewayRef,
+      payment_url: `/t/mock/listings?payRef=${gatewayRef}`,
+      created_at: new Date().toISOString(),
+    };
+    inMemoryListingPayments.push(paymentRecord);
+
+    return {
+      success: true,
+      paymentId,
+      gatewayRef,
+      amount,
+      isFeatured: Boolean(isFeatured),
+      durationDays: Number(durationDays),
+      paymentUrl: paymentRecord.payment_url,
+      qrisString: `00020101021126580016ID.CO.MAYAR.WWW0118${gatewayRef}520458125303360540${amount}5802ID5910RuangWarga6007Jakarta6304ABCD`,
+    };
+  }
+
+  // Coba invoke Edge Function create-listing-payment
+  try {
+    const { data, error } = await supabase.functions.invoke('create-listing-payment', {
+      body: {
+        listingId,
+        isFeatured: Boolean(isFeatured),
+        durationDays: Number(durationDays),
+      },
+    });
+
+    if (!error && data?.success) {
+      return data;
+    }
+    if (error && !error.message?.includes('Failed to send a request') && !error.message?.includes('FunctionsFetchError')) {
+      throw new Error(error.message || 'Gagal memproses pembuatan invoice pembayaran listing.');
+    }
+  } catch (edgeErr) {
+    // eslint-disable-next-line no-console
+    console.warn('[createListingPayment] Edge Function invoke failed, fallback to direct DB transaction:', edgeErr);
+  }
+
+  // Fallback: Direct DB query & insert jika Edge Function belum dideploy
+  const { data: listingData, error: lErr } = await supabase
+    .from('public_listings')
+    .select('id, tenant_id, type, title')
+    .eq('id', listingId)
+    .single();
+
+  if (lErr || !listingData) {
+    throw new Error('Listing tidak ditemukan di database.');
+  }
+
+  const { data: pricingRows } = await supabase
+    .from('listing_pricing')
+    .select('price')
+    .eq('listing_type', listingData.type)
+    .eq('is_featured', Boolean(isFeatured))
+    .eq('duration_days', Number(durationDays));
+
+  let amount = 0;
+  if (pricingRows && pricingRows.length > 0) {
+    amount = Number(pricingRows[0].price);
+  } else {
+    amount = listingData.type === 'room_vacancy' ? (isFeatured ? 35000 : 15000) : (isFeatured ? 25000 : 10000);
+  }
+
+  const gatewayRef = `MYR-DIR-${Date.now().toString(36).toUpperCase()}`;
+
+  const { data: paymentRecord, error: payErr } = await supabase
+    .from('listing_payments')
+    .insert({
+      listing_id: listingId,
+      amount,
+      status: 'pending',
+      is_featured: Boolean(isFeatured),
+      duration_days: Number(durationDays),
+      qris_ref: gatewayRef,
+      payment_url: `/t/${listingData.tenant_id}/listings?payRef=${gatewayRef}`,
+    })
+    .select()
+    .single();
+
+  if (payErr) {
+    throw new Error(`Gagal membuat catatan pembayaran: ${payErr.message}`);
+  }
+
+  return {
+    success: true,
+    paymentId: paymentRecord.id,
+    gatewayRef,
+    amount,
+    isFeatured: Boolean(isFeatured),
+    durationDays: Number(durationDays),
+    paymentUrl: paymentRecord.payment_url,
+    qrisString: `00020101021126580016ID.CO.MAYAR.WWW0118${gatewayRef}520458125303360540${amount}5802ID5910RuangWarga6007Jakarta6304ABCD`,
+  };
+}
+
+/**
+ * Memverifikasi pembayaran listing dan mengaktifkan / memperpanjang masa tayang (T10.6)
+ * Memanggil Edge Function `verify-listing-payment` atau RPC `activate_listing_payment`
+ * 
+ * @param {string} paymentId
+ * @param {string} [gatewayRef]
+ * @returns {Promise<Object>}
+ */
+export async function verifyListingPayment(paymentId, gatewayRef = null) {
+  if (!paymentId) {
+    throw new Error('Payment ID wajib disertakan.');
+  }
+
+  const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
+
+  if (!isSupabaseConfigured() || isDemo || String(paymentId).startsWith('pay-lst-') || String(paymentId).startsWith('mock-')) {
+    const pIdx = inMemoryListingPayments.findIndex((p) => String(p.id) === String(paymentId));
+    let listingId = null;
+    let isFeatured = false;
+    let durationDays = 30;
+
+    if (pIdx !== -1) {
+      inMemoryListingPayments[pIdx].status = 'paid';
+      inMemoryListingPayments[pIdx].paid_at = new Date().toISOString();
+      listingId = inMemoryListingPayments[pIdx].listing_id;
+      isFeatured = inMemoryListingPayments[pIdx].is_featured;
+      durationDays = inMemoryListingPayments[pIdx].duration_days || 30;
+    }
+
+    if (listingId) {
+      await renewListing(listingId, { durationDays, isFeatured });
+    }
+
+    return {
+      success: true,
+      message: 'Pembayaran iklan berhasil diverifikasi (demo mode)',
+      paymentId,
+      listingId,
+      status: 'active',
+      isFeatured,
+    };
+  }
+
+  // Coba Edge Function verify-listing-payment
+  try {
+    const { data, error } = await supabase.functions.invoke('verify-listing-payment', {
+      body: { paymentId, gatewayRef },
+    });
+
+    if (!error && data?.success) {
+      return data;
+    }
+  } catch (edgeErr) {
+    // eslint-disable-next-line no-console
+    console.warn('[verifyListingPayment] Edge function invoke failed, fallback to RPC activate_listing_payment:', edgeErr);
+  }
+
+  // Fallback ke RPC database activate_listing_payment
+  const { data: rpcResult, error: rpcError } = await supabase.rpc('activate_listing_payment', {
+    p_payment_id: paymentId,
+    p_gateway_ref: gatewayRef || null,
+  });
+
+  if (rpcError) {
+    throw new Error(`Gagal aktivasi pembayaran listing via database: ${rpcError.message}`);
+  }
+
+  return {
+    success: true,
+    message: 'Pembayaran iklan berhasil diverifikasi',
+    activationResult: rpcResult,
+  };
+}
+
+/**
+ * Mengambil status pembayaran listing
+ * 
+ * @param {string} paymentId
+ * @returns {Promise<Object>}
+ */
+export async function fetchListingPaymentStatus(paymentId) {
+  if (!paymentId) return null;
+
+  const isDemo = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
+
+  if (!isSupabaseConfigured() || isDemo || String(paymentId).startsWith('pay-lst-') || String(paymentId).startsWith('mock-')) {
+    const found = inMemoryListingPayments.find((p) => String(p.id) === String(paymentId));
+    return found || { id: paymentId, status: 'pending' };
+  }
+
+  const { data, error } = await supabase
+    .from('listing_payments')
+    .select('*')
+    .eq('id', paymentId)
+    .single();
+
+  if (error) {
+    throw new Error(`Gagal mengambil status pembayaran: ${error.message}`);
+  }
+
+  return data;
 }
 

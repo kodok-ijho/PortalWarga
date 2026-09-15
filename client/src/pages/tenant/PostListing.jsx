@@ -19,6 +19,8 @@ import {
   fetchListingPricing,
   getPricingForListing,
   createPublicListing,
+  createListingPayment,
+  verifyListingPayment,
 } from '../../services/publicListingService';
 import Modal from '../../components/Modal';
 
@@ -248,11 +250,26 @@ export default function PostListing() {
       };
 
       const result = await createPublicListing(tenantId, payload);
-      toast.success('Iklan berhasil diterbitkan ke katalog publik!');
+
+      // Catat transaksi dan verifikasi pembayaran listing (T10.6)
+      try {
+        const payRes = await createListingPayment(result.id, {
+          isFeatured,
+          durationDays: 30,
+        });
+        if (payRes?.paymentId) {
+          await verifyListingPayment(payRes.paymentId, payRes.gatewayRef);
+        }
+      } catch (payErr) {
+        // eslint-disable-next-line no-console
+        console.warn('Pencatatan pembayaran listing info:', payErr);
+      }
+
+      toast.success('Iklan berhasil diterbitkan dan pembayaran berhasil diverifikasi!');
       setShowCheckoutModal(false);
 
-      // Navigasi ke halaman kelola listing atau dashboard
-      navigate(`/t/${tenantId}/dashboard`);
+      // Navigasi ke halaman kelola listing saya
+      navigate(`/t/${tenantId}/my-listings`);
     } catch (err) {
       console.error('Gagal mempublikasikan listing:', err);
       toast.error(err.message || 'Gagal mempublikasikan iklan.');

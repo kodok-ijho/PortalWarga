@@ -11,6 +11,9 @@ import {
   updateListingStatus,
   renewListing,
   deleteListing,
+  createListingPayment,
+  verifyListingPayment,
+  fetchListingPaymentStatus,
 } from './publicListingService';
 
 describe('publicListingService - Unit Tests (T10.2: RLS & Public Access)', () => {
@@ -434,6 +437,97 @@ describe('publicListingService - Unit Tests (T10.2: RLS & Public Access)', () =>
       await expect(deleteListing('')).rejects.toThrow('Listing ID wajib disertakan.');
     });
   });
+
+  describe('publicListingService - Unit Tests (T10.6: Edge Function / Payment Processing)', () => {
+    it('createListingPayment membuat invoice pembayaran kamar kos reguler & featured', async () => {
+      const kosItem = await createPublicListing('demo-tenant-kos', {
+        title: 'Kamar Melati No 3',
+        contact_phone: '08123456789',
+        type: 'room_vacancy',
+      });
+
+      // Reguler: 15.000
+      const regPayment = await createListingPayment(kosItem.id, {
+        isFeatured: false,
+        durationDays: 30,
+      });
+
+      expect(regPayment.success).toBe(true);
+      expect(regPayment.paymentId).toBeDefined();
+      expect(regPayment.amount).toBe(15000);
+      expect(regPayment.isFeatured).toBe(false);
+      expect(regPayment.gatewayRef).toMatch(/^MYR-/);
+      expect(regPayment.qrisString).toBeDefined();
+      expect(regPayment.paymentUrl).toBeDefined();
+
+      // Featured: 35.000
+      const featPayment = await createListingPayment(kosItem.id, {
+        isFeatured: true,
+        durationDays: 30,
+      });
+
+      expect(featPayment.success).toBe(true);
+      expect(featPayment.amount).toBe(35000);
+      expect(featPayment.isFeatured).toBe(true);
+    });
+
+    it('createListingPayment membuat invoice pembayaran UMKM reguler & featured', async () => {
+      const umkmItem = await createPublicListing('demo-tenant-rtrw', {
+        title: 'Catering Bu Nur',
+        contact_phone: '08198765432',
+        type: 'umkm',
+      });
+
+      // Reguler: 10.000
+      const regPayment = await createListingPayment(umkmItem.id, {
+        isFeatured: false,
+        durationDays: 30,
+      });
+      expect(regPayment.amount).toBe(10000);
+
+      // Featured: 25.000
+      const featPayment = await createListingPayment(umkmItem.id, {
+        isFeatured: true,
+        durationDays: 30,
+      });
+      expect(featPayment.amount).toBe(25000);
+    });
+
+    it('createListingPayment melempar error jika listingId tidak disertakan', async () => {
+      await expect(createListingPayment('')).rejects.toThrow('Listing ID wajib disertakan untuk pembayaran.');
+    });
+
+    it('verifyListingPayment memverifikasi invoice dan mengaktifkan status/featured pada listing', async () => {
+      // 1. Buat listing awal
+      const item = await createPublicListing('demo-tenant-rtrw', {
+        title: 'Jasa Servis AC RT 05',
+        contact_phone: '08122334455',
+        type: 'umkm',
+        status: 'expired',
+      });
+
+      // 2. Buat pembayaran featured
+      const payment = await createListingPayment(item.id, {
+        isFeatured: true,
+        durationDays: 30,
+      });
+
+      // 3. Verifikasi pembayaran
+      const verifyRes = await verifyListingPayment(payment.paymentId, payment.gatewayRef);
+      expect(verifyRes.success).toBe(true);
+      expect(verifyRes.status).toBe('active');
+      expect(verifyRes.isFeatured).toBe(true);
+
+      // 4. Cek status pembayaran dari fetchListingPaymentStatus
+      const paymentStatus = await fetchListingPaymentStatus(payment.paymentId);
+      expect(paymentStatus.status).toBe('paid');
+    });
+
+    it('verifyListingPayment melempar error jika paymentId kosong', async () => {
+      await expect(verifyListingPayment('')).rejects.toThrow('Payment ID wajib disertakan.');
+    });
+  });
 });
+
 
 
