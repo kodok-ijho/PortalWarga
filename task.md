@@ -353,7 +353,7 @@ listing dari lintas tenant; listing otomatis kedaluwarsa sesuai masa aktifnya.
   signup sampai transaksi pertama berhasil.
 - [x] **T11.2** -- Regression test fondasi platform (Phase 1--5): trial expiry, read_only,
   renewal, isolasi tenant, akses Platform Owner Dashboard.
-- [ ] **T11.3** -- Regression test Modul Listing (Phase 10): posting listing kos & umkm,
+- [x] **T11.3** -- Regression test Modul Listing (Phase 10): posting listing kos & umkm,
   halaman publik dapat diakses tanpa login, listing lintas tenant tampil dengan benar,
   listing expired otomatis tersembunyi dari direktori publik.
 - [ ] **T11.4** -- Siapkan script migrasi opsional untuk instance PortalWarga single-tenant
