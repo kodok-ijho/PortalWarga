@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   AiOutlineHome,
   AiOutlineUser,
@@ -269,32 +269,34 @@ export default function Header() {
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
         {/* Kiri: Brand Logo */}
         <div className="flex items-center gap-3">
-          <img
-            src="/logo.png"
-            alt="Logo"
-            className="h-10 w-auto rounded-lg object-cover ring-2 ring-gold-500/30"
-          />
-          <div>
-            <h1 className="text-sm md:text-base font-bold text-white leading-none tracking-wide flex items-center gap-1.5 font-display">
-              Palm Village
-              <span className="inline-flex items-center rounded bg-gold-500/20 text-gold-300 px-1.5 py-0.5 text-[10px] font-mono font-bold border border-gold-400/30">
-                {APP_VERSION}
-              </span>
-              {IS_DEMO_MODE && (
-                <span className="bg-amber-400/90 text-forest-900 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider scale-90 origin-left">
-                  Demo
+          <Link to="/" className="flex items-center gap-3 group">
+            <img
+              src="/logo.png"
+              alt="Logo"
+              className="h-10 w-auto rounded-lg object-cover ring-2 ring-gold-500/30 group-hover:ring-gold-400 transition"
+            />
+            <div>
+              <h1 className="text-sm md:text-base font-bold text-white leading-none tracking-wide flex items-center gap-1.5 font-display">
+                {activeTenant?.name || 'RuangWarga'}
+                <span className="inline-flex items-center rounded bg-gold-500/20 text-gold-300 px-1.5 py-0.5 text-[10px] font-mono font-bold border border-gold-400/30">
+                  {APP_VERSION}
                 </span>
-              )}
-              {isReadOnly && (
-                <span className="bg-amber-400 text-forest-950 text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm flex items-center gap-0.5">
-                  <span>👁️</span> View Only
-                </span>
-              )}
-            </h1>
-            <p className="text-[10px] text-forest-300 leading-tight tracking-wider uppercase mt-0.5">
-              Portal Warga
-            </p>
-          </div>
+                {IS_DEMO_MODE && (
+                  <span className="bg-amber-400/90 text-forest-900 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider scale-90 origin-left">
+                    Demo
+                  </span>
+                )}
+                {isReadOnly && (
+                  <span className="bg-amber-400 text-forest-950 text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm flex items-center gap-0.5">
+                    <span>👁️</span> View Only
+                  </span>
+                )}
+              </h1>
+              <p className="text-[10px] text-forest-300 leading-tight tracking-wider uppercase mt-0.5">
+                {activeTenant?.type ? template?.communityLabel || 'Komunitas' : 'Platform Multi-Tenant'}
+              </p>
+            </div>
+          </Link>
           {isAuthenticated && (
             <div className="hidden xl:flex items-center ml-3">
               <TenantSwitcher />
@@ -573,23 +575,22 @@ export default function Header() {
               </button>
             </div>
 
-            {/* Shortcut 17 Agustus Mobile */}
-            <div className="p-3 mx-3 mt-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 border border-red-400/50 shadow-sm flex items-center justify-between gap-2">
+            {/* Shortcut Layanan & Onboarding Mobile */}
+            <div className="p-3 mx-3 mt-3 rounded-xl bg-forest-900 border border-gold-500/30 shadow-sm flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-xl">🇮🇩</span>
+                <span className="text-xl">🏢</span>
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-white truncate">Dokumentasi 17 Agustus</p>
-                  <p className="text-[10px] text-red-100 truncate">Foto & video perayaan HUT RI</p>
+                  <p className="text-xs font-bold text-white truncate">Layanan &amp; Komunitas</p>
+                  <p className="text-[10px] text-forest-300 truncate">Kelola atau buat tenant baru</p>
                 </div>
               </div>
-              <a
-                href="https://drive.google.com/drive/folders/1-CIioJe6MkyBUeepB9I9yBSjsiR1h5HY"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-2.5 py-1.5 bg-white hover:bg-red-50 text-red-700 text-[11px] font-bold rounded-lg shadow-xs flex-shrink-0"
+              <Link
+                to="/account/tenants"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-2.5 py-1.5 bg-gold-500 hover:bg-gold-400 text-forest-950 text-[11px] font-bold rounded-lg shadow-xs flex-shrink-0"
               >
-                Drive ↗
-              </a>
+                Layanan ↗
+              </Link>
             </div>
 
             {/* Menu List */}

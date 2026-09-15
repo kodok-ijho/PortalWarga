@@ -1,357 +1,449 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  AiOutlineUser,
-  AiOutlineHome,
-  AiOutlineTable,
-  AiOutlineBarChart,
-  AiOutlineSetting,
+  AiOutlinePlus,
+  AiOutlineArrowRight,
+  AiOutlineSafetyCertificate,
   AiOutlineTeam,
-  AiOutlineFileText,
-  AiOutlineWallet,
-  AiOutlineUserAdd,
+  AiOutlineHome,
+  AiOutlineDollarCircle,
   AiOutlineCheckCircle,
+  AiOutlineEye,
+  AiOutlineShop,
+  AiOutlineAppstore,
+  AiOutlineSwap,
+  AiOutlineUser,
 } from 'react-icons/ai';
-import { useAuth } from '../hooks/useAuth';
-import { useTour } from '../context/TourContext';
-import {
-  formatRupiah,
-  MONTHS_LONG,
-  isStaffRole,
-  isBendaharaOrAbove,
-  hasMinRole,
-  roleLabel,
-  roleColor,
-} from '../services/dataHelpers';
-import { fetchDashboardData, IS_DEMO } from '../services/dataService';
+import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
+import { useTenant } from '../hooks/useTenant';
+import { TENANT_TYPE_OPTIONS } from './onboarding/ChooseTenantType';
+import pkg from '../../package.json';
+
+const APP_VERSION = `v${pkg.version || '1.4.3'}`;
 
 export default function Home() {
-  const { profile, role, session } = useAuth();
-  const { triggerTour } = useTour();
-  const isStaff = isStaffRole(role);
-  const isBendahara = isBendaharaOrAbove(role);
+  const navigate = useNavigate();
+  const { user, profile, isAuthenticated, signOut, isSuperAdmin } = useAuth();
+  const { userTenants, activeTenant, switchTenant, isPlatformAdmin } = useTenant();
 
-  const [dashData, setDashData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const now = new Date();
-  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  const loadDashboard = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await fetchDashboardData(session?.access_token, { role, period: currentPeriod });
-      setDashData(data);
-    } catch {
-      // Dashboard should not crash — just show zeros
-      setDashData({ report: null, pendingRegistrationCount: 0, pendingPaymentCount: 0 });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [session?.access_token, role, currentPeriod]);
-
-  useEffect(() => {
-    loadDashboard();
-    triggerTour('dashboard');
-  }, [loadDashboard, triggerTour]);
-
-  const pendingRegCount = dashData?.pendingRegistrationCount || 0;
-  const pendingPayCount = dashData?.pendingPaymentCount || 0;
-  const report = dashData?.report || null;
-
-  const getFeatures = () => {
-    const base = [
-      { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Lihat daftar penghuni kompleks.' },
-      { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Lihat daftar rumah & nomor unit.' },
-      { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Bayar & pantau iuran IPL unit Anda.' },
-    ];
-    if (hasMinRole(role, 'admin')) {
-      return [
-        { to: '/user-approval', icon: AiOutlineUserAdd, title: 'Approval User', desc: 'Verifikasi pendaftaran warga baru.', badge: pendingRegCount },
-        { to: '/payment-verification', icon: AiOutlineCheckCircle, title: 'Verifikasi Bayar', desc: 'Verifikasi bukti transfer IPL.', badge: pendingPayCount },
-        { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
-        { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
-        { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Pantau status pembayaran IPL semua unit.' },
-        { to: '/expenses', icon: AiOutlineWallet, title: 'Pengeluaran', desc: 'Lihat & kelola biaya operasional perumahan.' },
-        { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
-        { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
-        { to: '/users', icon: AiOutlineTeam, title: 'Kelola User', desc: 'Kelola akun Gmail warga dan hak akses role.' },
-        { to: '/logs', icon: AiOutlineFileText, title: 'Log Sistem', desc: 'Audit log login, akses halaman, dan transaksi.' },
-      ];
-    }
-    if (isBendahara) {
-      return [
-        { to: '/user-approval', icon: AiOutlineUserAdd, title: 'Approval User', desc: 'Verifikasi pendaftaran warga baru.', badge: pendingRegCount },
-        { to: '/payment-verification', icon: AiOutlineCheckCircle, title: 'Verifikasi Bayar', desc: 'Verifikasi bukti transfer IPL.', badge: pendingPayCount },
-        { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
-        { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
-        { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Pantau status pembayaran IPL semua unit.' },
-        { to: '/expenses', icon: AiOutlineWallet, title: 'Pengeluaran', desc: 'Lihat & kelola biaya operasional perumahan.' },
-        { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
-        { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
-        { to: '/users', icon: AiOutlineTeam, title: 'Kelola User', desc: 'Kelola akun Gmail warga dan hak akses role.' },
-      ];
-    }
-    if (isStaff) {
-      return [
-        { to: '/user-approval', icon: AiOutlineUserAdd, title: 'Approval User', desc: 'Verifikasi pendaftaran warga baru.', badge: pendingRegCount },
-        { to: '/payment-verification', icon: AiOutlineCheckCircle, title: 'Verifikasi Bayar', desc: 'Verifikasi bukti transfer IPL.', badge: pendingPayCount },
-        { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
-        { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
-        { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Pantau status pembayaran IPL semua unit.' },
-        { to: '/expenses', icon: AiOutlineWallet, title: 'Pengeluaran', desc: 'Lihat & kelola biaya operasional perumahan.' },
-        { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
-        { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
-        { to: '/users', icon: AiOutlineTeam, title: 'Kelola User', desc: 'Kelola akun Gmail warga dan hak akses role.' },
-      ];
-    }
-    return base;
+  const handleSelectTenant = (tenantId) => {
+    switchTenant(tenantId);
+    navigate(`/t/${tenantId}/dashboard`);
   };
 
-  const features = getFeatures();
-
   return (
-    <div className="space-y-6">
-      {/* Hero */}
-      <section data-tour="dashboard-hero" className="pv-card overflow-hidden">
-        <div className="relative bg-gradient-to-br from-forest-800 via-forest-700 to-forest-900 px-6 sm:px-10 py-8 sm:py-12">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold-500 via-gold-400 to-gold-600" />
-          <div className="relative max-w-2xl">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white font-display leading-tight">
-              Selamat Datang di
-              <br />
-              <span className="text-gold-400">Portal Warga Palm Village</span>
-            </h2>
-            <p className="mt-3 text-forest-200 text-sm sm:text-base max-w-xl">
-              Portal layanan informasi dan transaksi untuk warga kompleks Perumahan Palm Village.
-            </p>
-            {profile?.full_name && (
-              <p data-tour="profile-badge" className="mt-4 inline-flex items-center gap-2 bg-forest-900/40 backdrop-blur rounded-full px-4 py-1.5 text-sm text-gold-300 border border-gold-500/20">
-                🌴 Halo, {profile.full_name}
-                {role && (
-                  <span className={`pv-badge ml-1 ${roleColor(role)}`}>
-                    {roleLabel(role)}
+    <div className="min-h-screen bg-[#06180e] text-white flex flex-col selection:bg-gold-500 selection:text-forest-950">
+      {/* ── Top Navigation Bar ───────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 bg-[#071f13]/90 border-b border-forest-800/80 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img
+              src="/logo.png"
+              alt="RuangWarga"
+              className="h-10 w-auto rounded-xl object-cover ring-2 ring-gold-500/40 shadow-lg"
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-lg sm:text-xl font-display tracking-tight text-white">
+                  RuangWarga
+                </span>
+                <span className="inline-flex items-center rounded-md bg-gold-500/20 text-gold-300 px-1.5 py-0.5 text-[10px] font-mono font-bold border border-gold-400/30">
+                  {APP_VERSION}
+                </span>
+                {IS_DEMO_MODE && (
+                  <span className="bg-amber-400/90 text-forest-950 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
+                    Demo
                   </span>
                 )}
+              </div>
+              <p className="text-[10px] text-forest-300 tracking-wider uppercase font-medium">
+                Platform SaaS Komunitas &amp; Properti
               </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link
+              to="/listing"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-forest-200 hover:text-white rounded-lg hover:bg-forest-800/60 transition"
+            >
+              <AiOutlineShop className="text-sm text-gold-400" />
+              <span>Direktori Listing</span>
+            </Link>
+
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/account/tenants"
+                  className="px-3 py-1.5 text-xs font-bold text-forest-200 hover:text-white rounded-lg hover:bg-forest-800/80 transition flex items-center gap-1.5"
+                >
+                  <AiOutlineAppstore className="text-sm text-gold-400" />
+                  <span className="hidden sm:inline">Layanan Saya</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => signOut()}
+                  className="px-3 py-1.5 text-xs text-rose-300 hover:text-white hover:bg-rose-950/50 rounded-lg transition border border-rose-500/20"
+                >
+                  Keluar
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className="px-4 py-2 text-xs font-bold text-forest-950 bg-gold-500 hover:bg-gold-400 rounded-xl transition shadow-md shadow-gold-900/30"
+              >
+                Masuk ke Akun
+              </Link>
             )}
           </div>
         </div>
-      </section>
+      </header>
 
-      {/* Stats bulan berjalan */}
-      {isLoading ? (
-        <section className="pv-card p-8 text-center">
-          <div className="mx-auto mb-3 h-10 w-10 rounded-full border-4 border-forest-100 border-t-gold-500 animate-spin" />
-          <p className="text-sm text-forest-500">Memuat data dashboard...</p>
-        </section>
-      ) : report && report.billCount > 0 ? (
-        <section className="pv-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-forest-800">
-              Ringkasan — {MONTHS_LONG[now.getMonth()]} {now.getFullYear()}
-            </h3>
+      {/* ── Main Content Area ────────────────────────────────────────── */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-12 sm:space-y-16">
+        {/* ── Hero Section (Model SumoPod) ───────────────────────────── */}
+        <section className="text-center max-w-4xl mx-auto pt-4 sm:pt-8 space-y-5 sm:space-y-6">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gold-500/10 border border-gold-500/30 text-gold-300 text-xs font-bold uppercase tracking-widest shadow-inner">
+            <span>✨ Model SumoPod SaaS Platform</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <StatBox label="Total Tagihan" value={formatRupiah(report.totalBilled)} color="text-forest-800" />
-            <StatBox label="Terkumpul" value={formatRupiah(report.totalCollected)} color="text-emerald-600" />
-            <StatBox label="Tunggakan" value={formatRupiah(report.totalOutstanding)} color="text-amber-600" />
-            <StatBox label="% Koleksi" value={`${report.collectionRate.toFixed(0)}%`} color="text-gold-600" />
+
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white font-display tracking-tight leading-tight">
+            Satu Infrastruktur untuk{' '}
+            <span className="bg-gradient-to-r from-gold-400 via-amber-300 to-gold-500 bg-clip-text text-transparent">
+              Seluruh Kebutuhan Komunitas &amp; Properti
+            </span>
+          </h1>
+
+          <p className="text-sm sm:text-lg text-forest-200 leading-relaxed max-w-3xl mx-auto">
+            RuangWarga melayani 4 vertikal bisnis terpadu: <strong>RT/RW &amp; Perumahan</strong>,{' '}
+            <strong>Kos-kosan &amp; Kontrakan</strong>, <strong>Kelompok Arisan</strong>, dan{' '}
+            <strong>Kelas &amp; Kursus</strong>. Dilengkapi kapasitas fleksibel berjenjang, auto-billing,
+            dan direktori listing publik.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <Link
+              to="/onboarding/choose-type"
+              className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-400 hover:to-amber-400 text-forest-950 font-extrabold text-sm shadow-xl shadow-gold-950/50 transition-all hover:scale-105 active:scale-95"
+            >
+              <AiOutlinePlus className="text-base stroke-2 font-bold" />
+              <span>Daftarkan Layanan / Tenant Baru</span>
+            </Link>
+
+            <Link
+              to="/account/tenants"
+              className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-forest-900/90 hover:bg-forest-800 text-forest-200 hover:text-white border border-forest-700 font-bold text-sm transition"
+            >
+              <AiOutlineAppstore className="text-base text-gold-400" />
+              <span>Kelola Layanan Saya</span>
+            </Link>
+
+            <Link
+              to="/listing"
+              className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-forest-950 hover:bg-forest-900 text-forest-300 hover:text-gold-300 border border-forest-800 font-medium text-sm transition"
+            >
+              <AiOutlineShop className="text-base text-emerald-400" />
+              <span>Jelajahi Listing Publik</span>
+            </Link>
+          </div>
+
+          <div className="flex items-center justify-center gap-6 pt-2 text-xs text-forest-400 font-medium">
+            <span className="flex items-center gap-1.5">
+              <AiOutlineCheckCircle className="text-gold-400 text-sm" /> 15 Hari Free Trial Otomatis
+            </span>
+            <span className="flex items-center gap-1.5">
+              <AiOutlineSafetyCertificate className="text-emerald-400 text-sm" /> Isolasi Data RLS Penuh
+            </span>
+            <span className="flex items-center gap-1.5">
+              <AiOutlineDollarCircle className="text-amber-400 text-sm" /> Block Pricing Fleksibel
+            </span>
           </div>
         </section>
-      ) : null}
 
-      {/* Pending Actions Notification Banner */}
-      {(pendingRegCount > 0 || pendingPayCount > 0) && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {pendingRegCount > 0 && (
-            <Link
-              to="/user-approval"
-              className="flex items-center justify-between rounded-xl bg-amber-50 border border-amber-200 p-4 hover:bg-amber-100 transition-colors shadow-sm"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">⏳</span>
-                <div>
-                  <h4 className="text-sm font-bold text-amber-900">Pendaftaran User Baru</h4>
-                  <p className="text-xs text-amber-700">Ada {pendingRegCount} warga menunggu persetujuan akun.</p>
+        {/* ── Banner Eksklusif Platform Owner / Superadmin ────────────── */}
+        {(isPlatformAdmin || isSuperAdmin) && (
+          <section className="bg-gradient-to-r from-amber-950/60 via-forest-900 to-amber-950/60 border-2 border-gold-500/60 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+            <div className="absolute -right-10 -bottom-10 opacity-10 text-9xl">👑</div>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">👑</span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-gold-300 bg-gold-500/20 px-2.5 py-0.5 rounded-full border border-gold-400/40">
+                    Platform Owner Access
+                  </span>
                 </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-white font-display">
+                  Selamat Datang, Superadmin ({user?.email || profile?.email || 'dyudhiantoro@gmail.com'})
+                </h2>
+                <p className="text-xs sm:text-sm text-forest-200 leading-relaxed">
+                  Anda memiliki otoritas penuh atas infrastruktur RuangWarga. Kelola status langganan seluruh tenant,
+                  penetapan harga blok &amp; diskon periode, serta pantau estimasi pendapatan MRR platform secara berkala.
+                </p>
               </div>
-              <span className="text-xs font-bold bg-amber-600 text-white px-3 py-1.5 rounded-lg shadow-sm">
-                Proses Sekarang →
-              </span>
-            </Link>
-          )}
-          {pendingPayCount > 0 && (
-            <Link
-              to="/payment-verification"
-              className="flex items-center justify-between rounded-xl bg-orange-50 border border-orange-200 p-4 hover:bg-orange-100 transition-colors shadow-sm"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">🔍</span>
-                <div>
-                  <h4 className="text-sm font-bold text-orange-900">Verifikasi Pembayaran</h4>
-                  <p className="text-xs text-orange-700">Ada {pendingPayCount} transfer IPL menunggu verifikasi.</p>
-                </div>
-              </div>
-              <span className="text-xs font-bold bg-orange-600 text-white px-3 py-1.5 rounded-lg shadow-sm">
-                Verifikasi →
-              </span>
-            </Link>
-          )}
-        </div>
-      )}
 
-      {/* Momen 17 Agustus Banner Shortcut */}
-      <section className="pv-card overflow-hidden border border-red-200/80 shadow-sm bg-gradient-to-r from-red-600 via-red-500 to-rose-600 text-white relative">
-        <div className="absolute top-0 right-0 -mt-6 -mr-6 w-36 h-36 bg-white/10 rounded-full blur-xl pointer-events-none" />
-        <div className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
-          <div className="flex items-center gap-3.5">
-            <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center text-2xl shadow-inner animate-bounce">
-              🇮🇩
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                <Link
+                  to="/platform"
+                  className="px-5 py-3 rounded-xl bg-gradient-to-r from-gold-500 to-amber-400 hover:from-gold-400 hover:to-amber-300 text-forest-950 font-black text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-gold-950/60 transition hover:scale-105"
+                >
+                  <AiOutlineSafetyCertificate className="text-base stroke-2" />
+                  <span>Buka Platform Dashboard</span>
+                </Link>
+                <Link
+                  to="/platform/pricing"
+                  className="px-4 py-3 rounded-xl bg-forest-900 hover:bg-forest-800 text-gold-300 border border-gold-500/30 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                >
+                  <AiOutlineDollarCircle className="text-base" />
+                  <span>Konfigurasi Harga</span>
+                </Link>
+              </div>
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-sm sm:text-base font-bold text-white">
-                  Momen & Dokumentasi 17 Agustus
-                </h3>
-                <span className="bg-white text-red-700 font-extrabold text-[9px] uppercase px-2 py-0.5 rounded-full shadow-xs">
-                  HUT RI Palm Village
-                </span>
+          </section>
+        )}
+
+        {/* ── Widget Workspace / Tenant Aktif Anda ────────────────────── */}
+        {userTenants && userTenants.length > 0 && (
+          <section className="bg-forest-900/60 border border-forest-700/80 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl backdrop-blur-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-forest-800">
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-white font-display flex items-center gap-2">
+                  <span>🏢</span>
+                  <span>Layanan Aktif Anda ({userTenants.length} Tenant)</span>
+                </h2>
+                <p className="text-xs text-forest-300 mt-0.5">
+                  Pilih salah satu layanan untuk masuk ke dashboard operasional harian.
+                </p>
               </div>
-              <p className="text-xs text-red-100 mt-0.5 max-w-xl leading-relaxed">
-                Akses kumpulan foto, video keseruan lomba, dan kemeriahan warga perumahan Palm Village di Google Drive.
+              <Link
+                to="/account/tenants"
+                className="text-xs font-bold text-gold-400 hover:text-gold-300 flex items-center gap-1"
+              >
+                <span>Kelola Semua Tenant</span>
+                <AiOutlineArrowRight className="text-xs" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {userTenants.map((t) => {
+                const opt = TENANT_TYPE_OPTIONS.find((o) => o.type === t.type);
+                const isActive = activeTenant?.id === t.id;
+                return (
+                  <div
+                    key={t.id}
+                    className={`rounded-2xl p-5 border transition-all flex flex-col justify-between ${
+                      isActive
+                        ? 'bg-forest-800/90 border-gold-500/60 shadow-lg shadow-gold-950/30 ring-1 ring-gold-500/30'
+                        : 'bg-forest-950/70 border-forest-800 hover:border-forest-600 hover:bg-forest-900/50'
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl">{opt?.icon || '🏢'}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-forest-800 text-forest-200 border border-forest-700 uppercase">
+                          {t.type?.replace('_', '/')}
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white line-clamp-1">{t.name}</h3>
+                        <p className="text-[11px] text-forest-400 line-clamp-1">{t.address || opt?.title}</p>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 mt-2 border-t border-forest-800/60 flex items-center justify-between">
+                      <span className="text-[10px] text-forest-300">
+                        Role: <strong className="text-gold-300 capitalize">{t.role || 'Admin'}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTenant(t.id)}
+                        className="px-3 py-1.5 rounded-lg bg-gold-500 hover:bg-gold-400 text-forest-950 font-bold text-xs flex items-center gap-1 transition"
+                      >
+                        <span>Buka</span>
+                        <AiOutlineArrowRight className="text-xs" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ── Showcase 4 Vertikal Bisnis (Pabrik SumoPod) ─────────────── */}
+        <section className="space-y-8">
+          <div className="text-center max-w-2xl mx-auto space-y-2">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-display">
+              Empat Vertikal Bisnis yang Didukung
+            </h2>
+            <p className="text-xs sm:text-sm text-forest-300">
+              Setiap vertikal memiliki template istilah, logika penagihan, dan modul kerja yang disesuaikan secara spesifik.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {TENANT_TYPE_OPTIONS.map((opt) => (
+              <div
+                key={opt.type}
+                className="bg-forest-900/70 border border-forest-800 hover:border-gold-500/40 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all hover:shadow-2xl hover:shadow-gold-950/20 group"
+              >
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="w-14 h-14 rounded-2xl bg-forest-950 border border-forest-700/60 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
+                      {opt.icon}
+                    </div>
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${opt.badgeColor}`}>
+                      {opt.badge}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-white font-display group-hover:text-gold-300 transition-colors">
+                      {opt.title}
+                    </h3>
+                    <p className="text-xs text-forest-400 mt-0.5">Untuk: {opt.targetRole}</p>
+                  </div>
+
+                  <p className="text-xs text-forest-200 leading-relaxed">{opt.description}</p>
+
+                  <div className="space-y-2 pt-2 border-t border-forest-800/80">
+                    <span className="text-[10px] font-bold text-forest-400 uppercase tracking-wider block">
+                      Fitur Utama:
+                    </span>
+                    <ul className="space-y-1.5 text-xs text-forest-300">
+                      {opt.features.map((feat, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          <AiOutlineCheckCircle className="text-gold-400 text-xs shrink-0" />
+                          <span>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="pt-6 mt-4 border-t border-forest-800 flex items-center gap-3">
+                  <Link
+                    to={`/onboarding/choose-type?type=${opt.type}`}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-400 hover:to-amber-400 text-forest-950 font-bold text-xs text-center transition shadow shadow-gold-950/40"
+                  >
+                    Buat {opt.title.split('&')[0]} Baru
+                  </Link>
+                  <Link
+                    to={`/t/demo-tenant-${opt.type}/dashboard`}
+                    className="py-2.5 px-4 rounded-xl bg-forest-950 hover:bg-forest-800 text-forest-300 hover:text-white border border-forest-700 font-semibold text-xs transition text-center"
+                    title="Pratinjau antarmuka demo"
+                  >
+                    Demo
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Pilar Fondasi Multi-Tenant Platform ─────────────────────── */}
+        <section className="bg-[#05140b] border border-forest-800 rounded-3xl p-8 sm:p-12 space-y-8">
+          <div className="text-center max-w-2xl mx-auto space-y-2">
+            <span className="text-xs font-bold text-gold-400 uppercase tracking-widest">
+              Arsitektur &amp; Keamanan
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-display">
+              Dibangun dengan Standar SaaS Modern
+            </h2>
+            <p className="text-xs sm:text-sm text-forest-300">
+              Fondasi multi-tenant yang tangguh, aman, dan siap tumbuh bersama skala komunitas Anda.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-forest-900/40 border border-forest-800 rounded-2xl p-6 space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-gold-500/10 text-gold-400 border border-gold-500/20 flex items-center justify-center text-2xl">
+                🛡️
+              </div>
+              <h3 className="text-sm font-bold text-white">Isolasi Database (RLS)</h3>
+              <p className="text-xs text-forest-300 leading-relaxed">
+                Setiap tabel operasional diproteksi oleh Row Level Security PostgreSQL sehingga data tidak akan pernah bocor antar tenant.
+              </p>
+            </div>
+
+            <div className="bg-forest-900/40 border border-forest-800 rounded-2xl p-6 space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-2xl">
+                📦
+              </div>
+              <h3 className="text-sm font-bold text-white">Block Capacity Pricing</h3>
+              <p className="text-xs text-forest-300 leading-relaxed">
+                Skema langganan modular: bayar hanya blok kapasitas unit, kamar, atau slot yang Anda gunakan.
+              </p>
+            </div>
+
+            <div className="bg-forest-900/40 border border-forest-800 rounded-2xl p-6 space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center text-2xl">
+                📢
+              </div>
+              <h3 className="text-sm font-bold text-white">Modul Listing Publik</h3>
+              <p className="text-xs text-forest-300 leading-relaxed">
+                Promosikan kamar kos kosong dan lapak UMKM warga ke halaman publik tanpa login dengan opsi promosi berbayar.
+              </p>
+            </div>
+
+            <div className="bg-forest-900/40 border border-forest-800 rounded-2xl p-6 space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center text-2xl">
+                💳
+              </div>
+              <h3 className="text-sm font-bold text-white">Mayar QRIS Otomatis</h3>
+              <p className="text-xs text-forest-300 leading-relaxed">
+                Pembayaran langganan platform dan iuran warga dapat dilakukan instan melalui scan QRIS seluruh e-wallet &amp; mobile banking.
               </p>
             </div>
           </div>
-          <a
-            href="https://drive.google.com/drive/folders/1-CIioJe6MkyBUeepB9I9yBSjsiR1h5HY"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-red-50 text-red-700 font-bold px-4 py-2.5 text-xs shadow-md transition-all duration-200 hover:scale-[1.02] flex-shrink-0"
-          >
-            <span>📸 Buka Google Drive</span>
-            <span className="text-xs">↗</span>
-          </a>
-        </div>
-      </section>
+        </section>
 
-      {/* Feature cards */}
-      <div data-tour="dashboard-features" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {features.map(({ to, icon: Icon, title, desc, badge }) => (
-          <Link
-            key={to}
-            to={to}
-            data-tour={to === '/payment-matrix' ? 'feature-payment-matrix' : to === '/houses' ? 'feature-houses' : to === '/residents' ? 'feature-residents' : undefined}
-            className="pv-card p-5 group hover:border-gold-400/50 hover:shadow-elevated transition-all duration-200 relative"
-          >
-            <div className="flex items-center justify-between">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-forest-800 text-gold-400 group-hover:bg-forest-700 transition-colors">
-                <Icon size={22} />
-              </span>
-              {badge > 0 && (
-                <span className="inline-flex items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white shadow-sm animate-pulse">
-                  {badge} Baru
-                </span>
-              )}
-            </div>
-            <h3 className="mt-4 font-semibold text-forest-900 text-sm">{title}</h3>
-            <p className="mt-1.5 text-xs text-forest-600 leading-relaxed">{desc}</p>
-          </Link>
-        ))}
-      </div>
-
-      {/* Kontak Darurat & SOS Satpam */}
-      <section className="pv-card overflow-hidden border-l-4 border-l-red-500 shadow-sm">
-        <div className="p-5 sm:p-6 bg-gradient-to-r from-red-50/50 via-white to-red-50/20 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 border border-red-200 flex items-center justify-center text-red-600 text-2xl shadow-sm animate-pulse">
-              🚨
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-bold text-forest-900">Kontak Darurat & Pos Satpam (SOS)</h3>
-                <span className="pv-badge bg-red-100 text-red-700 font-bold text-[10px] uppercase">Siaga 24 Jam</span>
-              </div>
-              <p className="text-xs text-forest-600 mt-1 max-w-xl leading-relaxed">
-                Keadaan darurat, keamanan lingkungan, atau bantuan mendesak? Hubungi langsung petugas satpam Perumahan Palm Village melalui WhatsApp atau Telepon langsung.
-              </p>
-            </div>
+        {/* ── Call To Action Bawah ────────────────────────────────────── */}
+        <section className="bg-gradient-to-br from-forest-900 via-forest-800 to-forest-950 border border-gold-500/40 rounded-3xl p-8 sm:p-12 text-center space-y-6 shadow-2xl relative overflow-hidden">
+          <div className="max-w-2xl mx-auto space-y-3">
+            <h2 className="text-2xl sm:text-3xl font-black text-white font-display">
+              Siap Mengelola Komunitas Anda Lebih Rapi?
+            </h2>
+            <p className="text-xs sm:text-sm text-forest-200 leading-relaxed">
+              Mulai sekarang dengan 15 hari trial gratis penuh tanpa kartu kredit.
+              Buat tenant Anda dan undang anggota dalam hitungan menit.
+            </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-0 border-forest-100">
-            {/* Satpam Riki */}
-            <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white border border-forest-100 shadow-xs">
-              <div className="min-w-0 pr-1">
-                <p className="text-xs font-bold text-forest-900 truncate">👮 Satpam Riki</p>
-                <p className="text-[11px] text-forest-500 font-mono">0895-3231-36366</p>
-              </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <a
-                  href="https://wa.me/62895323136366?text=Halo%20Pak%20Satpam%20Riki,%20saya%20warga%20Palm%20Village%20membutuhkan%20bantuan."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-2.5 py-1.5 text-xs shadow-xs transition-colors"
-                  title="Chat WhatsApp Satpam Riki"
-                >
-                  <span>💬 WA</span>
-                </a>
-                <a
-                  href="tel:+62895323136366"
-                  className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium px-2.5 py-1.5 text-xs shadow-xs transition-colors"
-                  title="Telepon Satpam Riki"
-                >
-                  <span>📞 Call</span>
-                </a>
-              </div>
-            </div>
 
-            {/* Satpam Roni */}
-            <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white border border-forest-100 shadow-xs">
-              <div className="min-w-0 pr-1">
-                <p className="text-xs font-bold text-forest-900 truncate">👮 Satpam Roni</p>
-                <p className="text-[11px] text-forest-500 font-mono">0881-0103-57049</p>
-              </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <a
-                  href="https://wa.me/62881010357049?text=Halo%20Pak%20Satpam%20Roni,%20saya%20warga%20Palm%20Village%20membutuhkan%20bantuan."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-2.5 py-1.5 text-xs shadow-xs transition-colors"
-                  title="Chat WhatsApp Satpam Roni"
-                >
-                  <span>💬 WA</span>
-                </a>
-                <a
-                  href="tel:+62881010357049"
-                  className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium px-2.5 py-1.5 text-xs shadow-xs transition-colors"
-                  title="Telepon Satpam Roni"
-                >
-                  <span>📞 Call</span>
-                </a>
-              </div>
-            </div>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Link
+              to="/onboarding/choose-type"
+              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-gold-500 to-amber-400 hover:from-gold-400 hover:to-amber-300 text-forest-950 font-extrabold text-sm shadow-xl shadow-gold-950/60 transition hover:scale-105"
+            >
+              <AiOutlinePlus className="text-base font-bold" />
+              <span>Daftarkan Tenant Pertama Anda</span>
+            </Link>
+            <Link
+              to="/listing"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-forest-950 hover:bg-forest-900 text-forest-200 hover:text-white border border-forest-700 font-bold text-sm transition"
+            >
+              <AiOutlineShop className="text-base text-gold-400" />
+              <span>Lihat Direktori Listing Publik</span>
+            </Link>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* Demo notice */}
-      {IS_DEMO && (
-        <div className="rounded-lg bg-gold-50 border border-gold-200 px-4 py-3 text-xs text-gold-800">
-          🔧 <strong>Mode Demo</strong> aktif — data yang ditampilkan adalah simulasi. Untuk data real,
-          hubungkan ke project Supabase dan set{' '}
-          <code className="bg-gold-100 px-1 rounded">VITE_DEMO_MODE=false</code> di{' '}
-          <code className="bg-gold-100 px-1 rounded">.env</code>.
+      {/* ── Footer ─────────────────────────────────────────────────── */}
+      <footer className="border-t border-forest-800/80 bg-[#05140b] py-8 text-center text-xs text-forest-400 space-y-2">
+        <p className="font-medium">
+          RuangWarga © 2026 — Platform SaaS Multi-Tenant Komunitas &amp; Properti.
+        </p>
+        <div className="flex items-center justify-center gap-4 text-[11px] text-forest-500">
+          <Link to="/listing/kos" className="hover:text-forest-300">Listing Kos</Link>
+          <span>•</span>
+          <Link to="/listing/umkm" className="hover:text-forest-300">Listing UMKM</Link>
+          <span>•</span>
+          <Link to="/account/tenants" className="hover:text-forest-300">Layanan Saya</Link>
+          <span>•</span>
+          <Link to="/platform" className="hover:text-forest-300">Platform Owner</Link>
         </div>
-      )}
+      </footer>
     </div>
   );
 }
-
-function StatBox({ label, value, color }) {
-  return (
-    <div className="text-center py-3 rounded-lg bg-forest-50">
-      <p className={`text-lg font-bold ${color}`}>{value}</p>
-      <p className="text-[11px] text-forest-500 mt-1">{label}</p>
-    </div>
-  );
-}
-

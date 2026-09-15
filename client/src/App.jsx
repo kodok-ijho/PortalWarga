@@ -102,6 +102,9 @@ export default function App() {
               <TourProvider>
               <WalkthroughTour />
               <Routes>
+                {/* Beranda SaaS Platform — Terbuka Publik ala SumoPod */}
+                <Route path="/" element={<Home />} />
+
                 {/* Login & Onboarding terbuka */}
                 <Route path="/login" element={<Login />} />
                 <Route
@@ -416,7 +419,6 @@ export default function App() {
 
                 {/* Halaman butuh login */}
                 <Route element={<ProtectedLayout />}>
-                  <Route path="/" element={<Home />} />
                   <Route
                     path="/residents"
                     element={

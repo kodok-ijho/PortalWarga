@@ -257,17 +257,17 @@ export default function Login() {
         <div className="text-center mb-6">
           <img
             src="/logo.png"
-            alt="Logo Palm Village"
-            className="h-24 w-auto rounded-2xl object-cover mx-auto ring-4 ring-gold-500/40 shadow-2xl mb-3"
+            alt="Logo RuangWarga"
+            className="h-20 w-auto rounded-2xl object-cover mx-auto ring-4 ring-gold-500/40 shadow-2xl mb-3"
           />
           <h1 className="text-2xl font-bold text-white font-display tracking-wide flex items-center justify-center gap-2">
-            <span>Portal Warga Palm Village</span>
+            <span>RuangWarga</span>
             <span className="inline-flex items-center rounded-full bg-gold-500/20 text-gold-300 px-2 py-0.5 text-xs font-mono font-bold border border-gold-400/30">
               {APP_VERSION}
             </span>
           </h1>
           <p className="text-xs text-forest-300 uppercase tracking-wider mt-1">
-            Sistem Layanan IPL &amp; Informasi Hunian
+            Platform SaaS Komunitas &amp; Properti (RT/RW • Kos • Arisan • Kelas)
           </p>
         </div>
 
