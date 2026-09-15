@@ -359,7 +359,7 @@ listing dari lintas tenant; listing otomatis kedaluwarsa sesuai masa aktifnya.
 - [x] **T11.4** -- Siapkan script migrasi opsional untuk instance PortalWarga single-tenant
   existing (bila ada pelanggan lama) ke struktur multi-tenant baru -- pemetaan data lama
   ke `tenants`/`tenant_units`/`tenant_members`/`billing_items`.
-- [ ] **T11.5** -- Review keamanan RLS menyeluruh (checklist: setiap tabel punya RLS aktif
+- [x] **T11.5** -- Review keamanan RLS menyeluruh (checklist: setiap tabel punya RLS aktif
   dan sesuai maksudnya -- termasuk memverifikasi ulang bahwa `public_listings` memang
   SENGAJA terbuka publik dan bukan tabel lain yang ke-skip secara tidak sengaja).
 - [ ] **T11.6** -- Deploy ke Supabase production project & Vercel, smoke test di production.
