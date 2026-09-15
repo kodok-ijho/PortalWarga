@@ -20,6 +20,7 @@ export default function Login() {
     signIn,
     signUp,
     signInWithGoogle,
+    signInWithSupabaseGoogle,
     loginDemoAdmin,
     enableDemoAdmin,
     isAuthenticated,
@@ -331,22 +332,49 @@ export default function Login() {
             <div className="space-y-5">
               {/* Tombol Utama Google OAuth */}
               {IS_DEMO_MODE ? (
-                <button
-                  type="button"
-                  onClick={() => handleGoogleLoginDemo('warga@palmvillage.id')}
-                  disabled={submitting}
-                  className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-white hover:bg-gray-100 text-gray-800 font-bold rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 group border border-gray-200"
-                >
-                  <FcGoogle className="w-5 h-5 shrink-0" />
-                  <span className="text-sm">Masuk sebagai Warga Demo</span>
-                </button>
+                <div className="space-y-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleGoogleLoginDemo('dyudhiantoro@gmail.com')}
+                    disabled={submitting}
+                    className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-gradient-to-r from-gold-500 to-amber-400 hover:from-gold-400 hover:to-amber-300 text-forest-950 font-bold rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 group border border-gold-400"
+                  >
+                    <span className="text-lg">👑</span>
+                    <span className="text-sm">Masuk sebagai Superadmin (dyudhiantoro@gmail.com)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleGoogleLoginDemo('warga@palmvillage.id')}
+                    disabled={submitting}
+                    className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white hover:bg-gray-100 text-gray-800 font-medium rounded-xl shadow transition-all group border border-gray-200"
+                  >
+                    <FcGoogle className="w-5 h-5 shrink-0" />
+                    <span className="text-sm">Masuk sebagai Warga Demo</span>
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-3">
-                  {!GOOGLE_AUTH_READY ? (
-                    <div className="rounded-xl border border-amber-500/50 bg-amber-950/30 p-3.5 text-xs text-amber-100">
-                      Konfigurasi VITE_GOOGLE_CLIENT_ID atau VITE_N8N_API_BASE_URL belum tersedia.
-                    </div>
-                  ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setError('');
+                      setSubmitting(true);
+                      try {
+                        await signInWithSupabaseGoogle({ redirectTo: window.location.origin });
+                      } catch (err) {
+                        setError(err.message || 'Gagal memulai login Google.');
+                        setSubmitting(false);
+                      }
+                    }}
+                    disabled={submitting}
+                    className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-white hover:bg-gray-50 text-gray-800 font-bold rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 border border-gray-300"
+                  >
+                    <FcGoogle className="w-5 h-5 shrink-0" />
+                    <span className="text-sm">Masuk dengan Akun Google</span>
+                  </button>
+
+                  {GOOGLE_AUTH_READY && (
                     <div className="rounded-xl bg-white p-2 shadow-lg">
                       <div ref={googleButtonRef} className="min-h-[44px] w-full flex items-center justify-center" />
                       {!googleButtonReady && (

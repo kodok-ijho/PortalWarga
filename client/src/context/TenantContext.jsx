@@ -123,7 +123,9 @@ export function TenantProvider({ children }) {
         localStorage.setItem(ACTIVE_TENANT_KEY, tenants[0].id);
       }
 
-      setIsPlatformAdmin(demoRole === 'admin');
+      const currentEmail = (user?.email || profile?.email || '').toLowerCase();
+      const isSuperAdminEmail = currentEmail === 'dyudhiantoro@gmail.com';
+      setIsPlatformAdmin(demoRole === 'admin' || isSuperAdminEmail);
       setLoading(false);
       return;
     }
@@ -138,15 +140,22 @@ export function TenantProvider({ children }) {
       }
 
       // 1. Cek apakah user adalah platform admin
-      try {
-        const { data: adminData } = await supabase
-          .from('platform_admins')
-          .select('user_id')
-          .eq('user_id', currentUserId)
-          .maybeSingle();
-        setIsPlatformAdmin(Boolean(adminData?.user_id));
-      } catch (_e) {
-        setIsPlatformAdmin(false);
+      const currentEmail = (user?.email || profile?.email || '').toLowerCase();
+      const isSuperAdminEmail = currentEmail === 'dyudhiantoro@gmail.com';
+
+      if (isSuperAdminEmail) {
+        setIsPlatformAdmin(true);
+      } else {
+        try {
+          const { data: adminData } = await supabase
+            .from('platform_admins')
+            .select('user_id')
+            .eq('user_id', currentUserId)
+            .maybeSingle();
+          setIsPlatformAdmin(Boolean(adminData?.user_id));
+        } catch (_e) {
+          setIsPlatformAdmin(false);
+        }
       }
 
       // 2. Ambil seluruh keanggotaan tenant (sebagai owner atau member approved)

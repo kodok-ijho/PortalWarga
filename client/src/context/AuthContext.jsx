@@ -19,6 +19,20 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 // Akun demo untuk preview UI tanpa project Supabase.
 // (hanya aktif saat VITE_DEMO_MODE=true)
 const DEMO_ACCOUNTS = {
+  'dyudhiantoro@gmail.com': {
+    password: 'demo123',
+    profile: {
+      id: 'superadmin-dyudhiantoro',
+      full_name: 'Dhani Yudhiantoro (Superadmin)',
+      phone: '0812-0000-0001',
+      role: 'admin',
+      unit_id: null,
+      occupancy_status: null,
+      is_active: true,
+      email: 'dyudhiantoro@gmail.com',
+      is_superadmin: true,
+    },
+  },
   'admin@palmvillage.id': {
     password: 'demo123',
     profile: {
@@ -235,21 +249,25 @@ function useDemoAuth() {
     return null;
   }, [profile]);
 
-  const signOut = useCallback(async () => {
-    localStorage.removeItem('pv_active_tenant_id');
-    persist(null);
+  const signInWithSupabaseGoogle = useCallback(async () => {
+    const acc = DEMO_ACCOUNTS['dyudhiantoro@gmail.com'];
+    if (acc) persist(acc.profile);
   }, []);
+
+  const isSuperAdmin = (profile?.email || '').toLowerCase() === 'dyudhiantoro@gmail.com';
 
   return {
     session: profile ? { user: { id: profile.id, email: profile.email } } : null,
-    user: profile ? { id: profile.id, email: profile.email, full_name: profile.full_name } : null,
-    profile,
+    user: profile ? { id: profile.id, email: profile.email, full_name: profile.full_name, is_superadmin: isSuperAdmin } : null,
+    profile: profile ? { ...profile, is_superadmin: isSuperAdmin } : null,
     role: profile?.role ?? null,
     isReadOnly: Boolean(profile?.is_read_only || profile?.role === 'admin_viewer'),
+    isSuperAdmin,
     isAuthenticated: !!profile,
     loading,
     signIn,
     signUp,
+    signInWithSupabaseGoogle,
     signOut,
     updateProfile,
   };
@@ -607,21 +625,25 @@ function useProductionAuth() {
     (ENABLE_DEMO_ADMIN && profile?.email?.toLowerCase() === DEMO_ADMIN_EMAIL)
   );
 
+  const isSuperAdmin = (supabaseUser?.email || session?.user?.email || profile?.email || '').toLowerCase() === 'dyudhiantoro@gmail.com';
+
   const resolvedUser = supabaseUser
     ? {
         id: supabaseUser.id,
         email: supabaseUser.email,
         full_name: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'User',
+        is_superadmin: isSuperAdmin,
         ...profile,
       }
-    : (session?.user ?? (profile ? { id: profile.id, email: profile.email, ...profile } : null));
+    : (session?.user ? { ...session.user, is_superadmin: isSuperAdmin } : (profile ? { id: profile.id, email: profile.email, is_superadmin: isSuperAdmin, ...profile } : null));
 
   return {
     session,
     user: resolvedUser,
-    profile: profile || (supabaseUser ? { id: supabaseUser.id, email: supabaseUser.email, full_name: supabaseUser.user_metadata?.full_name } : null),
+    profile: profile || (supabaseUser ? { id: supabaseUser.id, email: supabaseUser.email, full_name: supabaseUser.user_metadata?.full_name, is_superadmin: isSuperAdmin } : null),
     role: profile?.role ?? null,
     isReadOnly,
+    isSuperAdmin,
     enableDemoAdmin: ENABLE_DEMO_ADMIN,
     demoAdminEmail: DEMO_ADMIN_EMAIL,
     isAuthenticated: Boolean(session || supabaseUser),
