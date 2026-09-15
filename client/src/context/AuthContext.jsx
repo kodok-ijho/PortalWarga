@@ -254,6 +254,11 @@ function useDemoAuth() {
     if (acc) persist(acc.profile);
   }, []);
 
+  const signOut = useCallback(async () => {
+    localStorage.removeItem('pv_active_tenant_id');
+    persist(null);
+  }, []);
+
   const isSuperAdmin = (profile?.email || '').toLowerCase() === 'dyudhiantoro@gmail.com';
 
   return {
