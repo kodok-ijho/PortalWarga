@@ -262,8 +262,41 @@ export function canViewLogs(role) {
   return hasMinRole(role, 'admin');
 }
 
-export function roleLabel(role) {
-  const map = { warga: 'Warga', pengurus: 'Koordinator Palm Village', bendahara: 'Bendahara', admin: 'Admin', admin_viewer: 'Admin Viewer' };
+export function roleLabel(role, tenantType = 'rt_rw') {
+  if (tenantType === 'kelas') {
+    const kelasMap = {
+      warga: 'Siswa / Wali Murid',
+      anggota: 'Siswa / Wali Murid',
+      pengurus: 'Staf Pengajar',
+      bendahara: 'Bendahara Kelas',
+      admin: 'Pengajar / Pengelola',
+      admin_viewer: 'Admin Viewer',
+    };
+    return kelasMap[role] || role || '-';
+  }
+  if (tenantType === 'kos') {
+    const kosMap = {
+      warga: 'Penyewa',
+      anggota: 'Penyewa',
+      pengurus: 'Pengelola Kos',
+      bendahara: 'Bendahara Kos',
+      admin: 'Pemilik Kos',
+      admin_viewer: 'Admin Viewer',
+    };
+    return kosMap[role] || role || '-';
+  }
+  if (tenantType === 'arisan') {
+    const arisanMap = {
+      warga: 'Peserta Arisan',
+      anggota: 'Peserta Arisan',
+      pengurus: 'Pengurus Arisan',
+      bendahara: 'Bendahara Arisan',
+      admin: 'Ketua / Admin Arisan',
+      admin_viewer: 'Admin Viewer',
+    };
+    return arisanMap[role] || role || '-';
+  }
+  const map = { warga: 'Warga', anggota: 'Warga', pengurus: 'Pengurus RT/RW', bendahara: 'Bendahara', admin: 'Ketua RT/RW / Admin', admin_viewer: 'Admin Viewer' };
   return map[role] || role || '-';
 }
 
@@ -274,12 +307,50 @@ export function roleColor(role) {
     bendahara: 'bg-teal-100 text-teal-700 border-teal-200',
     pengurus: 'bg-blue-100 text-blue-700 border-blue-200',
     warga: 'bg-forest-100 text-forest-700 border-forest-200',
+    anggota: 'bg-forest-100 text-forest-700 border-forest-200',
   };
   return map[role] || 'bg-gray-100 text-gray-500 border-gray-200';
 }
 
 // ── OCCUPANCY STATUS ─────────────────────────────────────────────
-export function occupancyStatusLabel(status) {
+export function occupancyStatusLabel(status, tenantType = 'rt_rw') {
+  if (tenantType === 'kos') {
+    const kosMap = {
+      tenant: 'Penyewa Aktif',
+      owner_occupied: 'Pemilik / Pengelola',
+      owner_rented: 'Kamar Tersewa',
+      owner_vacant: 'Kamar Kosong',
+      checkout: 'Selesai / Checkout',
+      booking: 'Dipesan / Booking',
+    };
+    return kosMap[status] || OCCUPANCY_STATUS[status] || status || '-';
+  }
+  if (tenantType === 'kelas') {
+    const kelasMap = {
+      tenant: 'Siswa Terdaftar',
+      student: 'Siswa Terdaftar',
+      active: 'Siswa Terdaftar',
+      owner_occupied: 'Pengajar / Wali Kelas',
+      owner_rented: 'Slot Terisi',
+      owner_vacant: 'Slot Terbuka',
+      checkout: 'Lulus / Selesai',
+      completed: 'Lulus / Selesai',
+      alumni: 'Lulus / Alumni',
+      booking: 'Calon Siswa / Dipesan',
+    };
+    return kelasMap[status] || OCCUPANCY_STATUS[status] || status || '-';
+  }
+  if (tenantType === 'arisan') {
+    const arisanMap = {
+      tenant: 'Peserta Aktif',
+      owner_occupied: 'Ketua Arisan',
+      owner_rented: 'Slot Terisi',
+      owner_vacant: 'Slot Terbuka',
+      checkout: 'Selesai / Keluar',
+      booking: 'Calon Peserta',
+    };
+    return arisanMap[status] || OCCUPANCY_STATUS[status] || status || '-';
+  }
   return OCCUPANCY_STATUS[status] || status || '-';
 }
 
@@ -289,6 +360,8 @@ export function occupancyStatusColor(status) {
     owner_vacant: 'bg-amber-100 text-amber-700',
     owner_rented: 'bg-blue-100 text-blue-700',
     tenant: 'bg-indigo-100 text-indigo-700',
+    checkout: 'bg-gray-100 text-gray-600',
+    booking: 'bg-amber-100 text-amber-800',
   };
   return map[status] || 'bg-gray-100 text-gray-500';
 }

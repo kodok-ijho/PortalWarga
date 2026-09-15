@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { registerUnauthorizedHandler, portalApiPost } from '../services/apiClient';
 import { updateProfileApi } from '../services/dataService';
+import { supabase } from '../services/supabaseClient';
 
 const AuthContext = createContext(null);
 
@@ -234,11 +235,14 @@ function useDemoAuth() {
     return null;
   }, [profile]);
 
-  const signOut = useCallback(async () => persist(null), []);
+  const signOut = useCallback(async () => {
+    localStorage.removeItem('pv_active_tenant_id');
+    persist(null);
+  }, []);
 
   return {
-    session: profile ? { user: { id: profile.id } } : null,
-    user: profile ? { id: profile.id } : null,
+    session: profile ? { user: { id: profile.id, email: profile.email } } : null,
+    user: profile ? { id: profile.id, email: profile.email, full_name: profile.full_name } : null,
     profile,
     role: profile?.role ?? null,
     isReadOnly: Boolean(profile?.is_read_only || profile?.role === 'admin_viewer'),
@@ -319,14 +323,36 @@ function mapAuthError(error) {
   }
 }
 
-// ====== n8n App JWT auth (production) ======
+// ====== n8n App JWT auth + Supabase Auth (production) ======
 function useProductionAuth() {
   const [session, setSession] = useState(null);
+  const [supabaseUser, setSupabaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [accountStatus, setAccountStatus] = useState(null);
   const [authError, setAuthError] = useState(null);
   const [tokenExpiresAt, setTokenExpiresAt] = useState(null);
+
+  // Sinkronisasi sesi Supabase Auth
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data: { session: sbSession } }) => {
+      if (mounted && sbSession?.user) {
+        setSupabaseUser(sbSession.user);
+      }
+    }).catch(() => {});
+
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((_event, sbSession) => {
+      if (mounted) {
+        setSupabaseUser(sbSession?.user ?? null);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      authSubscription?.unsubscribe();
+    };
+  }, []);
 
   const persist = useCallback((token, currentUser, expiresAt) => {
     if (token && currentUser) {
@@ -517,7 +543,26 @@ function useProductionAuth() {
     return { currentUser: readOnlyProfile };
   }, [persist]);
 
+  const signInWithSupabaseGoogle = useCallback(async (options = {}) => {
+    const redirectTo = options.redirectTo || `${window.location.origin}/`;
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo,
+      },
+    });
+    if (error) throw error;
+    return data;
+  }, []);
+
   const signOut = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (_e) {
+      // ignore
+    }
+    localStorage.removeItem('pv_active_tenant_id');
+    setSupabaseUser(null);
     persist(null, null);
   }, [persist]);
 
@@ -562,15 +607,24 @@ function useProductionAuth() {
     (ENABLE_DEMO_ADMIN && profile?.email?.toLowerCase() === DEMO_ADMIN_EMAIL)
   );
 
+  const resolvedUser = supabaseUser
+    ? {
+        id: supabaseUser.id,
+        email: supabaseUser.email,
+        full_name: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'User',
+        ...profile,
+      }
+    : (session?.user ?? (profile ? { id: profile.id, email: profile.email, ...profile } : null));
+
   return {
     session,
-    user: session?.user ?? null,
-    profile,
+    user: resolvedUser,
+    profile: profile || (supabaseUser ? { id: supabaseUser.id, email: supabaseUser.email, full_name: supabaseUser.user_metadata?.full_name } : null),
     role: profile?.role ?? null,
     isReadOnly,
     enableDemoAdmin: ENABLE_DEMO_ADMIN,
     demoAdminEmail: DEMO_ADMIN_EMAIL,
-    isAuthenticated: !!session,
+    isAuthenticated: Boolean(session || supabaseUser),
     loading,
     accountStatus,
     authError,
@@ -578,6 +632,7 @@ function useProductionAuth() {
     signIn,
     signUp,
     signInWithGoogle,
+    signInWithSupabaseGoogle,
     loginDemoAdmin,
     signOut,
     updateProfile,

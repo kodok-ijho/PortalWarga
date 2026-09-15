@@ -1,0 +1,333 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import {
+  AiOutlineUser,
+  AiOutlineCheck,
+  AiOutlineClose,
+  AiOutlineLoading3Quarters,
+  AiOutlineHome,
+  AiOutlinePhone,
+  AiOutlineClockCircle,
+  AiOutlineArrowLeft,
+  AiOutlineCheckCircle,
+} from 'react-icons/ai';
+import { useTenant } from '../../hooks/useTenant';
+import { useSubscriptionGate } from '../../hooks/useSubscriptionGate';
+import { useToast } from '../../hooks/useToast';
+import {
+  fetchPendingTenantMembers,
+  approveTenantMember,
+  rejectTenantMember,
+  fetchTenantUnits,
+} from '../../services/tenantOperationalService';
+import SubscriptionGateButton from '../../components/SubscriptionGateButton';
+
+export default function TenantMemberApproval() {
+  const { tenantId } = useParams();
+  const toast = useToast();
+  const { activeTenant, activeTenantId, switchTenant, isTenantAdmin } = useTenant();
+  const { isReadOnly, guardAction } = useSubscriptionGate();
+
+  const [pendingList, setPendingList] = useState([]);
+  const [unitsList, setUnitsList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState(null);
+
+  // Modal approve state
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [selectedRole, setSelectedRole] = useState('anggota');
+  const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [selectedOccupancy, setSelectedOccupancy] = useState('owner_occupied');
+
+  // Sinkronkan activeTenantId
+  useEffect(() => {
+    if (tenantId && tenantId !== activeTenantId) {
+      switchTenant(tenantId);
+    }
+  }, [tenantId, activeTenantId, switchTenant]);
+
+  const loadData = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    try {
+      const [members, units] = await Promise.all([
+        fetchPendingTenantMembers(tenantId),
+        fetchTenantUnits(tenantId),
+      ]);
+      setPendingList(members || []);
+      setUnitsList(units || []);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[TenantMemberApproval] load error:', err);
+      toast.error('Gagal memuat daftar permohonan anggota.');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId, toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const openApproveModal = (member) => {
+    guardAction(() => {
+      setSelectedMember(member);
+      setSelectedRole(member.role || 'anggota');
+      setSelectedUnitId(member.unit_id ? String(member.unit_id) : '');
+      setSelectedOccupancy(member.occupancy_status || 'owner_occupied');
+    });
+  };
+
+  const handleConfirmApprove = async () => {
+    if (!selectedMember) return;
+
+    setProcessingId(selectedMember.id);
+    try {
+      await approveTenantMember(selectedMember.id, {
+        role: selectedRole,
+        unitId: selectedUnitId ? Number(selectedUnitId) : null,
+        occupancyStatus: selectedOccupancy,
+      });
+
+      toast.success(`${selectedMember.full_name} berhasil disetujui bergabung!`);
+      setSelectedMember(null);
+      await loadData();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[TenantMemberApproval] approve error:', err);
+      toast.error(err.message || 'Gagal menyetujui permohonan.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = (member) => {
+    guardAction(async () => {
+      if (!window.confirm(`Yakin ingin menolak pendaftaran "${member.full_name}"?`)) {
+        return;
+      }
+
+      setProcessingId(member.id);
+      try {
+        await rejectTenantMember(member.id);
+        toast.info(`Pendaftaran ${member.full_name} telah ditolak.`);
+        await loadData();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[TenantMemberApproval] reject error:', err);
+        toast.error(err.message || 'Gagal menolak permohonan.');
+      } finally {
+        setProcessingId(null);
+      }
+    });
+  };
+
+  const formatRelativeTime = (dateStr) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#071f13] text-white py-10 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Top Breadcrumb */}
+        <div>
+          <Link
+            to={`/t/${tenantId}/dashboard`}
+            className="inline-flex items-center gap-2 text-xs text-forest-400 hover:text-white transition-colors mb-3"
+          >
+            <AiOutlineArrowLeft /> Kembali ke Dashboard
+          </Link>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <span className="text-xs font-bold text-gold-400 uppercase tracking-wider block mb-1">
+                Manajemen Anggota Warga
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white font-display">
+                Persetujuan Pendaftaran Warga Baru
+              </h1>
+              <p className="text-xs text-forest-300 mt-1">
+                Komunitas: <strong className="text-white">{activeTenant?.name || tenantId}</strong>
+              </p>
+            </div>
+            <div className="text-xs text-forest-300 bg-forest-900/80 px-3 py-1.5 rounded-full border border-forest-800 w-fit">
+              Menunggu Verifikasi:{' '}
+              <strong className="text-gold-300 font-mono">{pendingList.length}</strong> orang
+            </div>
+          </div>
+        </div>
+
+        {/* List Card */}
+        <div className="bg-forest-900/80 border border-forest-700/80 rounded-3xl p-6 sm:p-8 shadow-xl backdrop-blur-md">
+          {loading ? (
+            <div className="py-16 text-center text-forest-300 text-xs flex items-center justify-center gap-2">
+              <AiOutlineLoading3Quarters className="animate-spin text-base text-gold-400" />
+              <span>Memuat daftar permohonan...</span>
+            </div>
+          ) : pendingList.length === 0 ? (
+            <div className="py-16 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-forest-950 text-emerald-400 border border-forest-800 flex items-center justify-center mx-auto text-2xl">
+                <AiOutlineCheckCircle />
+              </div>
+              <h3 className="text-sm font-bold text-white">Tidak Ada Permohonan Pending</h3>
+              <p className="text-xs text-forest-400 max-w-sm mx-auto">
+                Semua pendaftaran warga telah diproses. Bagikan tautan undangan komplek untuk mengajak warga lain bergabung.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pendingList.map((m) => {
+                const isProcessing = processingId === m.id;
+                const unitLabel = m.tenant_units?.label || (m.unit_id ? `Unit ID ${m.unit_id}` : 'Belum memilih unit');
+
+                return (
+                  <div
+                    key={m.id}
+                    className="p-4 sm:p-5 rounded-2xl bg-forest-950 border border-forest-800 hover:border-forest-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">{m.full_name}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-gold-500/10 border border-gold-500/30 text-gold-300 font-semibold uppercase">
+                          {m.occupancy_status === 'tenant' ? 'Penyewa' : 'Pemilik'}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-forest-300">
+                        <span className="inline-flex items-center gap-1 text-emerald-300 font-semibold">
+                          <AiOutlineHome />
+                          <span>{unitLabel}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-forest-400">
+                          <AiOutlinePhone />
+                          <span>{m.phone || '-'}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-forest-400">
+                          <AiOutlineClockCircle />
+                          <span>{formatRelativeTime(m.created_at)}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <SubscriptionGateButton
+                        onClick={() => openApproveModal(m)}
+                        disabled={isProcessing}
+                        className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-forest-950 text-xs font-bold transition-colors shadow-md disabled:opacity-50"
+                      >
+                        <AiOutlineCheck />
+                        <span>Setujui</span>
+                      </SubscriptionGateButton>
+
+                      <SubscriptionGateButton
+                        onClick={() => handleReject(m)}
+                        disabled={isProcessing}
+                        className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-forest-900 hover:bg-rose-900/30 text-forest-300 hover:text-rose-300 border border-forest-800 text-xs font-semibold transition-colors disabled:opacity-50"
+                      >
+                        <AiOutlineClose />
+                        <span>Tolak</span>
+                      </SubscriptionGateButton>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Modal Konfirmasi Persetujuan */}
+        {selectedMember && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <div className="bg-forest-900 border border-forest-700 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+              <div>
+                <h3 className="text-lg font-bold text-white font-display">
+                  Konfirmasi Persetujuan Warga
+                </h3>
+                <p className="text-xs text-forest-300 mt-0.5">
+                  Tetapkan nomor rumah dan peran untuk{' '}
+                  <strong className="text-gold-300">{selectedMember.full_name}</strong>.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-forest-200 mb-1.5">
+                    Nomor Rumah / Unit Warga
+                  </label>
+                  <select
+                    value={selectedUnitId}
+                    onChange={(e) => setSelectedUnitId(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-forest-950 border border-forest-700 text-white text-xs focus:outline-none"
+                  >
+                    <option value="">-- Pilih Unit --</option>
+                    {unitsList.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-forest-200 mb-1.5">
+                    Status Tinggal
+                  </label>
+                  <select
+                    value={selectedOccupancy}
+                    onChange={(e) => setSelectedOccupancy(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-forest-950 border border-forest-700 text-white text-xs focus:outline-none"
+                  >
+                    <option value="owner_occupied">Pemilik (Dihuni Sendiri)</option>
+                    <option value="tenant">Penyewa / Kontrak</option>
+                    <option value="owner_vacant">Pemilik (Rumah Kosong)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-forest-200 mb-1.5">
+                    Peran / Hak Akses
+                  </label>
+                  <select
+                    value={selectedRole}
+                    onChange={(e) => setSelectedRole(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-forest-950 border border-forest-700 text-white text-xs focus:outline-none"
+                  >
+                    <option value="anggota">Warga / Anggota Biasa</option>
+                    <option value="pengurus">Pengurus Lingkungan</option>
+                    <option value="bendahara">Bendahara</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-forest-800">
+                <button
+                  type="button"
+                  onClick={() => setSelectedMember(null)}
+                  className="px-4 py-2.5 rounded-xl bg-forest-800 hover:bg-forest-700 text-forest-200 text-xs font-semibold transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmApprove}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-forest-950 text-xs font-bold transition-colors shadow-md"
+                >
+                  <AiOutlineCheck />
+                  <span>Setujui Sekarang</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

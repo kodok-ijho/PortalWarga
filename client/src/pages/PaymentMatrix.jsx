@@ -1,10 +1,14 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useTenant } from '../hooks/useTenant';
+import { useTenantTemplate } from '../hooks/useTenantTemplate';
 import { useToast } from '../hooks/useToast';
 import { useTour } from '../context/TourContext';
 import Modal from '../components/Modal';
 import Placeholder from '../components/Placeholder';
 import QrisCheckoutModal from '../components/QrisCheckoutModal';
+import CreateBillingModal from '../components/CreateBillingModal';
+import CheckoutRoomModal from '../components/CheckoutRoomModal';
 import {
   MONTHS_SHORT,
   MONTHS_LONG,
@@ -48,6 +52,7 @@ import {
   downloadDigitalReceipt,
   sendEmailReceipt,
 } from '../services/mockData';
+import { autoGenerateKosBilling, generateKelasSppBilling } from '../services/tenantOperationalService';
 import { compressImage } from '../utils/imageCompressor';
 import { AiOutlineDownload } from 'react-icons/ai';
 
@@ -71,6 +76,8 @@ export function isHangingPayment(payment, bill, cellStatus) {
 
 export default function PaymentMatrix() {
   const { profile, role, session, isReadOnly } = useAuth();
+  const { activeTenantId, activeTenant } = useTenant();
+  const template = useTenantTemplate();
   const { triggerTour } = useTour();
   const toast = useToast();
   const years = [2026, 2027, 2028];
@@ -113,6 +120,52 @@ export default function PaymentMatrix() {
   const canUseQris = true;
   const myUnitId = profile?.unit_id;
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isCreateBillingOpen, setIsCreateBillingOpen] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [checkoutUnitId, setCheckoutUnitId] = useState(null);
+  const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+
+  const handleAutoGenerateBills = async () => {
+    const currentPeriod = new Date().toISOString().slice(0, 7);
+    const confirmMsg = `Buat tagihan sewa bulanan otomatis untuk periode ${currentPeriod}?\n\nHanya kamar berstatus terisi ('occupied') dengan masa kontrak aktif yang akan dibuatkan tagihannya. Tagihan yang sudah ada akan dilewati.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsAutoGenerating(true);
+    try {
+      const res = await autoGenerateKosBilling(activeTenantId, { period: currentPeriod });
+      if (res.generated_count > 0) {
+        toast.success(`Berhasil membuat ${res.generated_count} tagihan sewa untuk periode ${currentPeriod}. (${res.skipped_count} kamar dilewati/sudah memiliki tagihan)`);
+      } else {
+        toast.info(`Tidak ada tagihan baru yang dibuat. (${res.skipped_count} kamar dilewati/sudah memiliki tagihan)`);
+      }
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      toast.error(err.message || 'Gagal membuat tagihan sewa otomatis.');
+    } finally {
+      setIsAutoGenerating(false);
+    }
+  };
+
+  const handleAutoGenerateKelasBills = async () => {
+    const currentPeriod = new Date().toISOString().slice(0, 7);
+    const confirmMsg = `Buat tagihan ${template.billLabel} bulanan otomatis untuk periode ${currentPeriod}?\n\nTagihan akan dibuatkan untuk seluruh slot siswa aktif. Tagihan yang sudah ada akan dilewati.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsAutoGenerating(true);
+    try {
+      const res = await generateKelasSppBilling(activeTenantId, { period: currentPeriod });
+      if (res.generated_count > 0) {
+        toast.success(`Berhasil membuat ${res.generated_count} tagihan ${template.billLabel} untuk periode ${currentPeriod}. (${res.skipped_count} slot dilewati/sudah memiliki tagihan)`);
+      } else {
+        toast.info(`Tidak ada tagihan baru yang dibuat. (${res.skipped_count} slot dilewati/sudah memiliki tagihan)`);
+      }
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      toast.error(err.message || `Gagal membuat tagihan ${template.billLabel} otomatis.`);
+    } finally {
+      setIsAutoGenerating(false);
+    }
+  };
 
   const [matrix, setMatrix] = useState([]);
   const [productionPayments, setProductionPayments] = useState([]);
@@ -127,11 +180,11 @@ export default function PaymentMatrix() {
     try {
       const scopedMatrixPromise =
         !IS_DEMO && !isStaff && myUnitId
-          ? fetchBillMatrix(session?.access_token, year, { scopeUnitId: myUnitId }).catch(() => [])
+          ? fetchBillMatrix(session?.access_token, year, { scopeUnitId: myUnitId, tenantId: activeTenantId }).catch(() => [])
           : Promise.resolve([]);
 
       const [data, paymentData, scopedData] = await Promise.all([
-        fetchBillMatrix(session?.access_token, year),
+        fetchBillMatrix(session?.access_token, year, { tenantId: activeTenantId }),
         !IS_DEMO
           ? fetchPayments(session?.access_token, myUnitId ? { scopeUnitId: myUnitId } : {}).catch(() => [])
           : Promise.resolve([]),
@@ -699,11 +752,11 @@ export default function PaymentMatrix() {
       {/* Header & tahun */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-forest-900">Matriks Pembayaran IPL</h2>
+          <h2 className="text-lg font-bold text-forest-900">Matriks Pembayaran {template.billLabel}</h2>
           <p className="text-sm text-forest-500">
             {isStaff
-              ? 'Klik sel belum-bayar untuk memilih, lalu catat pembayaran tunai/transfer bendahara.'
-              : 'Lihat status semua unit. Bayar IPL untuk rumah Anda (baris disorot) secara berurutan — jika ada tunggakan tahun lalu, selesaikan dulu di tahun terkait.'}
+              ? `Klik sel belum-bayar untuk memilih, lalu catat pembayaran tunai/transfer ${template.billLabel}.`
+              : `Lihat status semua ${template.unitLabel.toLowerCase()}. ${template.paymentActionLabel} untuk ${template.unitLabel.toLowerCase()} Anda (baris disorot) secara berurutan — jika ada tunggakan tahun lalu, selesaikan dulu di tahun terkait.`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -728,6 +781,56 @@ export default function PaymentMatrix() {
               </option>
             ))}
           </select>
+          {canWrite && (
+            <div className="flex items-center gap-2">
+              {activeTenant?.type === 'kos' && (
+                <>
+                  <button
+                    type="button"
+                    disabled={isAutoGenerating}
+                    onClick={handleAutoGenerateBills}
+                    className="pv-btn bg-forest-700/90 hover:bg-forest-700 text-gold-300 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-forest-600/80 disabled:opacity-50"
+                    title="Generate otomatis tagihan sewa bulanan untuk kamar dengan kontrak aktif pada periode ini"
+                  >
+                    <span>⚡</span>
+                    <span>{isAutoGenerating ? 'Memproses...' : 'Auto-Tagih Sewa'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCheckoutUnitId(null);
+                      setIsCheckoutModalOpen(true);
+                    }}
+                    className="pv-btn bg-amber-700/90 hover:bg-amber-600 text-amber-200 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-amber-600/60"
+                    title="Checkout penyewa dari kamar dan hentikan tagihan sewa"
+                  >
+                    <span>🚪</span>
+                    <span>Checkout Kamar</span>
+                  </button>
+                </>
+              )}
+              {activeTenant?.type === 'kelas' && (
+                <button
+                  type="button"
+                  disabled={isAutoGenerating}
+                  onClick={handleAutoGenerateKelasBills}
+                  className="pv-btn bg-forest-700/90 hover:bg-forest-700 text-gold-300 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-forest-600/80 disabled:opacity-50"
+                  title="Generate otomatis tagihan SPP bulanan untuk seluruh siswa aktif pada periode ini"
+                >
+                  <span>⚡</span>
+                  <span>{isAutoGenerating ? 'Memproses...' : 'Auto-Generate SPP'}</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsCreateBillingOpen(true)}
+                className="pv-btn bg-forest-800 hover:bg-forest-700 text-gold-300 text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm border border-forest-700"
+              >
+                <span>+</span>
+                <span>{activeTenant?.type === 'kos' ? 'Kontrak & Tagihan Kamar' : `Buat Tagihan ${template.billLabel}`}</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -763,7 +866,7 @@ export default function PaymentMatrix() {
             <thead>
               <tr className="bg-forest-800">
                 <th className="sticky left-0 z-20 bg-forest-800 px-3 py-3 text-left text-[11px] font-semibold text-gold-400 uppercase tracking-wide w-[180px]">
-                  Rumah / Warga
+                  {template.headerResidentUnit || `${template.unitLabel} / ${template.memberLabel}`}
                 </th>
                 {matrixMonths.map((m) => (
                   <th
@@ -779,9 +882,9 @@ export default function PaymentMatrix() {
               {matrix.length === 0 ? (
                 <tr>
                   <td colSpan={13} className="px-4 py-10 text-center text-forest-400">
-                    {role === 'warga'
-                      ? 'Anda belum memiliki unit. Hubungi pengelola.'
-                      : 'Belum ada data unit.'}
+                    {role === 'warga' || role === 'anggota'
+                      ? `Anda belum memiliki ${template.unitLabel.toLowerCase()}. Hubungi pengelola.`
+                      : `Belum ada data ${template.unitLabel.toLowerCase()}.`}
                   </td>
                 </tr>
               ) : (
@@ -793,8 +896,8 @@ export default function PaymentMatrix() {
                       : [])
                     .map((resident) => resident?.full_name?.trim())
                     .filter(Boolean);
-                  // Warga hanya bisa interaksi (bayar) untuk unitnya sendiri.
-                  const isMyUnit = role === 'warga' && row.unit.id === myUnitId;
+                  // Warga / penyewa hanya bisa interaksi (bayar) untuk unitnya sendiri.
+                  const isMyUnit = (role === 'warga' || role === 'anggota') && row.unit.id === myUnitId;
                   const canInteract = isStaff || isMyUnit;
                   // Sel belum-bayar unit lain DIKUNCI saat ada unit aktif (hanya
                   // relevan untuk staff — warga hanya punya satu unit sendiri).
@@ -822,10 +925,10 @@ export default function PaymentMatrix() {
                     >
                       <td className={`sticky left-0 z-10 ${stickyBg} px-3 py-2 border-r border-forest-100`}>
                         <p className={`font-medium ${isMyUnit ? 'text-gold-700' : 'text-forest-900'}`}>
-                          Blok {row.unit.block}/{row.unit.unit_number}
+                          {row.unit.label || `Blok ${row.unit.block}/${row.unit.unit_number}`}
                           {isMyUnit && (
                             <span className="ml-1.5 pv-badge bg-gold-500 text-forest-900 text-[8px]">
-                              Rumah Saya
+                              {template.unitLabel} Saya
                             </span>
                           )}
                         </p>
@@ -833,17 +936,15 @@ export default function PaymentMatrix() {
                           className="text-[10px] leading-tight text-forest-500 max-w-[180px] break-words"
                           title={residentNames.join(' / ')}
                         >
-                          {residentNames.length > 0 ? residentNames.join(' / ') : '— Belum Ada Pemilik —'}
+                          {residentNames.length > 0 ? residentNames.join(' / ') : `— Belum Ada ${template.memberLabel} —`}
                         </p>
-                        {row.unit.is_occupied ? (
-                          row.resident?.occupancy_status && (
-                            <span className={`mt-0.5 inline-flex items-center rounded px-1 py-px text-[8px] font-semibold leading-none ${occupancyStatusColor(row.resident.occupancy_status)}`}>
-                              {occupancyStatusLabel(row.resident.occupancy_status)}
-                            </span>
-                          )
+                        {row.unit.is_occupied || row.unit.status === 'occupied' ? (
+                          <span className="mt-0.5 inline-flex items-center rounded px-1.5 py-0.5 text-[8px] font-bold leading-none bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            {template.occupiedUnitLabel}
+                          </span>
                         ) : (
                           <span className="mt-0.5 inline-flex items-center rounded px-1.5 py-0.5 text-[8px] font-bold leading-none bg-amber-100 text-amber-800 border border-amber-300">
-                            Rumah Kosong (IPL Basic)
+                            {template.emptyUnitLabel}
                           </span>
                         )}
                       </td>
@@ -954,6 +1055,7 @@ export default function PaymentMatrix() {
           bills={payModal}
           total={totalToPay}
           canUseQris={canUseQris}
+          billLabel={template.billLabel}
           onConfirm={confirmPay}
           onClose={() => setPayModal(null)}
         />
@@ -967,6 +1069,7 @@ export default function PaymentMatrix() {
           role={role}
           canWrite={canWrite}
           canUseQris={canUseQris}
+          billLabel={template.billLabel}
           onConfirm={confirmManual}
           onClose={() => setManualModal(null)}
         />
@@ -1059,12 +1162,36 @@ export default function PaymentMatrix() {
           profile={profile}
           session={session}
           isHanging={detailModal.isHanging}
+          billLabel={template.billLabel}
           onRefresh={() => setRefreshKey(k => k + 1)}
           onRetry={() => {
             toggleCell(detailModal.bill);
             setDetailModal(null);
           }}
           onClose={() => setDetailModal(null)}
+        />
+      )}
+
+      {isCreateBillingOpen && (
+        <CreateBillingModal
+          open={isCreateBillingOpen}
+          onClose={() => setIsCreateBillingOpen(false)}
+          tenantId={activeTenantId}
+          tenantType={activeTenant?.type || 'rt_rw'}
+          onSuccess={() => loadMatrix({ silent: true })}
+        />
+      )}
+
+      {isCheckoutModalOpen && (
+        <CheckoutRoomModal
+          isOpen={isCheckoutModalOpen}
+          onClose={() => {
+            setIsCheckoutModalOpen(false);
+            setCheckoutUnitId(null);
+          }}
+          tenantId={activeTenantId}
+          initialUnitId={checkoutUnitId}
+          onSuccess={() => loadMatrix({ silent: true })}
         />
       )}
 
@@ -1238,7 +1365,7 @@ function Cell({ cell, payment: propPayment, isHanging, unitId, isSelected, isSta
 }
 
 // ── Modal pembayaran warga: Transfer Bank (dengan bukti) ────
-function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
+function ResidentPayModal({ bills, total, canUseQris, billLabel = 'IPL', onConfirm, onClose }) {
   const { triggerTour } = useTour();
   const [method, setMethod] = useState('bank_transfer');
   const [receiptFile, setReceiptFile] = useState(null);
@@ -1306,12 +1433,12 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
   };
 
   return (
-    <Modal open onClose={onClose} title="Konfirmasi Pembayaran IPL" size="md">
+    <Modal open onClose={onClose} title={`Konfirmasi Pembayaran ${billLabel}`} size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Ringkasan tagihan */}
         <div className="rounded-lg bg-forest-50 p-3 text-sm border border-forest-100 space-y-1">
           <p className="text-forest-600 text-xs">
-            {isMulti ? `${bills.length} tagihan IPL:` : 'Tagihan IPL:'}
+            {isMulti ? `${bills.length} tagihan ${billLabel}:` : `Tagihan ${billLabel}:`}
           </p>
           <div className="mt-1 space-y-1 max-h-28 overflow-y-auto">
             {bills.map((bill) => (
@@ -1325,7 +1452,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
           {method === 'qris' && (
             <div className="pt-2 border-t border-forest-200 space-y-1 text-xs">
               <div className="flex justify-between text-forest-600">
-                <span>Subtotal IPL:</span>
+                <span>Subtotal {billLabel}:</span>
                 <span>{formatRupiah(total)}</span>
               </div>
               <div className="flex justify-between text-amber-800 font-medium">
@@ -1448,7 +1575,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
 // ── Modal input manual (bendahara, multi-bulan lintas tahun) ───────
 // Staff can record transfer proof for residents who cannot use the app yet.
 // Cash remains limited to bendahara/admin.
-function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm, onClose }) {
+function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, billLabel = 'IPL', onConfirm, onClose }) {
   const canRecordCash = isBendaharaOrAbove(role) && canWrite;
   const canRecordTransfer = canWrite;
   const methodCount = Number(canRecordCash) + Number(canRecordTransfer) + Number(canUseQris);
@@ -1587,7 +1714,7 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
             <p className="text-[11px] text-forest-500 mb-0.5">{unitLabel}</p>
           )}
           <p className="text-forest-600 text-xs">
-            {isMulti ? `${bills.length} tagihan IPL:` : 'Tagihan IPL:'}
+            {isMulti ? `${bills.length} tagihan ${billLabel}:` : `Tagihan ${billLabel}:`}
           </p>
           {/* Daftar periode terpilih (lintas tahun) */}
           <div className="mt-1 space-y-1 max-h-40 overflow-y-auto">
@@ -1620,7 +1747,7 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
           {method === 'qris' && (
             <div className="pt-2 border-t border-forest-200 space-y-1 text-xs">
               <div className="flex justify-between text-forest-600">
-                <span>Subtotal IPL:</span>
+                <span>Subtotal {billLabel}:</span>
                 <span>{formatRupiah(total)}</span>
               </div>
               <div className="flex justify-between text-amber-800 font-medium">
@@ -1834,7 +1961,7 @@ function getResolvedPaymentDate(payment, bill) {
 
 // Modal Detail Pembayaran Lunas
 // Modal Detail / Verifikasi / Revisi Pembayaran
-function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, session, isHanging: initialIsHanging, onRefresh, onRetry, onClose }) {
+function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, session, isHanging: initialIsHanging, billLabel = 'IPL', onRefresh, onRetry, onClose }) {
   const toast = useToast();
   const [asyncPayment, setAsyncPayment] = useState(null);
 
@@ -2135,7 +2262,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
 
   return (
     <>
-    <Modal open onClose={onClose} title={isHanging ? 'Detail & Perbaikan Transaksi IPL' : 'Detail Bukti Pembayaran IPL'} size="md">
+    <Modal open onClose={onClose} title={isHanging ? `Detail & Perbaikan Transaksi ${billLabel}` : `Detail Bukti Pembayaran ${billLabel}`} size="md">
       <div className="space-y-4 text-sm text-forest-900">
         {/* Banner Status */}
         {isHanging && (
@@ -2177,10 +2304,10 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
           <form onSubmit={handleSaveEdit} className="space-y-3.5 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200">
             <div className="flex items-center justify-between pb-1 border-b border-amber-200">
               <h4 className="font-bold text-xs text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
-                <span>✏️</span> Perbaikan Transaksi IPL
+                <span>✏️</span> Perbaikan Transaksi {billLabel}
               </h4>
               <span className="text-[10px] text-amber-700 font-medium">
-                {targetUnit ? `Blok ${targetUnit.block}/${targetUnit.unit_number}` : ''} · {formatPeriod(resolvedBill.period)}
+                {targetUnit?.label || (targetUnit ? `Blok ${targetUnit.block}/${targetUnit.unit_number}` : '')} · {formatPeriod(resolvedBill.period)}
               </span>
             </div>
 
@@ -2319,13 +2446,13 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
           <>
               <div className="grid grid-cols-2 gap-4 rounded-lg bg-forest-50 p-3">
               <div>
-                <p className="text-xs text-forest-500 font-medium">Rumah / Unit</p>
+                <p className="text-xs text-forest-500 font-medium">{template?.unitLabel || 'Rumah / Unit'}</p>
                 <p className="font-semibold text-forest-800">
-                  {targetUnit ? `${targetUnit.block} no ${targetUnit.unit_number}` : '-'}
+                  {targetUnit?.label || (targetUnit ? `${targetUnit.block} no ${targetUnit.unit_number}` : '-')}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-forest-500 font-medium">Periode IPL</p>
+                <p className="text-xs text-forest-500 font-medium">Periode {billLabel}</p>
                 <p className="font-semibold text-forest-800">{formatPeriod(resolvedBill.period)}</p>
               </div>
               <div>
@@ -2337,6 +2464,18 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
                 <p className="font-semibold text-forest-800">{resolvedPaidAt ? formatDate(resolvedPaidAt) : '-'}</p>
               </div>
             </div>
+
+            {(resolvedBill?.contract_start || resolvedBill?.contract_end) && (
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-950 space-y-0.5">
+                <span className="font-bold flex items-center gap-1.5 text-emerald-800">
+                  <span>🗓️</span> Masa Kontrak Sewa:
+                </span>
+                <p className="font-medium text-emerald-900 pl-5">
+                  {resolvedBill.contract_start ? formatDate(resolvedBill.contract_start) : '-'} s/d{' '}
+                  {resolvedBill.contract_end ? formatDate(resolvedBill.contract_end) : '-'}
+                </p>
+              </div>
+            )}
 
             <div>
               <p className="text-xs text-forest-500 font-medium mb-1">Metode Pembayaran</p>

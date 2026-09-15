@@ -19,10 +19,14 @@ import {
   AiOutlineEdit,
   AiOutlineCalendar,
   AiOutlineBulb,
+  AiOutlineSafetyCertificate,
 } from 'react-icons/ai';
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
+import { useTenant } from '../hooks/useTenant';
+import { useTenantTemplate } from '../hooks/useTenantTemplate';
 import { useToast } from '../hooks/useToast';
 import { useTour } from '../context/TourContext';
+import TenantSwitcher from './TenantSwitcher';
 import {
   isStaffRole,
   isBendaharaOrAbove,
@@ -41,6 +45,8 @@ const APP_VERSION = `v${pkg.version || '1.4.3'}`;
 
 export default function Header() {
   const { isAuthenticated, profile, role, isReadOnly, signOut, updateProfile, session } = useAuth();
+  const { isPlatformAdmin, activeTenant } = useTenant();
+  const template = useTenantTemplate();
   const { startTour } = useTour();
   const canWrite = canModifyData(role) && !isReadOnly;
   const location = useLocation();
@@ -154,12 +160,12 @@ export default function Header() {
     },
     {
       key: 'keuangan',
-      label: 'Keuangan & IPL',
+      label: `Keuangan & ${template.billLabel}`,
       icon: AiOutlineWallet,
       badgeCount: isStaffRole(role) ? pendingPayCount : 0,
       activePaths: ['/payment-matrix', '/payment-verification', '/expenses', '/reports', '/events', '/incomes'],
       items: [
-        { to: '/payment-matrix', label: 'Matriks Bayar', icon: AiOutlineTable, desc: 'Matriks pembayaran IPL unit' },
+        { to: '/payment-matrix', label: `Matriks ${template.billLabel}`, icon: AiOutlineTable, desc: `Matriks pembayaran ${template.billLabel.toLowerCase()}` },
         ...(canViewPaymentVerification(role)
           ? [
               {
@@ -167,13 +173,13 @@ export default function Header() {
                 label: 'Verifikasi Bayar',
                 icon: AiOutlineCheckCircle,
                 badge: pendingPayCount,
-                desc: 'Verifikasi bukti transfer warga',
+                desc: `Verifikasi bukti transfer ${template.memberLabel.toLowerCase()}`,
               },
             ]
           : []),
         ...(isStaffRole(role)
           ? [
-              { to: '/expenses', label: 'Pengeluaran', icon: AiOutlineWallet, desc: 'Catat & kelola pengeluaran' },
+              { to: '/expenses', label: 'Pengeluaran', icon: AiOutlineWallet, desc: `Catat & kelola pengeluaran ${template.communityLabel.toLowerCase()}` },
             ]
           : []),
         ...(canViewFinancialReports(role)
@@ -197,43 +203,57 @@ export default function Header() {
     },
     {
       key: 'warga',
-      label: 'Warga & Rumah',
+      label: `${template.memberLabel} & ${template.unitLabel}`,
       icon: AiOutlineTeam,
       badgeCount: isStaffRole(role) ? pendingRegCount : 0,
       activePaths: ['/residents', '/houses', '/user-approval', '/users'],
       items: [
-        { to: '/residents', label: 'Daftar Penghuni', icon: AiOutlineUser, desc: 'Direktori penghuni kompleks' },
+        { to: '/residents', label: `Daftar ${template.memberLabel}`, icon: AiOutlineUser, desc: `Direktori ${template.memberLabel.toLowerCase()}` },
         ...(canViewHouses(role)
           ? [
-              { to: '/houses', label: 'Daftar Rumah', icon: AiOutlineHome, desc: isStaffRole(role) ? 'Maintain data unit & mapsite' : 'Data nomor rumah & status hunian' },
+              { to: '/houses', label: `Daftar ${template.unitLabel}`, icon: AiOutlineHome, desc: isStaffRole(role) ? `Maintain data ${template.unitLabel.toLowerCase()}` : `Data status ${template.unitLabel.toLowerCase()}` },
             ]
           : []),
         ...(isStaffRole(role)
           ? [
               {
                 to: '/user-approval',
-                label: 'Approval User',
+                label: `Approval ${template.memberLabel}`,
                 icon: AiOutlineUserAdd,
                 badge: pendingRegCount,
-                desc: 'Verifikasi pendaftaran warga baru',
+                desc: `Verifikasi pendaftaran ${template.memberLabel.toLowerCase()} baru`,
               },
-              { to: '/users', label: 'Kelola User', icon: AiOutlineTeam, desc: 'Hak akses & edit profil warga' },
+              { to: '/users', label: `Kelola ${template.memberLabel}`, icon: AiOutlineTeam, desc: `Hak akses profil ${template.memberLabel.toLowerCase()}` },
             ]
           : []),
       ],
     },
-    ...(isStaffRole(role)
+    ...(isStaffRole(role) || isPlatformAdmin
       ? [
           {
             key: 'sistem',
             label: 'Sistem & Pengaturan',
             icon: AiOutlineSetting,
-            activePaths: ['/settings', '/logs'],
+            activePaths: ['/settings', '/logs', '/platform'],
             items: [
-              { to: '/settings', label: 'Pengaturan', icon: AiOutlineSetting, desc: 'Atur tarif IPL dan denda' },
-                ...(canViewLogs(role)
-                  ? [{ to: '/logs', label: 'Log Sistem', icon: AiOutlineFileText, desc: 'Audit log aktivitas portal' }]
-                  : []),
+              ...(isStaffRole(role)
+                ? [
+                    { to: '/settings', label: 'Pengaturan', icon: AiOutlineSetting, desc: `Atur tarif ${template.billLabel} dan preferensi` },
+                    ...(canViewLogs(role)
+                      ? [{ to: '/logs', label: 'Log Sistem', icon: AiOutlineFileText, desc: 'Audit log aktivitas portal' }]
+                      : []),
+                  ]
+                : []),
+              ...(isPlatformAdmin
+                ? [
+                    {
+                      to: '/platform',
+                      label: 'Platform Owner',
+                      icon: AiOutlineSafetyCertificate,
+                      desc: 'Kelola seluruh tenant, harga & MRR',
+                    },
+                  ]
+                : []),
             ],
           },
         ]
@@ -275,6 +295,11 @@ export default function Header() {
               Portal Warga
             </p>
           </div>
+          {isAuthenticated && (
+            <div className="hidden xl:flex items-center ml-3">
+              <TenantSwitcher />
+            </div>
+          )}
         </div>
 
         {/* Tengah: Navigasi Desktop Dropdown (Bebas Scrollbar) */}
@@ -411,6 +436,17 @@ export default function Header() {
                 <span className="text-[10px] opacity-80">↗</span>
               </a>
 
+              {isPlatformAdmin && (
+                <NavLink
+                  to="/platform"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40 shadow-xs transition-all hover:scale-105"
+                  title="Buka Platform Owner Dashboard"
+                >
+                  <AiOutlineSafetyCertificate className="text-sm" />
+                  <span className="hidden xl:inline">Platform</span>
+                </NavLink>
+              )}
+
               {profile?.full_name && (
                 <button
                   type="button"
@@ -426,7 +462,7 @@ export default function Header() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-white leading-tight group-hover:text-gold-400 transition-colors">{profile.full_name}</p>
-                      <p className="text-[10px] text-gold-400 font-medium uppercase tracking-wider">{roleLabel(role)}</p>
+                      <p className="text-[10px] text-gold-400 font-medium uppercase tracking-wider">{roleLabel(role, activeTenant?.type)}</p>
                     </div>
                   </div>
                   <AiOutlineEdit className="text-forest-300 group-hover:text-gold-400 transition-colors text-sm ml-1" />
@@ -502,7 +538,7 @@ export default function Header() {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-white">{profile.full_name}</p>
-                    <p className="text-xs text-gold-400 mt-0.5">{roleLabel(role)}</p>
+                    <p className="text-xs text-gold-400 mt-0.5">{roleLabel(role, activeTenant?.type)}</p>
                     {profile.phone && <p className="text-[11px] text-forest-300 mt-0.5">📞 {profile.phone}</p>}
                   </div>
                 </div>
@@ -516,6 +552,12 @@ export default function Header() {
                 </button>
               </div>
             )}
+
+            {/* Tenant Switcher Mobile */}
+            <div className="p-3 bg-[#082315] border-b border-forest-800 shrink-0">
+              <p className="text-[10px] text-forest-400 uppercase tracking-wider font-semibold mb-1.5 px-1">Layanan Aktif</p>
+              <TenantSwitcher isMobile={true} />
+            </div>
 
             {/* Tombol Panduan Aplikasi Mobile */}
             <div className="px-3 pt-3">
@@ -651,16 +693,16 @@ export default function Header() {
                 </button>
               </div>
 
-              {/* Status & Identitas Rumah Terdaftar */}
+              {/* Status & Identitas Terdaftar */}
               <div className="mb-4 p-3 rounded-xl bg-forest-900/80 border border-forest-700/60 grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-[10px] font-semibold text-forest-400 uppercase tracking-wider block">Role Akun</span>
                   <span className="font-bold text-gold-300 inline-flex items-center gap-1 mt-0.5">
-                    🏛️ {roleLabel(role)}
+                    🏛️ {roleLabel(role, activeTenant?.type)}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-semibold text-forest-400 uppercase tracking-wider block">Status Warga</span>
+                  <span className="text-[10px] font-semibold text-forest-400 uppercase tracking-wider block">Status {template.memberLabel}</span>
                   <span className="font-semibold text-emerald-300 inline-flex items-center gap-1 mt-0.5">
                     ✅ Terdaftar Aktif
                   </span>

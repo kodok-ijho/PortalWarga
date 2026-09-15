@@ -68,6 +68,18 @@ export default function Login() {
         setPendingSuccess({ message: result.message });
         return;
       }
+      // Cek apakah ada pending tenant onboarding dari ChooseTenantType
+      const pendingType = sessionStorage.getItem('rw_pending_tenant_type');
+      const pendingName = sessionStorage.getItem('rw_pending_tenant_name');
+      if (pendingType && pendingName) {
+        sessionStorage.removeItem('rw_pending_tenant_type');
+        sessionStorage.removeItem('rw_pending_tenant_name');
+        navigate('/onboarding/choose-type', {
+          replace: true,
+          state: { autoSubmit: true, type: pendingType, name: pendingName },
+        });
+        return;
+      }
       navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || 'Login Google belum berhasil.');
@@ -520,6 +532,21 @@ export default function Login() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Banner Registrasi Tenant Baru (Multi-tenant Onboarding T2.3) */}
+        <div className="mt-4 p-4 rounded-2xl bg-forest-900/60 border border-gold-500/30 text-center">
+          <p className="text-xs font-semibold text-white">
+            Ingin mengelola perumahan, kos, arisan, atau kelas Anda sendiri?
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/onboarding/choose-type')}
+            className="mt-2.5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gold-500/20 hover:bg-gold-500/30 text-gold-300 hover:text-gold-200 border border-gold-400/40 text-xs font-bold transition-all"
+          >
+            <span>Buka Layanan Baru (Trial 15 Hari Gratis)</span>
+            <span>&rarr;</span>
+          </button>
         </div>
 
         {/* Footer info */}

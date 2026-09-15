@@ -137,7 +137,12 @@ export async function deactivateUser(token, id) {
 // DASHBOARD / HOME
 // =====================================================================
 
-export async function fetchDashboardData(token, { role, period } = {}) {
+export async function fetchDashboardData(token, { role, period, tenantId } = {}) {
+  if (tenantId) {
+    const { fetchTenantDashboardData } = await import('./tenantOperationalService.js');
+    return fetchTenantDashboardData(tenantId, { role, period });
+  }
+
   if (IS_DEMO) {
     const mock = await getMockData();
     return {
@@ -483,7 +488,12 @@ export async function runPaymentSmokeTest(token) {
   return portalApiPost('/monitoring/payment-smoke/run', { token });
 }
 
-export async function generateBills(token, { period, dry_run }) {
+export async function generateBills(token, { period, dry_run, tenantId } = {}) {
+  if (tenantId) {
+    const { generateTenantBillingItems } = await import('./tenantOperationalService');
+    return generateTenantBillingItems(tenantId, { period, dry_run });
+  }
+
   if (IS_DEMO) {
     const mock = await getMockData();
     const existing = mock.mockIPLBills.filter(b => b.period === period);
@@ -544,6 +554,12 @@ export async function generateBills(token, { period, dry_run }) {
 }
 
 export async function fetchBillMatrix(token, year, opts = {}) {
+  if (opts?.tenantId) {
+    const { fetchTenantBillMatrix } = await import('./tenantOperationalService');
+    const rows = await fetchTenantBillMatrix(opts.tenantId, year, opts);
+    return normalizeBillMatrixRows(rows);
+  }
+
   if (IS_DEMO) {
     const mock = await getMockData();
     return normalizeBillMatrixRows(mock.getBillMatrix(year, opts));
@@ -901,10 +917,14 @@ export async function createCashPayment(token, { bill_id, amount, file, note, pa
   }
 }
 
-export async function approveManualPayment(token, { payment_id, note }) {
+export async function approveManualPayment(token, { payment_id, note, tenantId, verifiedBy } = {}) {
+  if (tenantId) {
+    const { verifyTenantPayment } = await import('./tenantOperationalService');
+    return verifyTenantPayment(tenantId, payment_id, { verifiedBy, note });
+  }
   if (IS_DEMO) {
     const mock = await getMockData();
-    return mock.verifyPayment(payment_id, { verifiedBy: 'Demo Staff', note });
+    return mock.verifyPayment(payment_id, { verifiedBy: verifiedBy || 'Demo Staff', note });
   }
   return portalApiPost('/payments/manual/approve', {
     token,
@@ -912,10 +932,14 @@ export async function approveManualPayment(token, { payment_id, note }) {
   });
 }
 
-export async function rejectManualPayment(token, { payment_id, note }) {
+export async function rejectManualPayment(token, { payment_id, note, tenantId, rejectedBy } = {}) {
+  if (tenantId) {
+    const { rejectTenantPayment } = await import('./tenantOperationalService');
+    return rejectTenantPayment(tenantId, payment_id, { rejectedBy, reason: note });
+  }
   if (IS_DEMO) {
     const mock = await getMockData();
-    return mock.rejectPayment(payment_id, { rejectedBy: 'Demo Staff', reason: note });
+    return mock.rejectPayment(payment_id, { rejectedBy: rejectedBy || 'Demo Staff', reason: note });
   }
   return portalApiPost('/payments/manual/reject', {
     token,
@@ -923,7 +947,11 @@ export async function rejectManualPayment(token, { payment_id, note }) {
   });
 }
 
-export async function updatePayment(token, { payment_id, unit_id, amount, method, paid_at, note, file, status }) {
+export async function updatePayment(token, { payment_id, unit_id, amount, method, paid_at, note, file, status, tenantId } = {}) {
+  if (tenantId) {
+    const { updateTenantPayment } = await import('./tenantOperationalService');
+    return updateTenantPayment(tenantId, payment_id, { unit_id, amount, method, paid_at, note });
+  }
   if (IS_DEMO) {
     const mock = await getMockData();
     return mock.updatePayment(payment_id, { unit_id, amount, method, paid_at, note, file, status });
@@ -951,6 +979,11 @@ export async function updatePayment(token, { payment_id, unit_id, amount, method
 }
 
 export async function fetchPayments(token, opts = {}) {
+  if (opts?.tenantId) {
+    const { fetchTenantPayments } = await import('./tenantOperationalService');
+    return fetchTenantPayments(opts.tenantId, opts);
+  }
+
   if (IS_DEMO) {
     const mock = await getMockData();
     return mock.mockPayments;
@@ -1519,7 +1552,11 @@ async function fetchRunningBalanceFromSupabase(token, { year, month }) {
   return { chain };
 }
 
-export async function fetchRunningBalance(token, { year, month }) {
+export async function fetchRunningBalance(token, { year, month, tenantId } = {}) {
+  if (tenantId) {
+    const { fetchTenantRunningBalance } = await import('./tenantOperationalService');
+    return fetchTenantRunningBalance(tenantId, { year, month });
+  }
   if (IS_DEMO) {
     const mock = await getMockData();
     return { chain: mock.computeRunningBalance(year, month) };
@@ -1543,7 +1580,11 @@ export async function fetchRunningBalance(token, { year, month }) {
   }
 }
 
-export async function fetchMonthlyFinance(token, { year, month }) {
+export async function fetchMonthlyFinance(token, { year, month, tenantId } = {}) {
+  if (tenantId) {
+    const { fetchTenantMonthlyFinance } = await import('./tenantOperationalService');
+    return fetchTenantMonthlyFinance(tenantId, { year, month });
+  }
   if (IS_DEMO) {
     const mock = await getMockData();
     const period = `${year}-${String(month).padStart(2, '0')}`;
@@ -1806,6 +1847,11 @@ export async function updateProfileApi(token, { full_name, phone, avatar_url }) 
 // =====================================================================
 
 export async function fetchExpenses(token, filters = {}) {
+  if (filters?.tenantId) {
+    const { fetchTenantExpenses } = await import('./tenantOperationalService');
+    return fetchTenantExpenses(filters.tenantId, filters);
+  }
+
   if (IS_DEMO) {
     if (filters.scope === 'event' || filters.event_id) {
       const eventMock = await getEventMockData();
@@ -1841,7 +1887,14 @@ export async function createExpense(token, {
   file,
   scope = 'general',
   event_id = null,
-}) {
+  tenantId = null,
+  recordedBy = null,
+} = {}) {
+  if (tenantId) {
+    const { createTenantExpense } = await import('./tenantOperationalService');
+    return createTenantExpense(tenantId, { date, category, amount, description, file, recordedBy });
+  }
+
   if (IS_DEMO) {
     if (scope === 'event') {
       const eventMock = await getEventMockData();
@@ -1887,7 +1940,13 @@ export async function updateExpense(token, id, {
   file,
   scope = 'general',
   event_id = null,
-}) {
+  tenantId = null,
+} = {}) {
+  if (tenantId) {
+    const { updateTenantExpense } = await import('./tenantOperationalService');
+    return updateTenantExpense(tenantId, id, { date, category, amount, description, file });
+  }
+
   if (IS_DEMO) {
     if (scope === 'event') {
       const eventMock = await getEventMockData();
@@ -1925,7 +1984,12 @@ export async function updateExpense(token, id, {
   }
 }
 
-export async function deleteExpense(token, id) {
+export async function deleteExpense(token, id, opts = {}) {
+  if (opts?.tenantId) {
+    const { deleteTenantExpense } = await import('./tenantOperationalService');
+    return deleteTenantExpense(opts.tenantId, id);
+  }
+
   if (IS_DEMO) {
     if (String(id).startsWith('demo-event-expense-')) {
       const eventMock = await getEventMockData();
