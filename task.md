@@ -351,7 +351,7 @@ listing dari lintas tenant; listing otomatis kedaluwarsa sesuai masa aktifnya.
 
 - [x] **T11.1** -- Regression test seluruh 4 vertikal (rt_rw, kos, arisan, kelas) dari
   signup sampai transaksi pertama berhasil.
-- [ ] **T11.2** -- Regression test fondasi platform (Phase 1--5): trial expiry, read_only,
+- [x] **T11.2** -- Regression test fondasi platform (Phase 1--5): trial expiry, read_only,
   renewal, isolasi tenant, akses Platform Owner Dashboard.
 - [ ] **T11.3** -- Regression test Modul Listing (Phase 10): posting listing kos & umkm,
   halaman publik dapat diakses tanpa login, listing lintas tenant tampil dengan benar,
