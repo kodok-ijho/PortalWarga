@@ -1,7 +1,5 @@
 # Requirement.md — Portal Warga Multi-Tenant SaaS
 
-> **Repository pengembangan:** https://github.com/kodok-ijho/RuangWarga-dev
-> Semua commit, push, dan pull dilakukan ke repo ini.
 ## 1. Latar Belakang
 
 Portal Warga (repo: `kodok-ijho/PortalWarga`) saat ini adalah aplikasi manajemen paguyuban
@@ -30,7 +28,13 @@ Platform baru harus bisa melayani 4 jenis kelompok (vertikal) sekaligus:
 
 ## 3. Aktor & Peran
 
-| Aktor | Deskripsi | Level |
+> **Catatan Revisi:** Tabel di bawah adalah versi **awal** (v1) yang menjadi dasar Phase
+> 0–11 di `task.md` yang sudah diimplementasikan dan di-merge ke `main` pada repo
+> `RuangWarga-dev`. Tabel ini **digantikan** oleh model role baru di §3.2 (v2 — Custom
+> Role & Permission Berjenjang). Dipertahankan di sini sebagai catatan sejarah keputusan,
+> BUKAN sebagai acuan implementasi aktif. Lihat §3.2 untuk model yang berlaku.
+
+| Aktor (v1 — historis) | Deskripsi | Level |
 |---|---|---|
 | **Platform Owner** | Pemilik bisnis SaaS ini (kamu) | Super admin lintas tenant |
 | **Tenant Admin** | Ketua RT/RW, Koordinator Perumahan, Pemilik Kos/Kontrakan, Admin Arisan, Admin Kelas | Admin dalam 1 tenant |
@@ -60,6 +64,109 @@ Alasan urutan ini bersifat mengikat untuk seluruh dokumen turunan (`specificatio
 - Modul Listing Publik memanfaatkan data yang baru bisa ada setelah modul vertikal (kamar
   kosong dari kos, keanggotaan warga dari RT/RW) benar-benar berjalan — sehingga secara
   teknis maupun bisnis, modul ini logisnya menyusul, bukan mendahului.
+
+## 3.2 Model Role Berjenjang (v2 — Revisi RBAC, Berlaku Aktif)
+
+### 3.2.1 Latar Belakang Revisi
+
+Model v1 di atas mewarisi struktur role tetap (`admin`, `bendahara`, `pengurus`, `anggota`)
+langsung dari PortalWarga single-tenant, yang didesain khusus untuk struktur organisasi
+RT/RW. Setelah platform berkembang ke 4 vertikal (RT/RW, Kos, Arisan, Kelas), ditemukan
+inkonsistensi: istilah "Bendahara"/"Pengurus" tidak relevan untuk kos, arisan, atau kelas,
+dan role ini tidak dapat disesuaikan Tenant Admin sesuai kebutuhan operasional nyata
+mereka (misal: kos butuh role "petugas kebersihan" dengan akses terbatas; RT/RW mungkin
+butuh role "Sekretaris" terpisah dari "Bendahara").
+
+Revisi ini mengganti role tetap dengan **sistem permission granular + custom role per
+tenant**, sekaligus memperjelas mekanisme kepemilikan tenant ketika 1 orang mengelola
+banyak tenant dan mendelegasikan sebagian ke orang lain.
+
+### 3.2.2 Empat Level Wewenang (Containment Penuh)
+
+Model ini berbentuk **4 lingkaran bersarang (containment penuh, bukan irisan sebagian)**:
+setiap level yang lebih dalam adalah **subset wewenang penuh** dari level yang
+membungkusnya — level luar otomatis bisa melakukan semua yang bisa dilakukan level dalam,
+ditambah wewenang eksklusif miliknya sendiri. Tidak ada wewenang milik level dalam yang
+tidak dimiliki level luar.
+
+```
+Super Admin  ⊃  Admin  ⊃  Pengelola  ⊃  Warga/Anggota
+```
+
+| Level | Cakupan | Wewenang Inti |
+|---|---|---|
+| **Super Admin** | Seluruh tenant di platform | Semua wewenang Admin, di TENANT MANAPUN (bukan cuma miliknya) + wewenang eksklusif level platform (atur `block_pricing`, `subscription_periods`, `listing_pricing`, lihat dashboard revenue/MRR lintas platform) |
+| **Admin** | 1 atau lebih tenant yang dimiliki (`tenants.owner_id`) | Semua wewenang Pengelola, di tenant miliknya + wewenang eksklusif: membuat custom role, meng-assign/mencabut Pengelola per tenant, mengatur subscription & billing platform untuk tenant miliknya, selalu bisa memonitor tenant miliknya walau didelegasikan |
+| **Pengelola** | 1 tenant spesifik, atas penugasan Admin | Semua wewenang Anggota, di tenant tsb + wewenang operasional sesuai kombinasi permission yang diberikan Admin (lihat §3.2.4) |
+| **Warga/Anggota** | Data & tagihan miliknya sendiri, dalam 1 tenant | Lihat & bayar tagihan sendiri, lihat riwayat sendiri, (khusus RT/RW) posting listing UMKM sendiri |
+
+### 3.2.3 Kepemilikan Multi-Tenant & Delegasi ke Pengelola
+
+- FR-31: Satu **Admin** dapat memiliki **lebih dari satu tenant**, termasuk lintas tipe
+  berbeda (mis. 1 tenant `rt_rw` + 2 tenant `kos` berbeda milik orang yang sama).
+- FR-32: Admin dapat **mendelegasikan** operasional 1 tenant spesifik ke orang lain dengan
+  menugaskan mereka sebagai **Pengelola** tenant tersebut, tanpa kehilangan kepemilikan
+  atau kemampuan memonitor tenant itu.
+- FR-33: Satu orang yang sama dapat ditugaskan sebagai Pengelola di **lebih dari satu
+  tenant** oleh Admin yang sama (mis. Orang A jadi Pengelola di Kos Melati DAN Kos Mawar,
+  keduanya milik Admin yang sama) — namun penugasan ini **tidak otomatis berlaku lintas
+  tenant**; Admin harus menugaskan secara terpisah untuk setiap tenant.
+- FR-34: Pengelola **tidak dapat** membuat custom role baru atau menugaskan orang lain
+  sebagai Pengelola, kecuali Admin secara eksplisit memberikan permission
+  `manage_tenant_users` kepada role Pengelola tersebut (lihat §3.2.4) — mencegah
+  privilege escalation oleh staff.
+- FR-35: Pengelola **tidak dapat** mengubah subscription atau billing platform untuk
+  tenant yang dikelolanya — wewenang ini eksklusif Admin (dan Super Admin).
+
+### 3.2.4 Sistem Custom Role & Permission
+
+- FR-36: Admin (dan Super Admin) dapat membuat **role kustom** dengan nama bebas (mis.
+  "Bendahara", "Sekretaris", "Admin Kos", "Koordinator") untuk tenant yang dimilikinya,
+  masing-masing dengan kombinasi permission granular berikut:
+
+| Permission Key | Label Default | Cakupan Aksi |
+|---|---|---|
+| `manage_billing_cash` | Catat Pembayaran Tunai | Mencatat pembayaran tunai langsung |
+| `manage_billing_transfer` | Catat & Verifikasi Transfer | Mencatat & memverifikasi bukti transfer |
+| `generate_billing` | Terbitkan Tagihan | Generate tagihan berkala (IPL/sewa/kontribusi/iuran) |
+| `manage_members` | Kelola Anggota | CRUD data anggota, approve/reject pendaftaran, impor CSV |
+| `manage_settings` | Kelola Pengaturan | Edit konfigurasi tenant (komponen IPL, harga sewa, dst) |
+| `manage_expenses` | Kelola Pengeluaran | CRUD pengeluaran (`expenses`) |
+| `view_reports` | Lihat Laporan | Akses laporan keuangan (read-only) |
+| `run_special_action` | Jalankan Aksi Khusus | Kocok arisan, checkout kamar kos, mulai siklus arisan baru |
+| `post_listing` | Pasang Iklan | Posting listing publik (kamar kosong / UMKM) |
+| `manage_tenant_users` | Kelola User & Audit | CRUD akun/akses user dalam tenant, ubah penugasan role, lihat log audit — **hanya diberikan ke role Pengelola bila Admin secara eksplisit mengizinkan (lihat FR-34)** |
+
+- FR-37: Dua role bawaan otomatis tersedia di setiap tenant baru dan **tidak dapat
+  dihapus**: role pemilik (seluruh permission, melekat pada Admin) dan role dasar
+  Warga/Anggota (tanpa permission staff apapun).
+- FR-38: Role kustom yang dibuat Admin dapat diberikan ke lebih dari satu anggota, dan
+  satu anggota hanya memiliki **satu role aktif per tenant** pada satu waktu.
+
+### 3.2.5 Wewenang Super Admin sebagai Superset
+
+- FR-39: Super Admin memiliki seluruh wewenang Admin (§3.2.2) di **tenant manapun** tanpa
+  perlu ditugaskan atau memiliki tenant tersebut — ini dipakai untuk keperluan dukungan
+  teknis, audit, dan penanganan tenant bermasalah, bukan operasional rutin.
+- FR-40: RLS untuk wewenang Super Admin diimplementasikan sebagai kondisi tambahan
+  (`OR is_platform_admin()`) di setiap policy tenant, bukan sebagai jalur akses terpisah
+  — lihat `specification.md` §6.2 untuk pola implementasi.
+
+### 3.2.6 Pemetaan Istilah v1 → v2 (Untuk Membaca FR Lama)
+
+Agar seluruh FR-1 s/d FR-30 di dokumen ini (ditulis sebelum revisi §3.2) tidak perlu
+ditulis ulang satu-satu, berlaku pemetaan istilah berikut ketika membaca FR-FR tersebut:
+
+| Istilah v1 (dipakai di FR-1 s/d FR-30) | Dibaca sebagai (v2) |
+|---|---|
+| "Tenant Admin" | **Admin** — pemilik tenant (§3.2.2), kecuali disebutkan eksplisit sebagai "Admin & Pengelola" |
+| "Owner"/"pendaftar" saat signup (FR-1 s/d FR-4) | **Admin** — hasil self-signup selalu membuat Admin baru, tidak pernah langsung membuat Pengelola |
+| "Bendahara", "Pengurus" (bila muncul di narasi luar §3) | Contoh **nama role kustom** yang dapat dibuat Admin (§3.2.4), bukan lagi role tetap platform |
+| "Anggota" | Tetap sama — **Warga/Anggota** (§3.2.2), role dasar yang tidak berubah |
+
+Ketentuan baru di §3.2 (FR-31 s/d FR-40) berlaku sebagai **lapisan tambahan** di atas FR-1
+s/d FR-30, bukan pengganti keseluruhan — FR-1 s/d FR-30 tetap sepenuhnya berlaku dengan
+pemetaan istilah di atas.
 
 ## 4. Kebutuhan Fungsional
 
@@ -133,10 +240,19 @@ Alasan urutan ini bersifat mengikat untuk seluruh dokumen turunan (`specificatio
 
 ### 4.3 Perilaku Read-Only (per Role)
 
+> **Catatan Revisi:** butir di bawah awalnya ditulis dengan istilah role v1 (Tenant Admin,
+> Anggota). Sesuai model v2 (§3.2), "Tenant Admin" pada FR-15 dibaca sebagai **Admin dan
+> Pengelola** (semua yang memiliki permission staff apapun di tenant tsb), dan "pengurus"
+> pada pesan ke Anggota dibaca sebagai istilah umum untuk siapapun yang memegang role
+> pengelolaan tenant tsb, bukan role literal "Pengurus" dari v1.
+
 - FR-15: Saat tenant berstatus `read_only`:
-  - **Tenant Admin**: dapat login dan melihat seluruh data historis (anggota, tagihan,
+  - **Admin & Pengelola**: dapat login dan melihat seluruh data historis (anggota, tagihan,
     laporan keuangan). Aksi transaksi (generate tagihan baru, approve pembayaran, approve
-    anggota baru, jalankan kocok arisan) dinonaktifkan dengan penjelasan kontekstual.
+    anggota baru, jalankan kocok arisan, posting listing) dinonaktifkan dengan penjelasan
+    kontekstual, terlepas dari permission granular apa yang mereka miliki (lihat §3.2.4)
+    — status `read_only` menonaktifkan SEMUA permission bertipe tulis (write), bukan hanya
+    sebagian.
   - **Anggota** (Warga/Penyewa/Peserta/Siswa): dapat login dan melihat tagihan serta riwayat
     pembayaran mereka sendiri. Tombol "Bayar Sekarang" dinonaktifkan dengan pesan:
     *"Pembayaran sementara tidak tersedia. Silakan hubungi pengurus."* Tidak ada indikasi
@@ -236,6 +352,13 @@ tercermin langsung pada urutan phase di `task.md`:
    Kos-kosan berjalan, karena bergantung pada data yang mereka hasilkan (unit kosong,
    keanggotaan warga terverifikasi). Modul ini secara sengaja diperlakukan sebagai
    pengecualian terhadap prinsip isolasi tenant (FR-20) karena tujuannya memang publik.
+
+> **Catatan Revisi RBAC (§3.2):** Model role berjenjang (Super Admin ⊃ Admin ⊃ Pengelola
+> ⊃ Warga/Anggota) dengan custom role & permission granular adalah **revisi yang berlaku
+> di atas seluruh 4 langkah prioritas di atas** — bukan langkah tambahan terpisah. Karena
+> perubahan ini bersifat struktural pada lapisan fondasi (tabel `tenant_members`, seluruh
+> RLS policy), lihat `task.md` Phase 12 untuk urutan pengerjaan migrasi dari RBAC v1 (role
+> tetap, sudah di-merge ke `main`) ke RBAC v2 (custom role & permission, revisi ini).
 
 ## 6. Di Luar Cakupan (Out of Scope) — Fase Awal
 

@@ -1,12 +1,8 @@
 # Specification.md — Portal Warga Multi-Tenant SaaS
 
-> **Repository pengembangan:** https://github.com/kodok-ijho/RuangWarga-dev
-> Semua commit, push, dan pull dilakukan ke repo ini.
-
 Dokumen ini adalah spesifikasi teknis turunan dari `requirement.md`, dengan basis kode
-existing di `github.com/kodok-ijho/PortalWarga` (repo asal, read-only reference) →
-pengembangan dilanjutkan di `github.com/kodok-ijho/RuangWarga-dev`
-(React 18 + Vite 5 + TailwindCSS + Supabase/PostgreSQL + Mayar QRIS + n8n).
+existing di `github.com/kodok-ijho/PortalWarga` (React 18 + Vite 5 + TailwindCSS +
+Supabase/PostgreSQL + Mayar QRIS + n8n).
 
 > Catatan: skema di bawah adalah **rancangan baru** untuk versi multi-tenant. Skema lama
 > PortalWarga (`profiles`, `units`, `ipl_bills`, `payments`, `expenses`, `events`, `rsvp`,
@@ -30,6 +26,11 @@ sebagai berikut — **bukan urutan penyajian dokumen semata, tapi urutan nyata p
 4. §5.1 (Modul Listing Publik/Iklan) — dibangun **setelah** langkah 2 selesai untuk
    minimal tenant tipe `rt_rw` dan `kos`, karena bergantung pada data yang mereka
    hasilkan (unit kosong, keanggotaan warga terverifikasi).
+5. **§2.1 (RBAC v2 — Custom Role & Permission)** — revisi struktural yang menggantikan
+   sebagian dari langkah 1 (kolom `tenant_members.role`, seluruh RLS policy di §6). Karena
+   RBAC v1 sudah terlanjur diimplementasikan penuh (lihat `task.md` Phase 0–11, sudah
+   di-merge ke `main`), migrasi ke v2 dikerjakan sebagai **Phase 12 tersendiri di
+   `task.md`**, bukan disisipkan mundur ke Phase 1 — lihat §2.1.5 untuk pemetaan data.
 
 ## 1. Arsitektur Tingkat Tinggi
 
@@ -136,6 +137,135 @@ CREATE TABLE subscription_payments (
   peringatan dan mewajibkan penyesuaian blok saat **renewal** berikutnya (sesuai FR-11 —
   keputusan penyesuaian ada di tangan user, bukan otomatis).
 
+## 2.1 Model RBAC v2 — Custom Role & Permission Berjenjang (Req §3.2, FR-31–FR-40)
+
+> **Revisi dari RBAC v1.** Skema di bawah **menggantikan** kolom `tenant_members.role`
+> versi enum tetap (`admin`/`bendahara`/`pengurus`/`anggota`) yang sudah terlanjur
+> diimplementasikan di Phase 1 (`RuangWarga-dev`, PR #1). Lihat §2.1.4 untuk catatan
+> migrasi dari skema lama ke skema ini.
+
+### 2.1.1 Tabel Permission & Custom Role
+
+```sql
+-- Daftar permission generik, FIXED secara platform (tidak berubah per tenant/vertikal)
+CREATE TABLE permissions (
+  key           text PRIMARY KEY,
+  label         text NOT NULL,
+  description   text
+);
+
+INSERT INTO permissions (key, label, description) VALUES
+  ('manage_billing_cash',     'Catat Pembayaran Tunai',      'Mencatat pembayaran tunai langsung'),
+  ('manage_billing_transfer', 'Catat & Verifikasi Transfer', 'Mencatat & memverifikasi bukti transfer'),
+  ('generate_billing',        'Terbitkan Tagihan',           'Generate tagihan berkala (IPL/sewa/kontribusi/iuran)'),
+  ('manage_members',          'Kelola Anggota',              'CRUD anggota, approve/reject pendaftaran, impor CSV'),
+  ('manage_settings',         'Kelola Pengaturan',           'Edit konfigurasi tenant'),
+  ('manage_expenses',         'Kelola Pengeluaran',          'CRUD pengeluaran'),
+  ('view_reports',            'Lihat Laporan',               'Akses laporan keuangan (read-only)'),
+  ('run_special_action',      'Jalankan Aksi Khusus',        'Kocok arisan, checkout kos, mulai siklus baru'),
+  ('post_listing',            'Pasang Iklan',                'Posting listing publik'),
+  ('manage_tenant_users',     'Kelola User & Audit',         'CRUD akun/akses user tenant, ubah role, lihat audit log');
+
+-- Role kustom, dibuat PER TENANT oleh Admin/Super Admin (Req FR-36)
+CREATE TABLE tenant_roles (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name            text NOT NULL,                    -- "Bendahara", "Admin Kos", bebas
+  is_owner_role   boolean NOT NULL DEFAULT false,    -- true = role bawaan pemilik (Admin), tak terhapus
+  is_base_role    boolean NOT NULL DEFAULT false,    -- true = role bawaan Warga/Anggota, tak terhapus
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, name)
+);
+
+-- Permission yang dimiliki tiap tenant_role (banyak-ke-banyak)
+CREATE TABLE tenant_role_permissions (
+  tenant_role_id  uuid NOT NULL REFERENCES tenant_roles(id) ON DELETE CASCADE,
+  permission_key  text NOT NULL REFERENCES permissions(key),
+  PRIMARY KEY (tenant_role_id, permission_key)
+);
+```
+
+### 2.1.2 Perubahan pada `tenant_members` (Kepemilikan & Penugasan)
+
+```sql
+-- Kolom 'role' enum lama DIHAPUS, diganti referensi ke tenant_roles + penanda kepemilikan
+ALTER TABLE tenant_members
+  DROP COLUMN role,
+  ADD COLUMN tenant_role_id  uuid REFERENCES tenant_roles(id),
+  ADD COLUMN is_owner        boolean NOT NULL DEFAULT false;
+  -- is_owner = true HANYA untuk baris di mana user_id = tenants.owner_id pada tenant tsb
+  -- (Admin asli/pemilik), false untuk Pengelola yang ditugaskan (FR-32) maupun Anggota.
+```
+
+Satu `user_id` dapat memiliki **banyak baris `tenant_members`** dengan `tenant_id` berbeda
+— ini yang memungkinkan 1 orang menjadi Admin di 1 tenant sekaligus Pengelola di tenant
+lain (FR-31, FR-33), masing-masing baris punya `tenant_role_id` independen.
+
+### 2.1.3 Role Bawaan Otomatis per Tenant Baru (Req FR-37)
+
+Trigger `handle_new_tenant()` (Spec §1, T1.6 di task.md) diperluas untuk juga membuat 2
+`tenant_roles` bawaan setiap kali tenant baru dibuat:
+
+```sql
+-- Diperluas di dalam handle_new_tenant():
+INSERT INTO tenant_roles (tenant_id, name, is_owner_role) VALUES (NEW.id, 'Admin', true);
+INSERT INTO tenant_roles (tenant_id, name, is_base_role) VALUES (NEW.id, 'Warga/Anggota', true);
+
+-- Role 'Admin' otomatis mendapat SEMUA permission:
+INSERT INTO tenant_role_permissions (tenant_role_id, permission_key)
+  SELECT (SELECT id FROM tenant_roles WHERE tenant_id = NEW.id AND is_owner_role), key
+  FROM permissions;
+-- Role 'Warga/Anggota' TIDAK mendapat permission apapun (baris kosong, memang disengaja)
+```
+
+Kedua role ini **tidak dapat dihapus** oleh Admin manapun (ditegakkan lewat RLS DELETE
+yang menolak baris dengan `is_owner_role = true OR is_base_role = true`).
+
+### 2.1.4 Fungsi Helper Permission (Dipakai RLS §6)
+
+```sql
+-- Mengecek apakah user_id punya permission tertentu di tenant tertentu,
+-- lewat tenant_role_id yang di-assign padanya
+CREATE OR REPLACE FUNCTION has_permission(p_tenant_id uuid, p_permission_key text)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM tenant_members tm
+    JOIN tenant_role_permissions trp ON trp.tenant_role_id = tm.tenant_role_id
+    WHERE tm.tenant_id = p_tenant_id
+      AND tm.user_id = auth.uid()
+      AND tm.status = 'approved'
+      AND trp.permission_key = p_permission_key
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- Mengecek apakah user_id adalah Admin (pemilik) tenant tertentu
+CREATE OR REPLACE FUNCTION is_tenant_owner(p_tenant_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM tenants WHERE id = p_tenant_id AND owner_id = auth.uid()
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+```
+
+Catatan penting: `is_tenant_owner()` menggantikan fungsi `is_tenant_admin()` versi lama
+(§6, dipakai di Phase 1 T1.5) — nama fungsi lama dipertahankan sebagai alias sementara
+untuk kompatibilitas mundur selama masa migrasi (lihat §2.1.5), lalu dihapus setelah
+migrasi selesai.
+
+### 2.1.5 Catatan Migrasi dari RBAC v1 ke v2
+
+Karena RBAC v1 sudah diimplementasikan dan di-merge ke `main` (`RuangWarga-dev`, PR #1,
+mencakup 60 commits dan 145+ test), migrasi ke v2 **bukan pekerjaan dari nol** — lihat
+`task.md` Phase 12 untuk urutan lengkap. Ringkasan pemetaan data lama → baru:
+
+| Data Lama (v1) | Menjadi (v2) |
+|---|---|
+| `tenant_members.role = 'admin'` DAN `user_id = tenants.owner_id` | Baris `tenant_members` dengan `is_owner = true`, `tenant_role_id` mengarah ke role bawaan "Admin" |
+| `tenant_members.role = 'bendahara'` | `tenant_role_id` mengarah ke `tenant_roles` baru bernama "Bendahara" (dibuat otomatis saat migrasi, dengan permission `manage_billing_cash`, `manage_billing_transfer`, `manage_expenses`, `view_reports` — meniru kombinasi hak lama di tabel RBAC README) |
+| `tenant_members.role = 'pengurus'` | `tenant_role_id` mengarah ke `tenant_roles` baru bernama "Pengurus" (permission `manage_billing_transfer`, `manage_members`, `view_reports` — meniru kombinasi hak lama) |
+| `tenant_members.role = 'anggota'` | `tenant_role_id` mengarah ke role bawaan "Warga/Anggota" (`is_base_role = true`) |
+
 ## 3. Perubahan Skema Data Operasional (Generik Lintas Vertikal)
 
 Tabel-tabel operasional existing PortalWarga diberi kolom `tenant_id` dan sebagian
@@ -151,7 +281,8 @@ CREATE TABLE tenant_units (
   metadata          jsonb DEFAULT '{}'::jsonb        -- field spesifik vertikal (lihat §4)
 );
 
--- Menggantikan "profiles" lama, tetap 1 baris per user tapi kini terikat tenant
+-- Menggantikan "profiles" lama, tetap 1 baris per (user, tenant) — lihat §2.1.2 untuk
+-- definisi role/permission-nya (RBAC v2: tenant_role_id + is_owner, BUKAN enum 'role' tetap)
 CREATE TABLE tenant_members (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id         uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -159,7 +290,8 @@ CREATE TABLE tenant_members (
   unit_id           bigint REFERENCES tenant_units(id),
   full_name         text NOT NULL,
   phone             text,
-  role              text NOT NULL,   -- admin | bendahara | pengurus | anggota
+  tenant_role_id    uuid REFERENCES tenant_roles(id),  -- lihat §2.1.1/§2.1.2, BUKAN enum tetap
+  is_owner          boolean NOT NULL DEFAULT false,     -- true jika user_id = tenants.owner_id
   status            text NOT NULL DEFAULT 'pending', -- pending | approved | rejected
   occupancy_status  text,             -- khusus kos: pemilik/penyewa; khusus rt_rw: existing value
   created_at        timestamptz NOT NULL DEFAULT now(),
@@ -321,20 +453,16 @@ CREATE TABLE listing_payments (
 
 ## 6. Row Level Security (RLS) — Pola Umum
 
-Helper function:
+> **Revisi RBAC v2:** Pola di bawah menggantikan pemakaian `is_tenant_admin()` /
+> `role = 'admin'` dengan `has_permission()` dan `is_tenant_owner()` dari §2.1.4, dan
+> menambahkan `OR is_platform_admin()` di setiap policy sesuai Req FR-40.
+
+Helper function (fondasi, tidak berubah dari versi sebelumnya):
 
 ```sql
 CREATE OR REPLACE FUNCTION current_tenant_ids()
 RETURNS SETOF uuid AS $$
   SELECT tenant_id FROM tenant_members WHERE user_id = auth.uid() AND status = 'approved';
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION is_tenant_admin(t_id uuid)
-RETURNS boolean AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM tenant_members
-    WHERE tenant_id = t_id AND user_id = auth.uid() AND role = 'admin' AND status = 'approved'
-  );
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION tenant_subscription_status(t_id uuid)
@@ -343,32 +471,83 @@ RETURNS subscription_status AS $$
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 ```
 
-Pola policy pada tabel transaksional (contoh `billing_items`, `payments`):
+`is_tenant_admin()` dan `has_permission()`/`is_tenant_owner()` didefinisikan di §2.1.4 —
+lihat bagian itu untuk definisi lengkap, tidak diulang di sini.
+
+Pola policy pada tabel transaksional (contoh `billing_items`, `payments`), sudah memakai
+permission granular v2:
 
 ```sql
 -- SELECT selalu diizinkan untuk anggota tenant terkait (termasuk saat read_only — FR-15)
 CREATE POLICY select_own_tenant ON billing_items
-  FOR SELECT USING (tenant_id IN (SELECT current_tenant_ids()));
-
--- INSERT/UPDATE hanya jika status subscription bukan read_only
-CREATE POLICY write_when_active ON billing_items
-  FOR INSERT WITH CHECK (
-    tenant_id IN (SELECT current_tenant_ids())
-    AND tenant_subscription_status(tenant_id) IN ('trial', 'active')
+  FOR SELECT USING (
+    is_platform_admin()
+    OR tenant_id IN (SELECT current_tenant_ids())
   );
 
+-- INSERT (generate tagihan) butuh permission spesifik, bukan lagi cek role fixed
+CREATE POLICY write_when_active ON billing_items
+  FOR INSERT WITH CHECK (
+    tenant_subscription_status(tenant_id) IN ('trial', 'active')
+    AND (
+      is_platform_admin()
+      OR is_tenant_owner(tenant_id)
+      OR has_permission(tenant_id, 'generate_billing')
+    )
+  );
+
+-- UPDATE (verifikasi pembayaran) butuh permission BERBEDA dari INSERT — sesuai FR-36:
+-- 'manage_billing_cash' dan 'manage_billing_transfer' adalah 2 permission terpisah
 CREATE POLICY update_when_active ON billing_items
   FOR UPDATE USING (
-    tenant_id IN (SELECT current_tenant_ids())
-    AND tenant_subscription_status(tenant_id) IN ('trial', 'active')
+    tenant_subscription_status(tenant_id) IN ('trial', 'active')
+    AND (
+      is_platform_admin()
+      OR is_tenant_owner(tenant_id)
+      OR has_permission(tenant_id, 'manage_billing_cash')
+      OR has_permission(tenant_id, 'manage_billing_transfer')
+    )
   );
 ```
 
-Policy serupa diterapkan pada `payments` (INSERT pembayaran baru), `tenant_members`
-(approval anggota baru), dan `arisan_rounds` (menjalankan kocok) — semuanya diblok saat
-`read_only`, sesuai FR-15.
+Policy serupa diterapkan pada `payments`, `tenant_members` (approval anggota baru butuh
+`manage_members`), dan `arisan_rounds` (menjalankan kocok butuh `run_special_action`) —
+semuanya diblok saat `read_only`, sesuai FR-15, dan semuanya menambahkan
+`OR is_platform_admin()` di awal kondisi sesuai FR-40.
 
-### 6.1 RLS Khusus `public_listings` — Pengecualian Isolasi Tenant
+### 6.1 RLS untuk `tenant_roles` & `tenant_role_permissions` (Req FR-34, FR-36, FR-37)
+
+```sql
+-- SELECT: siapapun yang jadi anggota tenant tsb boleh lihat daftar role yang ada
+CREATE POLICY select_tenant_roles ON tenant_roles
+  FOR SELECT USING (
+    is_platform_admin()
+    OR tenant_id IN (SELECT current_tenant_ids())
+  );
+
+-- INSERT/UPDATE role baru: HANYA Admin (owner) atau Pengelola yang diberi manage_tenant_users
+CREATE POLICY manage_tenant_roles ON tenant_roles
+  FOR INSERT WITH CHECK (
+    is_platform_admin()
+    OR is_tenant_owner(tenant_id)
+    OR has_permission(tenant_id, 'manage_tenant_users')
+  );
+
+-- DELETE: role bawaan (is_owner_role/is_base_role) tidak boleh dihapus siapapun (Req FR-37)
+CREATE POLICY delete_tenant_roles ON tenant_roles
+  FOR DELETE USING (
+    NOT (is_owner_role OR is_base_role)
+    AND (is_platform_admin() OR is_tenant_owner(tenant_id))
+  );
+```
+
+Catatan: kebijakan INSERT di atas secara sengaja **tidak** mengecualikan Pengelola dengan
+permission `manage_tenant_users` dari mengangkat role setinggi/dengan permission sekuat
+milik Admin — ini konsisten dengan FR-34 yang mensyaratkan pemberian akses tersebut adalah
+keputusan sadar Admin (Admin yang secara eksplisit memberi Pengelola permission tsb),
+bukan celah yang tidak disengaja.
+
+### 6.2 RLS Khusus `public_listings` — Pengecualian Isolasi Tenant
 
 Berbeda dari pola di atas, tabel ini **sengaja membuka akses SELECT ke siapa saja**,
 termasuk yang belum login, karena listing memang ditujukan publik (Req FR-23, FR-24):
@@ -430,6 +609,9 @@ client/src/
 │   ├── listing/                     (BARU — Modul Listing Publik, lihat §7.3)
 │   │   ├── PostListing.jsx           (dari dalam dashboard tenant, buat listing baru)
 │   │   └── MyListings.jsx            (dari dalam dashboard tenant, kelola listing sendiri)
+│   ├── roles/                        (BARU — RBAC v2, lihat §7.4)
+│   │   ├── ManageRoles.jsx           (Admin/Pengelola dgn manage_tenant_users: CRUD custom role)
+│   │   └── AssignMemberRole.jsx      (assign role ke anggota tertentu)
 │   └── ... (Reports, Expenses, Settings — existing, diadaptasi generik)
 ├── pages-public/                    (BARU — halaman publik TANPA tenant context, lihat §7.3)
 │   ├── RoomListingDirectory.jsx      (/listing/kos)
@@ -508,8 +690,21 @@ publik** (halaman terpisah, tanpa login, tanpa tenant context sama sekali).
 | `UmkmListingDetail.jsx` (`/listing/umkm/:id`) | Detail usaha + foto + tombol kontak WhatsApp | `public_listings` |
 
 Halaman-halaman `/listing/*` **tidak memuat `TenantContext.jsx`** — ini murni etalase
-publik lintas tenant, konsisten dengan RLS pengecualian di Spec §6.1. Listing berstatus
+publik lintas tenant, konsisten dengan RLS pengecualian di Spec §6.2. Listing berstatus
 `is_featured = true` ditampilkan lebih menonjol/di posisi awal pada kedua halaman direktori.
+
+### 7.4 Kelola Role & Permission (Req FR-34, FR-36–FR-38, Spec §2.1)
+
+Di dalam `/t/:tenantId/*`, hanya terlihat/dapat diakses oleh Admin (owner) atau Pengelola
+yang diberi permission `manage_tenant_users`:
+
+| Halaman | Fungsi |
+|---|---|
+| `ManageRoles.jsx` | CRUD `tenant_roles` untuk tenant aktif — buat role baru dengan nama bebas, centang kombinasi permission dari daftar tetap (§2.1.1). Role bawaan ("Admin", "Warga/Anggota") tampil tapi tidak bisa diedit/dihapus (tombol disabled, sesuai FR-37) |
+| `AssignMemberRole.jsx` | Pilih anggota tenant, assign salah satu `tenant_role_id` yang tersedia. Satu anggota hanya bisa punya 1 role aktif per tenant (FR-38) — mengganti role otomatis mencabut role lama |
+
+Kedua halaman ini menerapkan `useSubscriptionGate()` (Phase 5 di `task.md`) — dinonaktifkan
+saat tenant berstatus `read_only`, konsisten dengan seluruh aksi tulis lain di platform.
 
 **`tenantTemplates.js`** memetakan istilah UI per `tenant.type`, contoh:
 
