@@ -696,7 +696,7 @@ export function billStatusLabel(status) {
   const map = {
     pending: 'Menunggu',
     paid: 'Lunas',
-    overdue: 'Terlambat',
+    overdue: 'Belum Bayar', // Status merah/terlambat disimpan sementara (sebelumnya: 'Terlambat')
     cancelled: 'Dibatalkan',
     pending_verification: 'Menunggu Verifikasi',
   };
@@ -708,7 +708,7 @@ export function billStatusColor(status) {
   const map = {
     pending: 'bg-amber-50 text-amber-700 border-amber-200',
     paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    overdue: 'bg-red-50 text-red-700 border-red-200',
+    overdue: 'bg-amber-50 text-amber-700 border-amber-200', // Status merah disimpan sementara (sebelumnya: 'bg-red-50 text-red-700 border-red-200')
     cancelled: 'bg-gray-100 text-gray-500 border-gray-200',
     pending_verification: 'bg-orange-50 text-orange-700 border-orange-200',
   };

@@ -70,11 +70,15 @@ export function formatDateTime(dateStr) {
 
 
 // ── BILL STATUS ──────────────────────────────────────────────────
+// Status 'overdue' (merah / terlambat) disimpan sementara, saat ini ditampilkan sebagai 'Belum Bayar'.
+// Ubah ENABLE_OVERDUE_RED_STATUS = true jika sewaktu-waktu ingin mengaktifkan kembali status merah / Terlambat.
+export const ENABLE_OVERDUE_RED_STATUS = false;
+
 export function billStatusLabel(status) {
   const map = {
     pending: 'Belum Bayar',
     paid: 'Lunas',
-    overdue: 'Terlambat',
+    overdue: ENABLE_OVERDUE_RED_STATUS ? 'Terlambat' : 'Belum Bayar',
     partial: 'Sebagian',
     waiting_verification: 'Menunggu Verifikasi',
     pending_verification: 'Menunggu Verifikasi',
@@ -90,7 +94,7 @@ export function billStatusColor(status) {
   const map = {
     pending: 'bg-amber-100 text-amber-700',
     paid: 'bg-emerald-100 text-emerald-700',
-    overdue: 'bg-red-100 text-red-700',
+    overdue: ENABLE_OVERDUE_RED_STATUS ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700',
     partial: 'bg-blue-100 text-blue-700',
     waiting_verification: 'bg-purple-100 text-purple-700',
     pending_verification: 'bg-orange-100 text-orange-700',

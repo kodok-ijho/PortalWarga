@@ -16,6 +16,7 @@ import {
   occupancyStatusColor,
   billStatusLabel,
   billStatusColor,
+  ENABLE_OVERDUE_RED_STATUS,
   isStaffRole,
   isBendaharaOrAbove,
   canModifyData,
@@ -745,9 +746,15 @@ export default function PaymentMatrix() {
         <span className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded bg-amber-50 border border-amber-300"></span> Belum Bayar
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded bg-red-50 border border-red-300"></span> Terlambat / Ditolak
-        </span>
+        {ENABLE_OVERDUE_RED_STATUS ? (
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded bg-red-50 border border-red-300"></span> Terlambat / Ditolak
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded bg-red-100 border border-red-400"></span> ✕ Ditolak
+          </span>
+        )}
         <span className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded bg-gray-100 border border-gray-300"></span> Dibatalkan
         </span>
@@ -1080,8 +1087,9 @@ function Cell({ cell, payment: propPayment, isHanging, unitId, isSelected, isSta
   const { status, bill } = cell;
   const payment = propPayment || (status === 'paid' ? getPaymentForBill(bill.id) : null);
   const isPaid = status === 'paid';
-  const isOverdue = status === 'overdue';
-  const isPending = status === 'pending';
+  // Logika overdue (merah) disimpan sementara; saat dinonaktifkan (ENABLE_OVERDUE_RED_STATUS = false), dialihkan ke Belum Bayar (kuning/amber)
+  const isOverdue = ENABLE_OVERDUE_RED_STATUS && status === 'overdue';
+  const isPending = status === 'pending' || (!ENABLE_OVERDUE_RED_STATUS && status === 'overdue');
   const isPendingVerif = status === 'pending_verification';
   const isRejected = status === 'rejected' || cell.payment?.status === 'rejected' || payment?.status === 'rejected';
   const isCancelled = status === 'cancelled';
