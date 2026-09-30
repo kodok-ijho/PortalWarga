@@ -188,7 +188,7 @@ export function canViewHouses(role) {
 }
 
 export function canManageHouses(role, isReadOnly = false) {
-  return role === 'admin' && !isReadOnly;
+  return hasMinRole(role, 'bendahara') && !isReadOnly && role !== 'admin_viewer';
 }
 
 export function canViewEvents(role) {

@@ -47,8 +47,7 @@ export default function Houses() {
   const token = session?.access_token;
   const toast = useToast();
   const isStaff = isStaffRole(role);
-  // Unit master data is an Admin capability. Staff can inspect it, but the
-  // live /units/upsert workflow correctly rejects non-admin mutations.
+  // Master data unit rumah dan skema biaya IPL dapat dikelola oleh Admin dan Bendahara.
   const canWrite = canManageHouses(role, isReadOnly);
 
   // Data states
