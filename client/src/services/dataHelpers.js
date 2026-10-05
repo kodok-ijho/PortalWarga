@@ -341,3 +341,102 @@ export const MONTHS_LONG = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
 ];
+
+// ── DOCUMENT MANAGEMENT HELPERS ──────────────────────────────────
+export const DOCUMENT_CATEGORIES = {
+  resident: {
+    key: 'resident',
+    label: 'Dokumen Warga',
+    description: 'KTP, KK, dan berkas identitas kependudukan warga per rumah.',
+    gdriveFolderId: '1XW94zFg559-Ub746KoPQbUmMURp0wGR2',
+  },
+  event: {
+    key: 'event',
+    label: 'Dokumen Event',
+    description: 'Proposal, laporan pertanggungjawaban, dan keuangan kegiatan warga.',
+    gdriveFolderId: '1z66DYIGCcZUWlMhi8cLHsoH9yZGA85EV',
+  },
+  estate_general: {
+    key: 'estate_general',
+    label: 'Perumahan: Umum',
+    description: 'AD/ART, peraturan tata tertib, dan surat edaran perumahan.',
+    gdriveFolderId: '1I7splyZnenvypQGX50O_6Ce03mzJwhF9',
+  },
+  estate_finance: {
+    key: 'estate_finance',
+    label: 'Perumahan: Laporan Keuangan',
+    description: 'Laporan arus kas bulanan dan neraca tahunan (format PDF).',
+    gdriveFolderId: '1yuw_CjFWmvK-uLxC0OA6oRRarVtnCbzo',
+  },
+};
+
+export const DOCUMENT_TYPES = {
+  // resident
+  ktp: { label: 'KTP', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  kk: { label: 'Kartu Keluarga (KK)', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  sim: { label: 'SIM', color: 'bg-sky-50 text-sky-700 border-sky-200' },
+  bukti_kepemilikan: { label: 'Bukti Kepemilikan', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  // event
+  proposal: { label: 'Proposal', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  laporan_keuangan: { label: 'Laporan Keuangan', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  laporan_kegiatan: { label: 'Laporan Kegiatan', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  lpj: { label: 'LPJ', color: 'bg-teal-50 text-teal-700 border-teal-200' },
+  // estate_general
+  ad_art: { label: 'AD/ART', color: 'bg-forest-50 text-forest-800 border-forest-200' },
+  peraturan: { label: 'Peraturan', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+  surat_edaran: { label: 'Surat Edaran', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+  // estate_finance
+  bulanan: { label: 'Laporan Bulanan', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  tahunan: { label: 'Laporan Tahunan', color: 'bg-gold-50 text-gold-700 border-gold-200' },
+  neraca: { label: 'Neraca', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  // fallback
+  lainnya: { label: 'Lainnya', color: 'bg-gray-100 text-gray-700 border-gray-200' },
+};
+
+export function documentTypeLabel(type) {
+  return DOCUMENT_TYPES[type]?.label || type || 'Dokumen';
+}
+
+export function documentTypeColor(type) {
+  return DOCUMENT_TYPES[type]?.color || 'bg-gray-100 text-gray-700 border-gray-200';
+}
+
+export function canUploadResidentDoc(role, userUnitId, targetUnitId, isReadOnly = false) {
+  if (isReadOnly || role === 'admin_viewer') return false;
+  if (hasMinRole(role, 'pengurus')) return true;
+  return role === 'warga' && userUnitId && String(userUnitId) === String(targetUnitId);
+}
+
+export function canDeleteResidentDoc(role, isReadOnly = false) {
+  if (isReadOnly || role === 'admin_viewer') return false;
+  return hasMinRole(role, 'pengurus');
+}
+
+export function canManageEventDoc(role, isEventCommittee = false, isReadOnly = false) {
+  if (isReadOnly || role === 'admin_viewer') return false;
+  if (hasMinRole(role, 'pengurus')) return true;
+  return isEventCommittee;
+}
+
+export function canManageEstateGeneralDoc(role, isReadOnly = false) {
+  if (isReadOnly || role === 'admin_viewer') return false;
+  return hasMinRole(role, 'pengurus');
+}
+
+export function canManageEstateFinanceDoc(role, isReadOnly = false) {
+  if (isReadOnly || role === 'admin_viewer') return false;
+  return hasMinRole(role, 'bendahara');
+}
+
+export function canViewEstateFinanceDoc(role, isViewableByWarga = false) {
+  if (hasMinRole(role, 'pengurus')) return true;
+  return Boolean(isViewableByWarga);
+}
+
+export function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}

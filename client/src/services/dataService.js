@@ -2030,6 +2030,95 @@ export async function fetchAuditLogs(token, filters = {}) {
 }
 
 // =====================================================================
+// DOKUMEN & ARSIP (GOOGLE DRIVE INTEGRATION)
+// =====================================================================
+
+export async function fetchDocuments(token, filters = {}) {
+  if (IS_DEMO) {
+    const mock = await getMockData();
+    const documents = mock.getMockDocuments(filters);
+    return { documents, count: documents.length };
+  }
+
+  const data = await portalApiPost('/documents/list', {
+    token,
+    body: filters,
+  });
+
+  return {
+    documents: data?.documents || [],
+    count: Number(data?.count || (data?.documents || []).length),
+  };
+}
+
+export async function uploadDocument(token, { file, fields = {} } = {}) {
+  if (IS_DEMO) {
+    const mock = await getMockData();
+    let fileUrl = 'https://drive.google.com/file/d/demo-file/view?usp=sharing';
+    let downloadUrl = 'https://drive.google.com/uc?id=demo-file&export=download';
+    if (file instanceof File || file instanceof Blob) {
+      fileUrl = URL.createObjectURL(file);
+      downloadUrl = fileUrl;
+    }
+    const uploaded = mock.uploadMockDocument({
+      ...fields,
+      file_name: file?.name || fields.file_name || 'dokumen.pdf',
+      file_size: file?.size || fields.file_size || 1024 * 500,
+      mime_type: file?.type || fields.mime_type || 'application/pdf',
+      file_url: fileUrl,
+      file_download_url: downloadUrl,
+    });
+    return { success: true, document: uploaded };
+  }
+
+  const data = await portalApiUpload('/documents/upload', {
+    token,
+    file,
+    fields,
+  });
+
+  return {
+    success: true,
+    document: data?.document || data,
+  };
+}
+
+export async function updateDocument(token, { id, ...updates } = {}) {
+  if (IS_DEMO) {
+    const mock = await getMockData();
+    const doc = mock.updateMockDocument(id, updates);
+    return { success: true, document: doc };
+  }
+
+  const data = await portalApiPost('/documents/update', {
+    token,
+    body: { id, ...updates },
+  });
+
+  return {
+    success: true,
+    document: data?.document || data,
+  };
+}
+
+export async function deleteDocument(token, id) {
+  if (IS_DEMO) {
+    const mock = await getMockData();
+    return mock.deleteMockDocument(id);
+  }
+
+  const data = await portalApiPost('/documents/delete', {
+    token,
+    body: { id },
+  });
+
+  return {
+    success: true,
+    ...data,
+  };
+}
+
+// =====================================================================
 // MODE CHECK EXPORT
 // =====================================================================
 

@@ -1727,3 +1727,510 @@ export function sendEmailReceipt({ bill, unit, owner, occupant }) {
     }, 600);
   });
 }
+
+// =====================================================================
+// DOKUMEN & ARSIP (GOOGLE DRIVE INTEGRATION) MOCK DATA
+// =====================================================================
+
+export const mockDocuments = [
+  // ── 1. DOKUMEN WARGA ─────────────────────────────────────────
+  {
+    id: 'doc-warga-1',
+    title: 'KTP - Siti Rahayu',
+    category: 'resident',
+    description: 'KTP penghuni tetap unit A-02',
+    unit_id: 2,
+    event_id: null,
+    profile_id: 'demo-warga',
+    document_type: 'ktp',
+    period: null,
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-ktp-siti/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-ktp-siti&export=download',
+    file_id: '1demo-ktp-siti',
+    file_name: 'KTP_Siti_Rahayu_A02.jpg',
+    file_size: 1024 * 345,
+    mime_type: 'image/jpeg',
+    gdrive_folder_id: '1XW94zFg559-Ub746KoPQbUmMURp0wGR2',
+    gdrive_folder_path: 'A-02',
+    uploaded_by: 'demo-warga',
+    updated_by: null,
+    created_at: '2026-08-01T10:00:00.000Z',
+    updated_at: '2026-08-01T10:00:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'doc-warga-2',
+    title: 'Kartu Keluarga - Siti Rahayu',
+    category: 'resident',
+    description: 'Kartu Keluarga unit A-02 Palm Village',
+    unit_id: 2,
+    event_id: null,
+    profile_id: 'demo-warga',
+    document_type: 'kk',
+    period: null,
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-kk-siti/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-kk-siti&export=download',
+    file_id: '1demo-kk-siti',
+    file_name: 'KK_Keluarga_Siti_Rahayu.pdf',
+    file_size: 1024 * 820,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1XW94zFg559-Ub746KoPQbUmMURp0wGR2',
+    gdrive_folder_path: 'A-02',
+    uploaded_by: 'demo-warga',
+    updated_by: null,
+    created_at: '2026-08-01T10:15:00.000Z',
+    updated_at: '2026-08-01T10:15:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'doc-warga-3',
+    title: 'KTP - Hendra Gunawan',
+    category: 'resident',
+    description: 'KTP pemilik unit A-01',
+    unit_id: 1,
+    event_id: null,
+    profile_id: 'demo-bendahara',
+    document_type: 'ktp',
+    period: null,
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-ktp-hendra/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-ktp-hendra&export=download',
+    file_id: '1demo-ktp-hendra',
+    file_name: 'KTP_Hendra_Gunawan_A01.jpg',
+    file_size: 1024 * 410,
+    mime_type: 'image/jpeg',
+    gdrive_folder_id: '1XW94zFg559-Ub746KoPQbUmMURp0wGR2',
+    gdrive_folder_path: 'A-01',
+    uploaded_by: 'demo-admin',
+    updated_by: null,
+    created_at: '2026-08-02T11:00:00.000Z',
+    updated_at: '2026-08-02T11:00:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'doc-warga-4',
+    title: 'Bukti Kepemilikan Rumah B-01',
+    category: 'resident',
+    description: 'Sertifikat / AJB Unit B-01',
+    unit_id: 11,
+    event_id: null,
+    profile_id: 'p-10',
+    document_type: 'bukti_kepemilikan',
+    period: null,
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-ajb-b01/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-ajb-b01&export=download',
+    file_id: '1demo-ajb-b01',
+    file_name: 'Sertifikat_AJB_B01.pdf',
+    file_size: 1024 * 1024 * 2.4,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1XW94zFg559-Ub746KoPQbUmMURp0wGR2',
+    gdrive_folder_path: 'B-01',
+    uploaded_by: 'demo-admin',
+    updated_by: null,
+    created_at: '2026-08-05T09:30:00.000Z',
+    updated_at: '2026-08-05T09:30:00.000Z',
+    deleted_at: null,
+  },
+
+  // ── 2. DOKUMEN EVENT ─────────────────────────────────────────
+  {
+    id: 'doc-event-1',
+    title: 'Proposal Peringatan HUT RI Ke-81',
+    category: 'event',
+    description: 'Rincian anggaran, susunan panitia, dan jadwal kegiatan HUT RI Ke-81.',
+    unit_id: null,
+    event_id: 1,
+    profile_id: null,
+    document_type: 'proposal',
+    period: '2026',
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-proposal-hut81/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-proposal-hut81&export=download',
+    file_id: '1demo-proposal-hut81',
+    file_name: 'Proposal_HUT_RI_81_PalmVillage.pdf',
+    file_size: 1024 * 1250,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1z66DYIGCcZUWlMhi8cLHsoH9yZGA85EV',
+    gdrive_folder_path: '1-Peringatan HUT RI Ke-81',
+    uploaded_by: 'demo-pengurus',
+    updated_by: null,
+    created_at: '2026-08-01T14:00:00.000Z',
+    updated_at: '2026-08-01T14:00:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'doc-event-2',
+    title: 'Laporan Pertanggungjawaban (LPJ) & Keuangan HUT RI Ke-81',
+    category: 'event',
+    description: 'Realisasi pemasukan sponsorship, iuran warga, dan belanja operasional kegiatan.',
+    unit_id: null,
+    event_id: 1,
+    profile_id: null,
+    document_type: 'lpj',
+    period: '2026',
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-lpj-hut81/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-lpj-hut81&export=download',
+    file_id: '1demo-lpj-hut81',
+    file_name: 'LPJ_Keuangan_HUT_RI_81.pdf',
+    file_size: 1024 * 1850,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1z66DYIGCcZUWlMhi8cLHsoH9yZGA85EV',
+    gdrive_folder_path: '1-Peringatan HUT RI Ke-81',
+    uploaded_by: 'demo-bendahara',
+    updated_by: null,
+    created_at: '2026-08-25T16:00:00.000Z',
+    updated_at: '2026-08-25T16:00:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'doc-event-3',
+    title: 'Draft Rencana Anggaran Kerja Bakti Q4',
+    category: 'event',
+    description: 'Estimasi sewa alat berat mini dan konsumsi kerja bakti massal.',
+    unit_id: null,
+    event_id: 2,
+    profile_id: null,
+    document_type: 'proposal',
+    period: '2026',
+    is_viewable_by_warga: false,
+    file_url: 'https://drive.google.com/file/d/1demo-draft-rab-kb/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-draft-rab-kb&export=download',
+    file_id: '1demo-draft-rab-kb',
+    file_name: 'Draft_RAB_KerjaBakti_Q4.pdf',
+    file_size: 1024 * 420,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1z66DYIGCcZUWlMhi8cLHsoH9yZGA85EV',
+    gdrive_folder_path: '2-Kerja Bakti Lingkungan',
+    uploaded_by: 'demo-pengurus',
+    updated_by: null,
+    created_at: '2026-09-10T10:00:00.000Z',
+    updated_at: '2026-09-10T10:00:00.000Z',
+    deleted_at: null,
+  },
+
+  // ── 3. DOKUMEN PERUMAHAN: UMUM ────────────────────────────────
+  {
+    id: 'doc-umum-1',
+    title: 'Anggaran Dasar & Anggaran Rumah Tangga (AD/ART)',
+    category: 'estate_general',
+    description: 'AD/ART Paguyuban Warga Perumahan Palm Village Periode 2024-2027.',
+    unit_id: null,
+    event_id: null,
+    profile_id: null,
+    document_type: 'ad_art',
+    period: '2024-2027',
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-adart-pv/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-adart-pv&export=download',
+    file_id: '1demo-adart-pv',
+    file_name: 'AD_ART_Palm_Village_2024_2027.pdf',
+    file_size: 1024 * 2100,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1I7splyZnenvypQGX50O_6Ce03mzJwhF9',
+    gdrive_folder_path: null,
+    uploaded_by: 'demo-admin',
+    updated_by: null,
+    created_at: '2026-01-10T08:00:00.000Z',
+    updated_at: '2026-01-10T08:00:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'doc-umum-2',
+    title: 'Peraturan Ketertiban & Keamanan Lingkungan 2026',
+    category: 'estate_general',
+    description: 'Ketentuan jam tenang malam, akses portal tamu, dan tata tertib lingkungan.',
+    unit_id: null,
+    event_id: null,
+    profile_id: null,
+    document_type: 'peraturan',
+    period: '2026',
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-peraturan-2026/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-peraturan-2026&export=download',
+    file_id: '1demo-peraturan-2026',
+    file_name: 'Peraturan_Lingkungan_Palm_Village_2026.pdf',
+    file_size: 1024 * 950,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1I7splyZnenvypQGX50O_6Ce03mzJwhF9',
+    gdrive_folder_path: null,
+    uploaded_by: 'demo-pengurus',
+    updated_by: null,
+    created_at: '2026-02-15T09:00:00.000Z',
+    updated_at: '2026-02-15T09:00:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'doc-umum-3',
+    title: 'Surat Edaran Keamanan Menghadapi Libur Panjang',
+    category: 'estate_general',
+    description: 'Prosedur lapor rumah kosong kepada regu security klaster saat bepergian.',
+    unit_id: null,
+    event_id: null,
+    profile_id: null,
+    document_type: 'surat_edaran',
+    period: '2026-06',
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-se-liburan/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-se-liburan&export=download',
+    file_id: '1demo-se-liburan',
+    file_name: 'SE_Keamanan_Rumah_Kosong_Juni2026.pdf',
+    file_size: 1024 * 380,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1I7splyZnenvypQGX50O_6Ce03mzJwhF9',
+    gdrive_folder_path: null,
+    uploaded_by: 'demo-pengurus',
+    updated_by: null,
+    created_at: '2026-06-01T11:00:00.000Z',
+    updated_at: '2026-06-01T11:00:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'doc-umum-4',
+    title: 'Draft Standarisasi Renovasi Tampak Muka Rumah',
+    category: 'estate_general',
+    description: 'Kajian teknis garis sempadan bangunan dan keselarasan fasad klaster.',
+    unit_id: null,
+    event_id: null,
+    profile_id: null,
+    document_type: 'peraturan',
+    period: '2026',
+    is_viewable_by_warga: false,
+    file_url: 'https://drive.google.com/file/d/1demo-draft-renovasi/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-draft-renovasi&export=download',
+    file_id: '1demo-draft-renovasi',
+    file_name: 'Draft_Standar_Renovasi_Fasad_2026.pdf',
+    file_size: 1024 * 1620,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1I7splyZnenvypQGX50O_6Ce03mzJwhF9',
+    gdrive_folder_path: null,
+    uploaded_by: 'demo-admin',
+    updated_by: null,
+    created_at: '2026-09-01T15:00:00.000Z',
+    updated_at: '2026-09-01T15:00:00.000Z',
+    deleted_at: null,
+  },
+
+  // ── 4. DOKUMEN PERUMAHAN: LAPORAN KEUANGAN ───────────────────
+  {
+    id: 'doc-keuangan-1',
+    title: 'Laporan Keuangan & Kas Warga Bulan Juli 2026',
+    category: 'estate_finance',
+    description: 'Rekapitulasi iuran IPL, pengeluaran satpam, kebersihan & sisa saldo kas Juli 2026.',
+    unit_id: null,
+    event_id: null,
+    profile_id: null,
+    document_type: 'bulanan',
+    period: '2026-07',
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-lapkeu-juli2026/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-lapkeu-juli2026&export=download',
+    file_id: '1demo-lapkeu-juli2026',
+    file_name: 'Laporan_Keuangan_Palm_Village_2026-07.pdf',
+    file_size: 1024 * 1150,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1yuw_CjFWmvK-uLxC0OA6oRRarVtnCbzo',
+    gdrive_folder_path: null,
+    uploaded_by: 'demo-bendahara',
+    updated_by: null,
+    created_at: '2026-08-05T10:00:00.000Z',
+    updated_at: '2026-08-05T10:00:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'doc-keuangan-2',
+    title: 'Laporan Keuangan & Kas Warga Bulan Agustus 2026',
+    category: 'estate_finance',
+    description: 'Laporan keuangan bulanan Agustus 2026 yang telah diaudit internal.',
+    unit_id: null,
+    event_id: null,
+    profile_id: null,
+    document_type: 'bulanan',
+    period: '2026-08',
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-lapkeu-agustus2026/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-lapkeu-agustus2026&export=download',
+    file_id: '1demo-lapkeu-agustus2026',
+    file_name: 'Laporan_Keuangan_Palm_Village_2026-08.pdf',
+    file_size: 1024 * 1280,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1yuw_CjFWmvK-uLxC0OA6oRRarVtnCbzo',
+    gdrive_folder_path: null,
+    uploaded_by: 'demo-bendahara',
+    updated_by: null,
+    created_at: '2026-09-05T10:00:00.000Z',
+    updated_at: '2026-09-05T10:00:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'doc-keuangan-3',
+    title: 'Draft Laporan Keuangan Bulan September 2026',
+    category: 'estate_finance',
+    description: 'Draft laporan kas berjalan bulan September 2026 (proses rekonsiliasi bank).',
+    unit_id: null,
+    event_id: null,
+    profile_id: null,
+    document_type: 'bulanan',
+    period: '2026-09',
+    is_viewable_by_warga: false,
+    file_url: 'https://drive.google.com/file/d/1demo-lapkeu-september2026/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-lapkeu-september2026&export=download',
+    file_id: '1demo-lapkeu-september2026',
+    file_name: 'Draft_Laporan_Keuangan_2026-09.pdf',
+    file_size: 1024 * 890,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1yuw_CjFWmvK-uLxC0OA6oRRarVtnCbzo',
+    gdrive_folder_path: null,
+    uploaded_by: 'demo-bendahara',
+    updated_by: null,
+    created_at: '2026-10-01T11:00:00.000Z',
+    updated_at: '2026-10-01T11:00:00.000Z',
+    deleted_at: null,
+  },
+  {
+    id: 'doc-keuangan-4',
+    title: 'Laporan Pertanggungjawaban Keuangan Tahunan 2025',
+    category: 'estate_finance',
+    description: 'Neraca tahunan, rekap penerimaan IPL, dan realisasi anggaran operasional 2025.',
+    unit_id: null,
+    event_id: null,
+    profile_id: null,
+    document_type: 'tahunan',
+    period: '2025',
+    is_viewable_by_warga: true,
+    file_url: 'https://drive.google.com/file/d/1demo-lapkeu-tahunan2025/view?usp=sharing',
+    file_download_url: 'https://drive.google.com/uc?id=1demo-lapkeu-tahunan2025&export=download',
+    file_id: '1demo-lapkeu-tahunan2025',
+    file_name: 'Laporan_Tahunan_Palm_Village_2025.pdf',
+    file_size: 1024 * 3400,
+    mime_type: 'application/pdf',
+    gdrive_folder_id: '1yuw_CjFWmvK-uLxC0OA6oRRarVtnCbzo',
+    gdrive_folder_path: null,
+    uploaded_by: 'demo-bendahara',
+    updated_by: null,
+    created_at: '2026-01-20T14:00:00.000Z',
+    updated_at: '2026-01-20T14:00:00.000Z',
+    deleted_at: null,
+  },
+];
+
+/**
+ * Filter mock documents according to category, search, unit_id, event_id, role, etc.
+ */
+export function getMockDocuments({ category, unit_id, event_id, search, period, role = 'admin', user_unit_id = null } = {}) {
+  let list = mockDocuments.filter((d) => !d.deleted_at);
+
+  if (category) {
+    list = list.filter((d) => d.category === category);
+  }
+
+  if (unit_id) {
+    list = list.filter((d) => String(d.unit_id) === String(unit_id));
+  }
+
+  if (event_id) {
+    list = list.filter((d) => String(d.event_id) === String(event_id));
+  }
+
+  if (period) {
+    list = list.filter((d) => d.period === period);
+  }
+
+  if (search) {
+    const q = search.toLowerCase();
+    list = list.filter((d) =>
+      (d.title || '').toLowerCase().includes(q) ||
+      (d.description || '').toLowerCase().includes(q) ||
+      (d.file_name || '').toLowerCase().includes(q) ||
+      (d.gdrive_folder_path || '').toLowerCase().includes(q)
+    );
+  }
+
+  // Role visibility checks
+  if (role === 'warga') {
+    list = list.filter((d) => {
+      if (d.category === 'resident') {
+        // Warga only sees documents for their own house
+        return user_unit_id && String(d.unit_id) === String(user_unit_id);
+      }
+      if (d.category === 'event') {
+        // Warga only sees viewable events
+        return d.is_viewable_by_warga === true;
+      }
+      if (d.category === 'estate_general') {
+        return d.is_viewable_by_warga === true;
+      }
+      if (d.category === 'estate_finance') {
+        return d.is_viewable_by_warga === true;
+      }
+      return false;
+    });
+  }
+
+  // Sort descending by created_at
+  return list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+/**
+ * Upload mock document
+ */
+export function uploadMockDocument(payload) {
+  const newDoc = {
+    id: `doc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    title: payload.title || 'Dokumen Tanpa Judul',
+    category: payload.category || 'estate_general',
+    description: payload.description || '',
+    unit_id: payload.unit_id ? Number(payload.unit_id) : null,
+    event_id: payload.event_id || null,
+    profile_id: payload.profile_id || null,
+    document_type: payload.document_type || 'lainnya',
+    period: payload.period || null,
+    is_viewable_by_warga: payload.is_viewable_by_warga ?? (payload.category === 'resident'),
+    file_url: payload.file_url || 'https://drive.google.com/file/d/demo-file/view?usp=sharing',
+    file_download_url: payload.file_download_url || 'https://drive.google.com/uc?id=demo-file&export=download',
+    file_id: payload.file_id || `demo-id-${Date.now()}`,
+    file_name: payload.file_name || 'dokumen.pdf',
+    file_size: Number(payload.file_size) || 1024 * 500,
+    mime_type: payload.mime_type || 'application/pdf',
+    gdrive_folder_id: payload.gdrive_folder_id || '',
+    gdrive_folder_path: payload.gdrive_folder_path || null,
+    uploaded_by: payload.uploaded_by || 'demo-admin',
+    updated_by: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    deleted_at: null,
+  };
+
+  mockDocuments.unshift(newDoc);
+  return newDoc;
+}
+
+/**
+ * Update mock document
+ */
+export function updateMockDocument(id, updates) {
+  const doc = mockDocuments.find((d) => d.id === id);
+  if (!doc) throw new Error('Dokumen tidak ditemukan.');
+
+  Object.assign(doc, {
+    ...updates,
+    updated_at: new Date().toISOString(),
+  });
+
+  return doc;
+}
+
+/**
+ * Delete mock document
+ */
+export function deleteMockDocument(id, deletedBy = 'demo-admin') {
+  const doc = mockDocuments.find((d) => d.id === id);
+  if (!doc) throw new Error('Dokumen tidak ditemukan.');
+
+  doc.deleted_at = new Date().toISOString();
+  doc.deleted_by = deletedBy;
+  return { success: true, id };
+}

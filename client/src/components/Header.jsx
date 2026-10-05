@@ -19,6 +19,8 @@ import {
   AiOutlineEdit,
   AiOutlineCalendar,
   AiOutlineBulb,
+  AiOutlineFolder,
+  AiOutlineFilePdf,
 } from 'react-icons/ai';
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -220,6 +222,19 @@ export default function Header() {
               { to: '/users', label: 'Kelola User', icon: AiOutlineTeam, desc: 'Hak akses & edit profil warga' },
             ]
           : []),
+      ],
+    },
+    {
+      key: 'dokumen',
+      label: 'Dokumen',
+      icon: AiOutlineFolder,
+      activePaths: ['/documents'],
+      items: [
+        { to: '/documents', label: 'Semua Dokumen', icon: AiOutlineFolder, desc: 'Pusat arsip & Google Drive' },
+        { to: '/documents?tab=resident', label: 'Dokumen Warga', icon: AiOutlineUser, desc: 'KTP, KK & berkas kependudukan' },
+        { to: '/documents?tab=event', label: 'Dokumen Event', icon: AiOutlineCalendar, desc: 'Proposal & LPJ kegiatan' },
+        { to: '/documents?tab=estate_general', label: 'Perumahan: Umum', icon: AiOutlineFileText, desc: 'AD/ART & peraturan lingkungan' },
+        { to: '/documents?tab=estate_finance', label: 'Laporan Keuangan', icon: AiOutlineFilePdf, desc: 'Transparansi kas & neraca (PDF)' },
       ],
     },
     ...(isStaffRole(role)

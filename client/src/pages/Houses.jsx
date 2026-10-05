@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import {
   AiOutlineDelete,
   AiOutlineDownload,
@@ -634,16 +634,24 @@ function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSch
         />
         {unit.notes && <InfoRow label="Catatan" value={unit.notes} />}
       </div>
-      {canWrite && (
-        <div className="mt-6 flex gap-2 border-t border-forest-100 pt-4">
-          <button type="button" onClick={onEdit} className="pv-btn-ghost flex-1 text-xs">
-            <AiOutlineEdit /> Edit
-          </button>
-          <button type="button" onClick={onDelete} className="pv-btn-danger flex-1 text-xs">
-            <AiOutlineDelete /> Hapus
-          </button>
-        </div>
-      )}
+      <div className="mt-6 flex flex-wrap gap-2 border-t border-forest-100 pt-4">
+        <Link
+          to={`/documents?tab=resident&unit=${unit.id}`}
+          className="pv-btn-ghost flex-1 text-xs text-center inline-flex items-center justify-center gap-1.5"
+        >
+          <span>📁</span> Dokumen Rumah
+        </Link>
+        {canWrite && (
+          <>
+            <button type="button" onClick={onEdit} className="pv-btn-ghost flex-1 text-xs">
+              <AiOutlineEdit /> Edit
+            </button>
+            <button type="button" onClick={onDelete} className="pv-btn-danger flex-1 text-xs">
+              <AiOutlineDelete /> Hapus
+            </button>
+          </>
+        )}
+      </div>
     </Modal>
   );
 }

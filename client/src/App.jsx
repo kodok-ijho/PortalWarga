@@ -39,6 +39,7 @@ const Users = lazy(() => import('./pages/Users'));
 const Logs = lazy(() => import('./pages/Logs'));
 const UserApproval = lazy(() => import('./pages/UserApproval'));
 const PaymentVerification = lazy(() => import('./pages/PaymentVerification'));
+const Documents = lazy(() => import('./pages/Documents'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center py-20">
@@ -108,6 +109,14 @@ export default function App() {
                     element={
                       <Suspense fallback={<PageLoader />}>
                         <PaymentMatrix />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/documents"
+                    element={
+                      <Suspense fallback={<PageLoader />}>
+                        <Documents />
                       </Suspense>
                     }
                   />

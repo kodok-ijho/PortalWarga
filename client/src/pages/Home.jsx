@@ -11,6 +11,7 @@ import {
   AiOutlineWallet,
   AiOutlineUserAdd,
   AiOutlineCheckCircle,
+  AiOutlineFolder,
 } from 'react-icons/ai';
 import { useAuth } from '../hooks/useAuth';
 import { useTour } from '../context/TourContext';
@@ -64,6 +65,7 @@ export default function Home() {
       { to: '/payment-matrix', icon: AiOutlineTable, title: 'Matriks Bayar', desc: 'Bayar & pantau iuran IPL unit Anda.' },
       { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Lihat daftar penghuni kompleks.' },
       { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Lihat daftar rumah & nomor unit.' },
+      { to: '/documents', icon: AiOutlineFolder, title: 'Dokumen & Arsip', desc: 'Unggah identitas rumah & berkas transparansi warga.' },
     ];
     if (hasMinRole(role, 'admin')) {
       return [
@@ -72,6 +74,7 @@ export default function Home() {
         { to: '/payment-verification', icon: AiOutlineCheckCircle, title: 'Verifikasi Bayar', desc: 'Verifikasi bukti transfer IPL.', badge: pendingPayCount },
         { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
         { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
+        { to: '/documents', icon: AiOutlineFolder, title: 'Dokumen & Arsip', desc: 'Kelola arsip berkas warga, event & laporan keuangan (Drive).' },
         { to: '/expenses', icon: AiOutlineWallet, title: 'Pengeluaran', desc: 'Lihat & kelola biaya operasional perumahan.' },
         { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
         { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
@@ -86,6 +89,7 @@ export default function Home() {
         { to: '/payment-verification', icon: AiOutlineCheckCircle, title: 'Verifikasi Bayar', desc: 'Verifikasi bukti transfer IPL.', badge: pendingPayCount },
         { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
         { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
+        { to: '/documents', icon: AiOutlineFolder, title: 'Dokumen & Arsip', desc: 'Kelola arsip berkas warga, event & laporan keuangan (Drive).' },
         { to: '/expenses', icon: AiOutlineWallet, title: 'Pengeluaran', desc: 'Lihat & kelola biaya operasional perumahan.' },
         { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
         { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
@@ -99,6 +103,7 @@ export default function Home() {
         { to: '/payment-verification', icon: AiOutlineCheckCircle, title: 'Verifikasi Bayar', desc: 'Verifikasi bukti transfer IPL.', badge: pendingPayCount },
         { to: '/residents', icon: AiOutlineUser, title: 'Penghuni', desc: 'Kelola data warga: tambah, edit, upload CSV.' },
         { to: '/houses', icon: AiOutlineHome, title: 'Rumah', desc: 'Maintain nomor rumah, owner, status hunian, dan mapsite.' },
+        { to: '/documents', icon: AiOutlineFolder, title: 'Dokumen & Arsip', desc: 'Kelola arsip berkas warga, event & laporan perumahan (Drive).' },
         { to: '/expenses', icon: AiOutlineWallet, title: 'Pengeluaran', desc: 'Lihat & kelola biaya operasional perumahan.' },
         { to: '/reports', icon: AiOutlineBarChart, title: 'Laporan', desc: 'Laporan keuangan IPL bulanan + grafik & export.' },
         { to: '/settings', icon: AiOutlineSetting, title: 'Pengaturan', desc: 'Atur besaran IPL, denda, dan komponen iuran.' },
