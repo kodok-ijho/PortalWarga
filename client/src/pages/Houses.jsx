@@ -27,6 +27,7 @@ import {
   computeSchemaAmount,
   getSchemaById,
   canManageHouses,
+  isAdminRole,
   DEFAULT_IPL_SCHEMAS,
 } from '../services/dataHelpers';
 
@@ -49,6 +50,8 @@ export default function Houses() {
   const isStaff = isStaffRole(role);
   // Master data unit rumah dan skema biaya IPL dapat dikelola oleh Admin dan Bendahara.
   const canWrite = canManageHouses(role, isReadOnly);
+  // Tombol tambah rumah baru hanya untuk Admin
+  const canAddUnit = isAdminRole(role) && !isReadOnly;
 
   // Data states
   const [units, setUnits] = useState([]);
@@ -156,6 +159,7 @@ export default function Houses() {
   }, [filterBlock, filterStatus, search, units, getUnitOwner, getUnitOccupant]);
 
   const openAdd = () => {
+    if (!canAddUnit) return;
     setFormUnit({ ...EMPTY_FORM });
   };
 
@@ -177,6 +181,11 @@ export default function Houses() {
   };
 
   const handleSave = async (data) => {
+    if (!data.id && !canAddUnit) {
+      toast.error('Hanya Admin yang berhak menambahkan unit rumah baru.');
+      return;
+    }
+
     const normalized = {
       ...data,
       block: data.block.trim().toUpperCase(),
@@ -273,7 +282,7 @@ export default function Houses() {
               : 'Informasi denah perumahan blok CB1-CB4, status hunian, dan direktori unit rumah.'}
           </p>
         </div>
-        {canWrite && (
+        {canAddUnit && (
           <button type="button" onClick={openAdd} className="pv-btn-primary text-xs">
             <AiOutlinePlus /> Tambah Rumah
           </button>
