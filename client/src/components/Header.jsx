@@ -20,7 +20,6 @@ import {
   AiOutlineCalendar,
   AiOutlineBulb,
   AiOutlineFolder,
-  AiOutlineFilePdf,
 } from 'react-icons/ai';
 import { useAuth, IS_DEMO_MODE } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -202,7 +201,7 @@ export default function Header() {
       label: 'Warga & Rumah',
       icon: AiOutlineTeam,
       badgeCount: isStaffRole(role) ? pendingRegCount : 0,
-      activePaths: ['/residents', '/houses', '/user-approval', '/users'],
+      activePaths: ['/residents', '/houses', '/documents', '/user-approval', '/users'],
       items: [
         { to: '/residents', label: 'Daftar Penghuni', icon: AiOutlineUser, desc: 'Direktori penghuni kompleks' },
         ...(canViewHouses(role)
@@ -210,6 +209,7 @@ export default function Header() {
               { to: '/houses', label: 'Daftar Rumah', icon: AiOutlineHome, desc: isStaffRole(role) ? 'Maintain data unit & mapsite' : 'Data nomor rumah & status hunian' },
             ]
           : []),
+        { to: '/documents', label: 'Dokumen & Arsip', icon: AiOutlineFolder, desc: 'KTP/KK per rumah, dokumen event & laporan (Google Drive)' },
         ...(isStaffRole(role)
           ? [
               {
@@ -222,19 +222,6 @@ export default function Header() {
               { to: '/users', label: 'Kelola User', icon: AiOutlineTeam, desc: 'Hak akses & edit profil warga' },
             ]
           : []),
-      ],
-    },
-    {
-      key: 'dokumen',
-      label: 'Dokumen',
-      icon: AiOutlineFolder,
-      activePaths: ['/documents'],
-      items: [
-        { to: '/documents', label: 'Semua Dokumen', icon: AiOutlineFolder, desc: 'Pusat arsip & Google Drive' },
-        { to: '/documents?tab=resident', label: 'Dokumen Warga', icon: AiOutlineUser, desc: 'KTP, KK & berkas kependudukan' },
-        { to: '/documents?tab=event', label: 'Dokumen Event', icon: AiOutlineCalendar, desc: 'Proposal & LPJ kegiatan' },
-        { to: '/documents?tab=estate_general', label: 'Perumahan: Umum', icon: AiOutlineFileText, desc: 'AD/ART & peraturan lingkungan' },
-        { to: '/documents?tab=estate_finance', label: 'Laporan Keuangan', icon: AiOutlineFilePdf, desc: 'Transparansi kas & neraca (PDF)' },
       ],
     },
     ...(isStaffRole(role)
