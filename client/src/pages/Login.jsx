@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
-import FullScreenLoader from '../components/FullScreenLoader';
 import {
   useAuth,
   IS_DEMO_MODE,
@@ -44,8 +43,6 @@ export default function Login() {
   const [googleButtonReady, setGoogleButtonReady] = useState(false);
   const [googleRegistration, setGoogleRegistration] = useState(null);
   const [registrationError, setRegistrationError] = useState('');
-  // true sejak akun Google dipilih sampai login selesai/gagal, untuk menampilkan layar loading penuh.
-  const [googleSigningIn, setGoogleSigningIn] = useState(false);
 
   const handleGoogleCredential = useCallback(async (credential) => {
     if (!credential) {
@@ -55,8 +52,6 @@ export default function Login() {
 
     setError('');
     setSubmitting(true);
-    setGoogleSigningIn(true);
-    let signedIn = false;
     try {
       const result = await signInWithGoogle(credential);
       if (result?.registrationRequired) {
@@ -73,14 +68,11 @@ export default function Login() {
         setPendingSuccess({ message: result.message });
         return;
       }
-      signedIn = true;
       navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || 'Login Google belum berhasil.');
     } finally {
       setSubmitting(false);
-      // Saat berhasil, biarkan layar loading tetap tampil sampai halaman tujuan terbuka.
-      if (!signedIn) setGoogleSigningIn(false);
     }
   }, [from, navigate, signInWithGoogle]);
 
@@ -137,16 +129,8 @@ export default function Login() {
     };
   }, [handleGoogleCredential]);
 
-  if (googleSigningIn) {
-    return (
-      <FullScreenLoader
-        title="Sedang masuk dengan Google..."
-        message="Mohon tunggu, akun Anda sedang diverifikasi. Tidak perlu menekan tombol Google lagi."
-      />
-    );
-  }
   if (loading) {
-    return <FullScreenLoader title="Memuat sesi..." />;
+    return <div className="min-h-screen flex items-center justify-center text-forest-500">Memuat sesi keamanan JWT...</div>;
   }
   if (isAuthenticated) {
     return <Navigate to={from} replace />;
