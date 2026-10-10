@@ -11,6 +11,7 @@ import { mockUnits, roleLabel, roleColor } from '../services/mockData';
 import { AiOutlineSafetyCertificate, AiOutlineCloudSync, AiOutlineClose, AiOutlineHome } from 'react-icons/ai';
 import { FcGoogle } from 'react-icons/fc';
 import pkg from '../../package.json';
+import AuthLoadingScreen from '../components/AuthLoadingScreen';
 
 const GOOGLE_SCRIPT_ID = 'google-identity-services';
 const APP_VERSION = `v${pkg.version || '1.4.3'}`;
@@ -39,6 +40,7 @@ export default function Login() {
   const [googleEmail, setGoogleEmail] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [googleVerifying, setGoogleVerifying] = useState(false);
   const [pendingSuccess, setPendingSuccess] = useState(null);
   const [googleButtonReady, setGoogleButtonReady] = useState(false);
   const [googleRegistration, setGoogleRegistration] = useState(null);
@@ -52,6 +54,7 @@ export default function Login() {
 
     setError('');
     setSubmitting(true);
+    setGoogleVerifying(true);
     try {
       const result = await signInWithGoogle(credential);
       if (result?.registrationRequired) {
@@ -73,6 +76,7 @@ export default function Login() {
       setError(err.message || 'Login Google belum berhasil.');
     } finally {
       setSubmitting(false);
+      setGoogleVerifying(false);
     }
   }, [from, navigate, signInWithGoogle]);
 
@@ -130,8 +134,9 @@ export default function Login() {
   }, [handleGoogleCredential]);
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-forest-500">Memuat sesi keamanan JWT...</div>;
+    return <AuthLoadingScreen title="Memuat sesi..." />;
   }
+
   if (isAuthenticated) {
     return <Navigate to={from} replace />;
   }
@@ -239,6 +244,13 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-forest-900 via-forest-800 to-[#082315] px-4 py-8">
+      {/* Overlay saat kembali dari pemilihan akun Google; tombol Google tetap terpasang di bawahnya */}
+      {googleVerifying && (
+        <AuthLoadingScreen
+          title="Sedang masuk..."
+          message="Akun Google Anda sedang diverifikasi. Mohon tunggu, tidak perlu menekan tombol Google lagi."
+        />
+      )}
       <div className="w-full max-w-md">
         {/* Brand Header */}
         <div className="text-center mb-6">
