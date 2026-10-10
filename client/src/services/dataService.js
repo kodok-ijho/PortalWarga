@@ -30,7 +30,7 @@ async function getEventMockData() {
 }
 
 // ── API imports ──────────────────────────────────────────────────
-import { PortalApiError, portalApiPost, portalApiUpload } from './apiClient';
+import { PortalApiError, portalApiPost as rawPortalApiPost, portalApiUpload } from './apiClient';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import {
@@ -39,6 +39,41 @@ import {
   isPendingVerificationStatus,
   normalizePaymentStatus,
 } from './dataHelpers';
+
+// ── Short-lived read cache ───────────────────────────────────────
+// Several pages load the same master data at once (fetchUnits also needs
+// residents, Houses/PaymentVerification ask for both). Identical reads made
+// within READ_CACHE_TTL_MS share one request, and any write clears the cache
+// so a page that reloads after saving always sees fresh data.
+const READ_CACHE_TTL_MS = 60 * 1000;
+const CACHEABLE_READ_PATHS = new Set([
+  '/residents/list',
+  '/units/list',
+  '/settings/get',
+  '/settings/qris/get',
+]);
+const WRITE_PATH_PATTERN = /\/(create|update|delete|upsert|approve|reject|import-csv|generate|submit|cancel)$/;
+const readCache = new Map();
+
+function clearReadCache() {
+  readCache.clear();
+}
+
+function portalApiPost(path, options = {}) {
+  if (!CACHEABLE_READ_PATHS.has(path)) {
+    if (WRITE_PATH_PATTERN.test(path)) clearReadCache();
+    return rawPortalApiPost(path, options);
+  }
+  const key = `${path}|${options.token || ''}`;
+  const hit = readCache.get(key);
+  if (hit && Date.now() - hit.at < READ_CACHE_TTL_MS) return hit.promise;
+  const promise = rawPortalApiPost(path, options).catch((error) => {
+    if (readCache.get(key)?.promise === promise) readCache.delete(key);
+    throw error;
+  });
+  readCache.set(key, { at: Date.now(), promise });
+  return promise;
+}
 
 // =====================================================================
 // USER APPROVAL
@@ -232,7 +267,7 @@ export async function fetchUnits(token) {
     console.error('Failed to fetch units with occupant data:', err);
     try {
       const resUnitsData = await portalApiPost('/units/list', { token });
-      return resUnitsData?.units || [];
+      return [...(resUnitsData?.units || [])];
     } catch {
       return [];
     }
@@ -286,7 +321,7 @@ export async function fetchResidents(token) {
     return mock.mockProfiles.filter((p) => p.approval_status === 'approved');
   }
   const data = await portalApiPost('/residents/list', { token });
-  return data?.residents || [];
+  return [...(data?.residents || [])];
 }
 
 export async function createResident(token, payload) {
@@ -370,9 +405,11 @@ export async function fetchSettings(token) {
     return mock.mockSettings;
   }
   try {
+    const qrisPromise = portalApiPost('/settings/qris/get', { token });
+    qrisPromise.catch(() => {});
     const data = await portalApiPost('/settings/get', { token });
     try {
-      const qris = await portalApiPost('/settings/qris/get', { token });
+      const qris = await qrisPromise;
       return {
         ...data,
         ipl_schemas: Array.isArray(data?.ipl_schemas) && data.ipl_schemas.length > 0 ? data.ipl_schemas : DEFAULT_IPL_SCHEMAS,
