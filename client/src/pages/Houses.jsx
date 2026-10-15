@@ -1,10 +1,11 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import {
   AiOutlineDelete,
   AiOutlineDownload,
   AiOutlineEdit,
   AiOutlineEye,
+  AiOutlineFolderOpen,
   AiOutlineHome,
   AiOutlinePlus,
   AiOutlineSearch,
@@ -13,6 +14,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { useTour } from '../context/TourContext';
 import Modal from '../components/Modal';
+import HouseDocumentsPanel from '../components/HouseDocumentsPanel';
 import {
   fetchUnits,
   upsertUnit,
@@ -43,7 +45,7 @@ const EMPTY_FORM = {
 };
 
 export default function Houses() {
-  const { role, session, isReadOnly } = useAuth();
+  const { role, profile, session, isReadOnly } = useAuth();
   const { triggerTour } = useTour();
   const token = session?.access_token;
   const toast = useToast();
@@ -483,6 +485,15 @@ export default function Houses() {
                           >
                             <AiOutlineEye />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedUnit(unit)}
+                            className="rounded-lg p-2 text-forest-500 hover:bg-forest-100 hover:text-forest-800"
+                            aria-label="Lihat dokumen rumah"
+                            title="Dokumen Rumah"
+                          >
+                            <AiOutlineFolderOpen />
+                          </button>
                           {canWrite && (
                             <>
                               <button
@@ -525,6 +536,8 @@ export default function Houses() {
           iplSchemas={iplSchemas}
           token={token}
           role={role}
+          profile={profile}
+          isReadOnly={isReadOnly}
           onClose={() => setSelectedUnit(null)}
           onEdit={() => {
             if (!canWrite) return;
@@ -570,7 +583,7 @@ function StatCard({ label, value, tone }) {
   );
 }
 
-function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSchemas, token, role, onClose, onEdit, onDelete, canWrite }) {
+function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSchemas, token, role, profile, isReadOnly, onClose, onEdit, onDelete, canWrite }) {
   const owner = getUnitOwner(unit.id);
   const occupant = getUnitOccupant(unit.id);
   const relatedProfiles = profiles.filter((profile) => profile.unit_id === unit.id);
@@ -610,7 +623,7 @@ function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSch
   }, [unit.id, token, role, hasAccess]);
 
   return (
-    <Modal open onClose={onClose} title={`Rumah ${unit.block}/${unit.unit_number}`}>
+    <Modal open onClose={onClose} title={`Rumah ${unit.block}/${unit.unit_number}`} size="lg">
       <div className="space-y-3 text-sm">
         <InfoRow label="Owner" value={owner?.full_name || 'Belum ada'} />
         <InfoRow label="Penghuni Aktif" value={occupant?.full_name || 'Kosong'} />
@@ -634,24 +647,25 @@ function UnitDetailModal({ unit, getUnitOwner, getUnitOccupant, profiles, iplSch
         />
         {unit.notes && <InfoRow label="Catatan" value={unit.notes} />}
       </div>
-      <div className="mt-6 flex flex-wrap gap-2 border-t border-forest-100 pt-4">
-        <Link
-          to={`/documents?tab=resident&unit=${unit.id}`}
-          className="pv-btn-ghost flex-1 text-xs text-center inline-flex items-center justify-center gap-1.5"
-        >
-          <span>📁</span> Dokumen Rumah
-        </Link>
-        {canWrite && (
-          <>
-            <button type="button" onClick={onEdit} className="pv-btn-ghost flex-1 text-xs">
-              <AiOutlineEdit /> Edit
-            </button>
-            <button type="button" onClick={onDelete} className="pv-btn-danger flex-1 text-xs">
-              <AiOutlineDelete /> Hapus
-            </button>
-          </>
-        )}
+      <div className="mt-5 border-t border-forest-100 pt-4">
+        <HouseDocumentsPanel
+          unit={unit}
+          token={token}
+          role={role}
+          profile={profile}
+          isReadOnly={isReadOnly}
+        />
       </div>
+      {canWrite && (
+        <div className="mt-6 flex flex-wrap gap-2 border-t border-forest-100 pt-4">
+          <button type="button" onClick={onEdit} className="pv-btn-ghost flex-1 text-xs">
+            <AiOutlineEdit /> Edit
+          </button>
+          <button type="button" onClick={onDelete} className="pv-btn-danger flex-1 text-xs">
+            <AiOutlineDelete /> Hapus
+          </button>
+        </div>
+      )}
     </Modal>
   );
 }
