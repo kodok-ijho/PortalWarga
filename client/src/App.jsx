@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
@@ -6,26 +7,12 @@ import { TourProvider } from './context/TourContext';
 import WalkthroughTour from './components/WalkthroughTour';
 import ProtectedLayout from './components/Layout';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import NotFound from './pages/NotFound';
+import ErrorBoundary from './components/ErrorBoundary';
 
-// Lazy-load halaman berat untuk code-splitting (recharts, papaparse)
-import { lazy, Suspense } from 'react';
-import { useAuth } from './hooks/useAuth';
-import {
-  canViewFinancialReports,
-  canViewResidents,
-  canViewHouses,
-  canViewSettings,
-  canViewUsers,
-  canViewLogs,
-  canViewPaymentVerification,
-  canViewUserApproval,
-  canViewExpenses,
-  canViewEvents,
-  canViewIncomes,
-} from './services/dataHelpers';
+// Lazy-load semua halaman untuk optimalisasi code-splitting dan reduksi initial bundle
+const Home = lazy(() => import('./pages/Home'));
+const Login = lazy(() => import('./pages/Login'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 const Residents = lazy(() => import('./pages/Residents'));
 const Houses = lazy(() => import('./pages/Houses'));
 const PaymentMatrix = lazy(() => import('./pages/PaymentMatrix'));
@@ -40,6 +27,21 @@ const Logs = lazy(() => import('./pages/Logs'));
 const UserApproval = lazy(() => import('./pages/UserApproval'));
 const PaymentVerification = lazy(() => import('./pages/PaymentVerification'));
 const Documents = lazy(() => import('./pages/Documents'));
+
+import { useAuth } from './hooks/useAuth';
+import {
+  canViewFinancialReports,
+  canViewResidents,
+  canViewHouses,
+  canViewSettings,
+  canViewUsers,
+  canViewLogs,
+  canViewPaymentVerification,
+  canViewUserApproval,
+  canViewExpenses,
+  canViewEvents,
+  canViewIncomes,
+} from './services/dataHelpers';
 
 const PageLoader = () => (
   <div className="flex items-center justify-center py-20">
@@ -59,176 +61,204 @@ function RoleGuard({ allowed, canAccess, children }) {
   return children;
 }
 
+// Konfigurasi React Query: cache bertahan 5 menit dan garbage collection 10 menit
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 menit (300.000 ms)
+      gcTime: 10 * 60 * 1000, // 10 menit (600.000 ms)
     },
   },
 });
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <PWAUpdatePrompt />
-        <AuthProvider>
-          <BrowserRouter>
-            <TourProvider>
-              <WalkthroughTour />
-              <Routes>
-                {/* Login terbuka */}
-                <Route path="/login" element={<Login />} />
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <PWAUpdatePrompt />
+          <AuthProvider>
+            <BrowserRouter>
+              <TourProvider>
+                <WalkthroughTour />
+                <ErrorBoundary>
+                  <Routes>
+                    {/* Login terbuka */}
+                    <Route
+                      path="/login"
+                      element={
+                        <Suspense fallback={<PageLoader />}>
+                          <Login />
+                        </Suspense>
+                      }
+                    />
 
-                {/* Halaman butuh login */}
-                <Route element={<ProtectedLayout />}>
-                  <Route path="/" element={<Home />} />
-                  <Route
-                    path="/residents"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewResidents}>
-                          <Residents />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/houses"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewHouses}>
-                          <Houses />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/payment-matrix"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <PaymentMatrix />
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/documents"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <Documents />
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/reports"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewFinancialReports}>
-                          <Reports />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/settings"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewSettings}>
-                          <Settings />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/expenses"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewExpenses}>
-                          <Expenses />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/events"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewEvents}>
-                          <Events />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/events/:eventId"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewEvents}>
-                          <EventFinance />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/incomes"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewIncomes}>
-                          <NonIplIncomes />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/users"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewUsers}>
-                          <Users />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/logs"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewLogs}>
-                          <Logs />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/user-approval"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewUserApproval}>
-                          <UserApproval />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="/payment-verification"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <RoleGuard canAccess={canViewPaymentVerification}>
-                          <PaymentVerification />
-                        </RoleGuard>
-                      </Suspense>
-                    }
-                  />
-                </Route>
+                    {/* Halaman butuh login */}
+                    <Route element={<ProtectedLayout />}>
+                      <Route
+                        path="/"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <Home />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/residents"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewResidents}>
+                              <Residents />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/houses"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewHouses}>
+                              <Houses />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/payment-matrix"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <PaymentMatrix />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/documents"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <Documents />
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/reports"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewFinancialReports}>
+                              <Reports />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/settings"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewSettings}>
+                              <Settings />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/expenses"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewExpenses}>
+                              <Expenses />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/events"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewEvents}>
+                              <Events />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/events/:eventId"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewEvents}>
+                              <EventFinance />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/incomes"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewIncomes}>
+                              <NonIplIncomes />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/users"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewUsers}>
+                              <Users />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/logs"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewLogs}>
+                              <Logs />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/user-approval"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewUserApproval}>
+                              <UserApproval />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                      <Route
+                        path="/payment-verification"
+                        element={
+                          <Suspense fallback={<PageLoader />}>
+                            <RoleGuard canAccess={canViewPaymentVerification}>
+                              <PaymentVerification />
+                            </RoleGuard>
+                          </Suspense>
+                        }
+                      />
+                    </Route>
 
-                <Route path="/404" element={<NotFound />} />
-                <Route path="*" element={<Navigate to="/404" replace />} />
-              </Routes>
-            </TourProvider>
-          </BrowserRouter>
-        </AuthProvider>
-      </ToastProvider>
-    </QueryClientProvider>
+                    <Route
+                      path="/404"
+                      element={
+                        <Suspense fallback={<PageLoader />}>
+                          <NotFound />
+                        </Suspense>
+                      }
+                    />
+                    <Route path="*" element={<Navigate to="/404" replace />} />
+                  </Routes>
+                </ErrorBoundary>
+              </TourProvider>
+            </BrowserRouter>
+          </AuthProvider>
+        </ToastProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

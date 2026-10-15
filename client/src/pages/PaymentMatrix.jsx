@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { useTour } from '../context/TourContext';
@@ -114,6 +115,68 @@ export default function PaymentMatrix() {
   const canUseQris = true;
   const myUnitId = profile?.unit_id;
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const tableContainerRef = useRef(null);
+  const floatingHeaderRef = useRef(null);
+  const [isSticky, setIsSticky] = useState(false);
+  const [tableRect, setTableRect] = useState({ left: 0, width: 0, top: 64 });
+
+  useEffect(() => {
+    const updateStickyState = () => {
+      if (!tableContainerRef.current) return;
+      const rect = tableContainerRef.current.getBoundingClientRect();
+      const navbar = document.querySelector("header");
+      const navbarBottom = navbar ? navbar.getBoundingClientRect().bottom : 64;
+      const thead = tableContainerRef.current.querySelector("thead");
+      const headerHeight = thead ? thead.offsetHeight : 44;
+
+      const shouldBeSticky =
+        rect.top <= navbarBottom && rect.bottom > navbarBottom + headerHeight;
+
+      setIsSticky(shouldBeSticky);
+      if (shouldBeSticky) {
+        setTableRect((prev) => {
+          if (prev.left === rect.left && prev.width === rect.width && prev.top === navbarBottom) {
+            return prev;
+          }
+          return { left: rect.left, width: rect.width, top: navbarBottom };
+        });
+        if (floatingHeaderRef.current && tableContainerRef.current) {
+          floatingHeaderRef.current.scrollLeft = tableContainerRef.current.scrollLeft;
+        }
+      }
+    };
+
+    window.addEventListener("scroll", updateStickyState, { passive: true });
+    window.addEventListener("resize", updateStickyState);
+    window.addEventListener("orientationchange", updateStickyState);
+
+    updateStickyState();
+
+    return () => {
+      window.removeEventListener("scroll", updateStickyState);
+      window.removeEventListener("resize", updateStickyState);
+      window.removeEventListener("orientationchange", updateStickyState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isSticky && floatingHeaderRef.current && tableContainerRef.current) {
+      floatingHeaderRef.current.scrollLeft = tableContainerRef.current.scrollLeft;
+    }
+  }, [isSticky]);
+
+  const handleTableScroll = (e) => {
+    if (floatingHeaderRef.current && floatingHeaderRef.current.scrollLeft !== e.target.scrollLeft) {
+      floatingHeaderRef.current.scrollLeft = e.target.scrollLeft;
+    }
+  };
+
+  const handleFloatingHeaderScroll = (e) => {
+    if (tableContainerRef.current && tableContainerRef.current.scrollLeft !== e.target.scrollLeft) {
+      tableContainerRef.current.scrollLeft = e.target.scrollLeft;
+    }
+  };
 
   const [matrix, setMatrix] = useState([]);
   const [productionPayments, setProductionPayments] = useState([]);
@@ -763,19 +826,60 @@ export default function PaymentMatrix() {
         </span>
       </div>
 
+      {/* Floating Sticky Header saat scroll vertikal melewati navbar (dimount via createPortal ke document.body) */}
+      {isSticky &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={floatingHeaderRef}
+            onScroll={handleFloatingHeaderScroll}
+            aria-hidden="true"
+            className="fixed z-40 overflow-x-auto shadow-md border-b border-forest-700 select-none [&::-webkit-scrollbar]:hidden"
+            style={{
+              top: `${tableRect.top}px`,
+              left: `${tableRect.left}px`,
+              width: `${tableRect.width}px`,
+              scrollbarWidth: "none",
+            }}
+          >
+            <table className="w-full text-xs table-fixed min-w-[960px] border-separate border-spacing-0 bg-forest-800">
+              <thead>
+                <tr className="bg-forest-800">
+                  <th className="sticky left-0 z-40 bg-forest-800 px-3 py-3 text-left text-[11px] font-semibold text-gold-400 uppercase tracking-wide w-[180px] border-b border-forest-700 shadow-xs">
+                    Rumah / Warga
+                  </th>
+                  {matrixMonths.map((m) => (
+                    <th
+                      key={m.period}
+                      className="bg-forest-800 px-1 py-3 text-center text-[11px] font-semibold text-gold-400 uppercase w-16 border-b border-forest-700 shadow-xs"
+                    >
+                      {m.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            </table>
+          </div>,
+          document.body
+        )}
+
       {/* Matriks */}
       <div data-tour="matrix-grid" className="pv-card relative z-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs table-fixed min-w-[960px] border-collapse">
+        <div
+          ref={tableContainerRef}
+          onScroll={handleTableScroll}
+          className="overflow-x-auto rounded-xl"
+        >
+          <table className="w-full text-xs table-fixed min-w-[960px] border-separate border-spacing-0">
             <thead>
               <tr className="bg-forest-800">
-                <th className="sticky left-0 z-20 bg-forest-800 px-3 py-3 text-left text-[11px] font-semibold text-gold-400 uppercase tracking-wide w-[180px]">
+                <th className="sticky left-0 z-20 bg-forest-800 px-3 py-3 text-left text-[11px] font-semibold text-gold-400 uppercase tracking-wide w-[180px] border-b border-forest-700 shadow-xs">
                   Rumah / Warga
                 </th>
                 {matrixMonths.map((m) => (
                   <th
                     key={m.period}
-                    className="px-1 py-3 text-center text-[11px] font-semibold text-gold-400 uppercase w-16"
+                    className="bg-forest-800 px-1 py-3 text-center text-[11px] font-semibold text-gold-400 uppercase w-16 border-b border-forest-700 shadow-xs"
                   >
                     {m.label}
                   </th>
@@ -785,7 +889,7 @@ export default function PaymentMatrix() {
             <tbody className="divide-y divide-forest-100">
               {matrix.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="px-4 py-10 text-center text-forest-400">
+                  <td colSpan={13} className="px-4 py-10 text-center text-forest-400 border-b border-forest-100">
                     {role === 'warga'
                       ? 'Anda belum memiliki unit. Hubungi pengelola.'
                       : 'Belum ada data unit.'}
@@ -827,7 +931,7 @@ export default function PaymentMatrix() {
                       data-tour={isMyUnit ? 'my-unit-row' : undefined}
                       className={rowBg}
                     >
-                      <td className={`sticky left-0 z-10 ${stickyBg} px-3 py-2 border-r border-forest-100`}>
+                      <td className={`sticky left-0 z-10 ${stickyBg} px-3 py-2 border-r border-b border-forest-100`}>
                         <p className={`font-medium ${isMyUnit ? 'text-gold-700' : 'text-forest-900'}`}>
                           Blok {row.unit.block}/{row.unit.unit_number}
                           {isMyUnit && (
@@ -870,7 +974,7 @@ export default function PaymentMatrix() {
                         );
                         const isHanging = isHangingPayment(payment, matchedCell?.bill, matchedCell?.status);
                         return (
-                          <td key={mIdx} className="px-1 py-1 text-center">
+                          <td key={mIdx} className="px-1 py-1 text-center border-b border-forest-100">
                             <Cell
                               cell={matchedCell}
                               payment={payment}
