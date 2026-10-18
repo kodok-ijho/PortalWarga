@@ -2014,6 +2014,17 @@ function formatPeriodShort(period) {
   return `${monthName} ${y}`;
 }
 
+export function extractGoogleDriveFileId(url) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  const fileMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/i);
+  if (fileMatch?.[1]) return fileMatch[1];
+  const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/i);
+  if (idMatch?.[1]) return idMatch[1];
+  if (/^[a-zA-Z0-9_-]{25,60}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
 export function isImagePaymentProof(payment) {
   let sourceUrl =
     (typeof payment === 'string' ? payment : null) ||
@@ -2024,8 +2035,18 @@ export function isImagePaymentProof(payment) {
     payment?.proof_file_path ||
     payment?.receipt_file ||
     payment?.metadata?.proof_file_url ||
+    payment?.metadata?.drive_url ||
     payment?.metadata?.file_url ||
     '';
+
+  const driveId =
+    payment?.proof_file_id ||
+    payment?.metadata?.proof_file_id ||
+    extractGoogleDriveFileId(sourceUrl);
+
+  if (driveId || payment?.proof_file_provider === 'google_drive') {
+    return true;
+  }
 
   const mimeType = String(payment?.proof_file_mime_type || payment?.receipt_file_mime_type || '').toLowerCase();
   const fileName = String(
@@ -2041,8 +2062,6 @@ export function isImagePaymentProof(payment) {
     mimeType.startsWith('image/') ||
     /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(fileName) ||
     /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(fileUrl) ||
-    /drive\.google\.com\/file\/d\/[^/]+/i.test(fileUrl) ||
-    /drive\.google\.com\/thumbnail/i.test(fileUrl) ||
     /googleusercontent\.com/i.test(fileUrl) ||
     Boolean(fileUrl && !fileUrl.endsWith('.pdf'))
   );
@@ -2058,23 +2077,27 @@ export function getPaymentProofPreviewUrl(payment) {
     payment?.proof_file_path ||
     payment?.receipt_file ||
     payment?.metadata?.proof_file_url ||
+    payment?.metadata?.drive_url ||
     payment?.metadata?.file_url;
+
+  const driveId =
+    payment?.proof_file_id ||
+    payment?.metadata?.proof_file_id ||
+    extractGoogleDriveFileId(sourceUrl);
+
+  if (driveId) {
+    return `https://lh3.googleusercontent.com/d/${encodeURIComponent(driveId)}=w1200`;
+  }
 
   if (!sourceUrl) return null;
   sourceUrl = String(sourceUrl).trim();
 
-  // 1. Google Drive link
-  const driveMatch = sourceUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/i);
-  if (driveMatch?.[1] && driveMatch[1] !== 'undefined') {
-    return `https://lh3.googleusercontent.com/d/${encodeURIComponent(driveMatch[1])}=w1200`;
-  }
-
-  // 2. Full HTTP/HTTPS URL
+  // Full HTTP/HTTPS URL
   if (sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://')) {
     return sourceUrl;
   }
 
-  // 3. Supabase storage relative path
+  // Supabase Storage relative file path (e.g. "2026-09__unit-13__payment-...")
   const cleanPath = sourceUrl.replace(/^payments\//, '');
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mzjgliclzihrdjaqzmqg.supabase.co';
   return `${supabaseUrl.replace(/\/+$/, '')}/storage/v1/object/public/payments/${encodeURIComponent(cleanPath)}`;
@@ -2090,23 +2113,25 @@ export function getPaymentProofDirectUrl(payment) {
     payment?.proof_file_path ||
     payment?.receipt_file ||
     payment?.metadata?.proof_file_url ||
+    payment?.metadata?.drive_url ||
     payment?.metadata?.file_url;
+
+  const driveId =
+    payment?.proof_file_id ||
+    payment?.metadata?.proof_file_id ||
+    extractGoogleDriveFileId(sourceUrl);
+
+  if (driveId) {
+    return `https://drive.google.com/file/d/${driveId}/view`;
+  }
 
   if (!sourceUrl) return '';
   sourceUrl = String(sourceUrl).trim();
 
-  // 1. Google Drive link
-  const driveMatch = sourceUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/i);
-  if (driveMatch?.[1] && driveMatch[1] !== 'undefined') {
-    return `https://drive.google.com/file/d/${driveMatch[1]}/view`;
-  }
-
-  // 2. Full HTTP/HTTPS URL
   if (sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://')) {
     return sourceUrl;
   }
 
-  // 3. Supabase storage relative path
   const cleanPath = sourceUrl.replace(/^payments\//, '');
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mzjgliclzihrdjaqzmqg.supabase.co';
   return `${supabaseUrl.replace(/\/+$/, '')}/storage/v1/object/public/payments/${encodeURIComponent(cleanPath)}`;
@@ -2195,7 +2220,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
   const targetUnit = unit || (IS_DEMO && bill?.unit_id ? getUnitById(bill.unit_id) : null);
   const resolvedUnitId = targetUnit?.id ?? bill?.unit_id ?? activePayment?.unit_id;
 
-  const canViewReceipt = isStaffRole(role) || isMyUnit;
+  const isStaff = isStaffRole(role) || ['pengurus', 'bendahara', 'admin', 'admin_viewer'].includes(String(role).toLowerCase());
 
   const isMyUnit = Boolean(
     (myUnitId && resolvedUnitId && String(resolvedUnitId) === String(myUnitId)) ||
@@ -2219,7 +2244,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
     (profile?.id && activePayment?.resident_id && String(activePayment.resident_id) === String(profile.id))
   );
 
-  
+  const canViewReceipt = isStaff || isMyUnit;
   const canVerify = isBendaharaOrAbove(role) && canModifyData(role);
   const canRepair = isBendaharaOrAbove(role) && canModifyData(role);
   const isHanging = Boolean(initialIsHanging || isHangingPayment(activePayment, resolvedBill, resolvedBill?.status));
@@ -2811,10 +2836,106 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
                   <p className="text-xs text-forest-400 italic">{missingProofText}</p>
                 )
               ) : (
-                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-red-700 text-xs flex items-center gap-2">
-                  <span>🔒</span>
-                  <span>Anda tidak memiliki izin untuk melihat bukti pembayaran unit lain.</span>
+                <div className="rounded-lg bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-900 space-y-1.5 shadow-xs">
+                  <div className="flex items-center gap-2 font-semibold text-amber-950">
+                    <span className="text-base">🔒</span>
+                    <span>Tidak Memiliki Otorisasi (No Authorization)</span>
+                  </div>
+                  <p className="text-amber-800 leading-relaxed">
+                    Anda tidak memiliki otorisasi (authorization) untuk melihat bukti transfer unit lain. Bukti pembayaran hanya dapat diakses oleh warga penghuni unit ini, pengurus, bendahara, dan admin.
+                  </p>
                 </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Tombol Aksi */}
+        <div className="pt-2 flex flex-col gap-2">
+          {canRepair && !isEditing && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="pv-btn-primary w-full text-xs py-2.5 bg-amber-600 hover:bg-amber-700 flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <span>✏️</span>
+              <span>Perbaiki / Edit Transaksi</span>
+            </button>
+          )}
+
+          {payment?.status === 'rejected' && isMyUnit && onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="pv-btn-primary w-full text-xs py-2"
+            >
+              Pilih Tagihan untuk Bayar Ulang
+            </button>
+          )}
+          {(resolvedBill.status === 'paid' || payment?.status === 'verified' || payment?.status === 'completed') && canViewReceipt && (
+            <div className="grid grid-cols-2 gap-2 pb-1 border-b border-forest-100">
+              <button
+                type="button"
+                onClick={() => {
+                  downloadDigitalReceipt({ bill: resolvedBill, unit: targetUnit });
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-forest-300 bg-white px-3 py-2 text-xs font-semibold text-forest-800 shadow-sm hover:bg-forest-50 transition-colors"
+              >
+                📥 Download Kuitansi
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!canModifyData(role)) {
+                    toast.error('Akun read-only tidak dapat mengirim kuitansi email.');
+                    return;
+                  }
+                  toast.info('Mengirim kuitansi digital ke email...');
+                  const res = await sendEmailReceipt({ bill, unit: targetUnit });
+                  toast.success(res.message);
+                }}
+                disabled={!canModifyData(role)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gold-300 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 shadow-sm hover:bg-gold-100 transition-colors disabled:opacity-50"
+              >
+                📧 Kirim ke Email
+              </button>
+            </div>
+          )}
+
+          {payment?.status === 'pending_verification' && canVerify && !isEditing && (
+            <div className="flex gap-2">
+              <button type="button" onClick={handleVerify} disabled={isActing} className="pv-btn-primary flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
+                ✓ Verifikasi Lunas
+              </button>
+              <button type="button" onClick={handleReject} disabled={isActing} className="pv-btn-ghost flex-1 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50">
+                ✕ Tolak Bukti
+              </button>
+            </div>
+          )}
+
+          {payment?.status === 'rejected' && (isMyUnit || isStaffRole(role)) && !isRevising && canModifyData(role) && !isEditing && (
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setIsRevising(true)} className="pv-btn-primary flex-1 text-xs">
+                🔄 Revisi & Upload Ulang
+              </button>
+              <button type="button" onClick={handleCancel} disabled={isActing} className="pv-btn-ghost flex-1 text-xs border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50">
+                🗑 Batalkan
+              </button>
+            </div>
+          )}
+
+          {(isHanging || payment?.status === 'pending_verification') && (isMyUnit || isStaffRole(role)) && canModifyData(role) && !isEditing && (
+            <button type="button" onClick={handleCancel} disabled={isActing} className="pv-btn-ghost w-full text-xs border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-1">
+              <span>🗑</span>
+              <span>Batalkan Transaksi {isHanging ? 'Menggantung' : 'Pembayaran'}</span>
+            </button>
+          )}
+
+          <button type="button" onClick={onClose} className="pv-btn-ghost w-full text-sm">
+            Tutup
+          </button>
+        </div>
+      </div>
     </Modal>
 
       {isProofPreviewOpen && proofPreviewUrl && (
