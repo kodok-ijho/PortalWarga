@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import {
@@ -166,6 +166,9 @@ export default function PaymentVerification() {
   const [qrisEnabled, setQrisEnabled] = useState(true);
   const [qrisProvider, setQrisProvider] = useState('midtrans');
 
+  // Cache matrix annual data to avoid re-fetching heavy matrix on subsequent updates
+  const matrixCacheRef = useRef(null);
+
   const sortedUnits = useMemo(() => {
     return [...units].sort((a, b) => {
       const blockCompare = String(a.block || '').localeCompare(String(b.block || ''));
@@ -188,7 +191,7 @@ export default function PaymentVerification() {
           setQrisEnabled(mockSettings.qris_enabled ?? true);
           setQrisProvider(String(mockSettings.qris_provider || 'midtrans').toLowerCase());
         } else {
-          // Prod mode fetches from API & Supabase
+          // Prod mode fetches from API & Supabase; caches annual matrix to prevent over-fetching
           const [payData, unitData, resData, matrixData, settingsData] = await Promise.all([
             fetchPayments(session?.access_token).catch((err) => {
               console.error('fetchPayments error:', err);
@@ -202,7 +205,14 @@ export default function PaymentVerification() {
               console.error('fetchResidents error:', err);
               return [];
             }),
-            fetchBillMatrix(session?.access_token, currentBillingYear()).catch(() => []),
+            matrixCacheRef.current
+              ? Promise.resolve(matrixCacheRef.current)
+              : fetchBillMatrix(session?.access_token, currentBillingYear())
+                  .then((res) => {
+                    matrixCacheRef.current = res;
+                    return res;
+                  })
+                  .catch(() => []),
             fetchSettings(session?.access_token).catch(() => null),
           ]);
           if (active) {
@@ -266,24 +276,55 @@ export default function PaymentVerification() {
       ? verifiedPayments
       : rejectedPayments;
 
+  // Optimistic UI update: instantly update payment status (<100ms) without full loading spinner
   const handleVerify = async (payment) => {
     if (!canWrite) {
       toast.error('Akun read-only tidak dapat memverifikasi pembayaran.');
       return;
     }
     if (!payment || activeActionId) return;
+
+    // Snapshot state for graceful rollback if API fails
+    const previousPayments = payments;
+    const previousSelectedPayment = selectedPayment;
+    const previousModalMode = modalMode;
+
+    const verifiedBy = profile?.full_name || 'Bendahara';
+    const verifiedAt = new Date().toISOString();
+
+    // 1. Optimistic UI update (<100ms): immediately update local state
+    setPayments((prev) =>
+      prev.map((p) =>
+        p.id === payment.id
+          ? {
+              ...p,
+              status: 'verified',
+              verified_by: verifiedBy,
+              verified_at: verifiedAt,
+            }
+          : p
+      )
+    );
+
+    if (modalMode === 'detail' && selectedPayment?.id === payment.id) {
+      setSelectedPayment(null);
+      setModalMode(null);
+    }
+
     setActiveActionId(payment.id);
     try {
       if (IS_DEMO) {
-        verifyPayment(payment.id, { verifiedBy: profile.full_name });
+        verifyPayment(payment.id, { verifiedBy });
       } else {
         await approveManualPayment(session?.access_token, { payment_id: payment.id });
       }
       toast.success('Pembayaran berhasil diverifikasi.');
-      setRefreshKey((k) => k + 1);
-      setSelectedPayment(null);
-      setModalMode(null);
+      // Over-fetching pruned: no setIsLoading(true) and no re-fetching 1-year matrix
     } catch (err) {
+      // 2. Graceful rollback on failure
+      setPayments(previousPayments);
+      setSelectedPayment(previousSelectedPayment);
+      setModalMode(previousModalMode);
       toast.error(err.message || 'Gagal memverifikasi pembayaran.');
     } finally {
       setActiveActionId(null);
@@ -300,27 +341,53 @@ export default function PaymentVerification() {
     setRejectReason('');
   };
 
+  // Optimistic reject with graceful rollback
   const handleReject = async () => {
     if (!canWrite || !selectedPayment || activeActionId) return;
     if (!rejectReason.trim()) {
       toast.error('Silakan isi alasan penolakan.');
       return;
     }
-    setActiveActionId(selectedPayment.id);
+
+    const paymentToReject = selectedPayment;
+    const reason = rejectReason.trim();
+    const previousPayments = payments;
+    const previousSelectedPayment = selectedPayment;
+    const previousModalMode = modalMode;
+
+    // 1. Optimistic UI update (<100ms)
+    setPayments((prev) =>
+      prev.map((p) =>
+        p.id === paymentToReject.id
+          ? {
+              ...p,
+              status: 'rejected',
+              rejection_reason: reason,
+              rejected_by: profile?.full_name || 'Bendahara',
+            }
+          : p
+      )
+    );
+    setSelectedPayment(null);
+    setModalMode(null);
+    setRejectReason('');
+
+    setActiveActionId(paymentToReject.id);
     try {
       if (IS_DEMO) {
-        rejectPayment(selectedPayment.id, {
-          rejectedBy: profile.full_name,
-          reason: rejectReason,
+        rejectPayment(paymentToReject.id, {
+          rejectedBy: profile?.full_name,
+          reason,
         });
       } else {
-        await rejectManualPayment(session?.access_token, { payment_id: selectedPayment.id, note: rejectReason });
+        await rejectManualPayment(session?.access_token, { payment_id: paymentToReject.id, note: reason });
       }
       toast.warning('Pembayaran ditolak.');
-      setRefreshKey((k) => k + 1);
-      setSelectedPayment(null);
-      setModalMode(null);
     } catch (err) {
+      // 2. Graceful rollback
+      setPayments(previousPayments);
+      setSelectedPayment(previousSelectedPayment);
+      setModalMode(previousModalMode);
       toast.error(err.message || 'Gagal menolak pembayaran.');
     } finally {
       setActiveActionId(null);
@@ -362,16 +429,29 @@ export default function PaymentVerification() {
       return;
     }
 
-    setActiveActionId(selectedPayment.id);
+    const updatedPaymentId = selectedPayment.id;
+    setActiveActionId(updatedPaymentId);
     try {
       await updatePayment(session?.access_token, {
-        payment_id: selectedPayment.id,
+        payment_id: updatedPaymentId,
         ...paymentForm,
       });
       toast.success('Detail pembayaran berhasil diperbarui.');
+      setPayments((prev) =>
+        prev.map((p) =>
+          p.id === updatedPaymentId
+            ? {
+                ...p,
+                amount: Number(paymentForm.amount),
+                method: paymentForm.method,
+                paid_at: paymentForm.paid_at,
+                metadata: { ...(p.metadata || {}), note: paymentForm.note },
+              }
+            : p
+        )
+      );
       setModalMode(null);
       setSelectedPayment(null);
-      setRefreshKey((k) => k + 1);
     } catch (err) {
       toast.error(err.message || 'Gagal memperbarui pembayaran.');
     } finally {
@@ -548,7 +628,16 @@ export default function PaymentVerification() {
                           disabled={Boolean(activeActionId) || !canWrite}
                           className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
                         >
-                          <AiOutlineCheck /> Verifikasi
+                          {activeActionId === payment.id ? (
+                            <>
+                              <div className="h-3 w-3 border-2 border-white/60 border-t-white rounded-full animate-spin" />
+                              <span>Memproses...</span>
+                            </>
+                          ) : (
+                            <>
+                              <AiOutlineCheck /> Verifikasi
+                            </>
+                          )}
                         </button>
                         <button
                           onClick={() => openRejectModal(payment)}
@@ -730,7 +819,7 @@ export default function PaymentVerification() {
                       disabled={Boolean(activeActionId) || !canWrite}
                       className="flex-1 pv-btn-primary py-2.5 rounded-lg text-sm"
                     >
-                      ✅ Verifikasi
+                      {activeActionId === selectedPayment.id ? 'Memproses...' : '✅ Verifikasi'}
                     </button>
                     <button
                       onClick={() => { setModalMode('reject'); setRejectReason(''); }}
@@ -889,9 +978,9 @@ export default function PaymentVerification() {
               <button
                 onClick={handleReject}
                 disabled={Boolean(activeActionId) || !canWrite}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 text-white py-2.5 text-sm font-medium hover:bg-red-700 transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 text-white py-2.5 text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-60"
               >
-                ❌ Tolak Pembayaran
+                {activeActionId === selectedPayment.id ? 'Memproses...' : '❌ Tolak Pembayaran'}
               </button>
               <button
                 onClick={() => setModalMode('detail')}
@@ -906,4 +995,3 @@ export default function PaymentVerification() {
     </div>
   );
 }
-

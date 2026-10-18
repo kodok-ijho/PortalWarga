@@ -170,7 +170,9 @@ export async function fetchDashboardData(token, { role, period } = {}) {
     // Fetch pending payments count (for all staff roles: pengurus, bendahara, admin)
     if (isStaffRole(role)) {
       try {
-        const payments = await fetchPayments(token);
+        const payments = await fetchPayments(token, {
+          statuses: ['pending_verification', 'pending'],
+        });
         pendingPaymentCount = payments.filter((p) => isPendingVerificationStatus(p.status)).length;
         const [yearStr, monthStr] = resolvedPeriod.split('-');
         const year = Number(yearStr);
@@ -620,6 +622,22 @@ function normalizePaymentRecord(payment) {
     proofFileUrl = proofFileName;
   }
 
+  const proofFileId =
+    payment.proof_file_id ||
+    payment.proofFileId ||
+    payment.receipt_file_id ||
+    payment.receiptFileId ||
+    metadata.proof_file_id ||
+    metadata.receipt_file_id ||
+    '';
+
+  if (!proofFileUrl && proofFileId) {
+    proofFileUrl = `https://drive.google.com/file/d/${proofFileId}/view`;
+    if (!proofFileName) {
+      proofFileName = `Bukti Transfer Google Drive (${proofFileId.slice(0, 8)}...)`;
+    }
+  }
+
   const method = payment.method || payment.payment_method || payment.paymentMethod || metadata.method || '';
   const provider = String(
     payment.provider ||
@@ -854,24 +872,113 @@ function normalizeBillMatrixRows(rows) {
 // PAYMENTS
 // =====================================================================
 
-export async function submitManualPayment(token, { bill_id, method, amount, file, proof_file, note, paid_at }) {
+export async function submitManualPayment(token, { bill_id, bill_ids, method, amount, file, proof_file, note, paid_at }) {
+  const ids = Array.isArray(bill_ids) && bill_ids.length > 0
+    ? bill_ids
+    : (bill_id ? [bill_id] : []);
+
   if (IS_DEMO) {
     const mock = await getMockData();
-    return mock.recordResidentPayment([bill_id], { method, receiptFile: file || proof_file, note });
+    return mock.recordResidentPayment(ids, { method, receiptFile: file || proof_file, note });
   }
-  
+
+  const primaryBillId = bill_id || (ids.length > 0 ? ids[0] : null);
+
+  // Single bill submission or legacy single target
+  if (ids.length <= 1) {
+    const fieldsOrBody = {
+      ...(primaryBillId ? { bill_id: primaryBillId } : {}),
+      ...(ids.length > 0 ? { bill_ids: ids } : {}),
+      method,
+      amount,
+      note,
+      paid_at,
+    };
+    if (file) {
+      return portalApiUpload('/payments/manual/submit', {
+        token,
+        file,
+        fields: fieldsOrBody,
+      });
+    } else {
+      return portalApiPost('/payments/manual/submit', {
+        token,
+        body: { ...fieldsOrBody, proof_file },
+      });
+    }
+  }
+
+  // Multi-bill batch submission with single proof file upload
+  // Upload the file once on the first bill, then reuse proof reference for remaining bills
+  const firstBillId = ids[0];
+  let firstResult;
   if (file) {
-    return portalApiUpload('/payments/manual/submit', {
+    firstResult = await portalApiUpload('/payments/manual/submit', {
       token,
       file,
-      fields: { bill_id, method, amount, note, paid_at }
+      fields: {
+        bill_id: firstBillId,
+        bill_ids: ids,
+        method,
+        amount,
+        note,
+        paid_at,
+      },
     });
   } else {
-    return portalApiPost('/payments/manual/submit', {
+    firstResult = await portalApiPost('/payments/manual/submit', {
       token,
-      body: { bill_id, method, amount, proof_file, note, paid_at }
+      body: {
+        bill_id: firstBillId,
+        bill_ids: ids,
+        method,
+        amount,
+        proof_file,
+        note,
+        paid_at,
+      },
     });
   }
+
+  const normalizedFirst = normalizePaymentRecord(firstResult || {});
+  const proofRef =
+    proof_file ||
+    firstResult?.proof_file ||
+    firstResult?.proof_file_url ||
+    firstResult?.file_url ||
+    firstResult?.file_path ||
+    firstResult?.proof_url ||
+    normalizedFirst.proof_file_url ||
+    normalizedFirst.proof_file_name ||
+    'lampiran-batch-terverifikasi';
+
+  const remainingResults = [];
+  for (let i = 1; i < ids.length; i++) {
+    const nextBillId = ids[i];
+    const nextNote = note
+      ? `${note} (Batch multi-bulan ref: ${firstBillId})`
+      : `Batch multi-bulan ref: ${firstBillId}`;
+
+    const res = await portalApiPost('/payments/manual/submit', {
+      token,
+      body: {
+        bill_id: nextBillId,
+        bill_ids: ids,
+        method,
+        amount,
+        proof_file: proofRef,
+        note: nextNote,
+        paid_at,
+      },
+    });
+    remainingResults.push(res);
+  }
+
+  return {
+    ...firstResult,
+    batch_count: ids.length,
+    batch_results: [firstResult, ...remainingResults],
+  };
 }
 
 export async function createCashPayment(token, { bill_id, amount, file, note, paid_at, recorderRole }) {
@@ -953,7 +1060,18 @@ export async function updatePayment(token, { payment_id, unit_id, amount, method
 export async function fetchPayments(token, opts = {}) {
   if (IS_DEMO) {
     const mock = await getMockData();
-    return mock.mockPayments;
+    let res = mock.mockPayments || [];
+    if (opts?.status) {
+      res = res.filter((p) => p.status === opts.status);
+    } else if (Array.isArray(opts?.statuses) && opts.statuses.length > 0) {
+      res = res.filter((p) => opts.statuses.includes(p.status));
+    }
+    if (opts?.scopeUnitId !== undefined && opts.scopeUnitId !== null) {
+      res = res.filter(
+        (p) => String(p._bill?.unit_id || p.unit_id) === String(opts.scopeUnitId)
+      );
+    }
+    return res;
   }
 
   let rawPayments = [];
@@ -962,6 +1080,16 @@ export async function fetchPayments(token, opts = {}) {
     if (opts?.scopeUnitId !== undefined && opts.scopeUnitId !== null) {
       body.scopeUnitId = opts.scopeUnitId;
       body.unit_id = opts.scopeUnitId;
+    }
+    if (opts?.status) {
+      body.status = opts.status;
+    }
+    if (Array.isArray(opts?.statuses) && opts.statuses.length > 0) {
+      body.statuses = opts.statuses;
+    }
+    if (opts?.bill_id || opts?.ipl_bill_id) {
+      body.bill_id = opts.bill_id || opts.ipl_bill_id;
+      body.ipl_bill_id = opts.bill_id || opts.ipl_bill_id;
     }
     const result = await portalApiPost('/payments/list', { token, body });
     rawPayments = extractPaymentList(result);
@@ -976,6 +1104,14 @@ export async function fetchPayments(token, opts = {}) {
       if (opts?.scopeUnitId) {
         query = query.eq('ipl_bills.unit_id', opts.scopeUnitId);
       }
+      if (opts?.bill_id || opts?.ipl_bill_id) {
+        query = query.eq('ipl_bill_id', opts.bill_id || opts.ipl_bill_id);
+      }
+      if (opts?.status) {
+        query = query.eq('status', opts.status);
+      } else if (Array.isArray(opts?.statuses) && opts.statuses.length > 0) {
+        query = query.in('status', opts.statuses);
+      }
       const { data: supaPayments } = await query;
       if (Array.isArray(supaPayments) && supaPayments.length > 0) {
         rawPayments = supaPayments;
@@ -985,7 +1121,14 @@ export async function fetchPayments(token, opts = {}) {
     }
   }
 
-  return (rawPayments || []).map(p => ({
+  let filtered = rawPayments || [];
+  if (opts?.status) {
+    filtered = filtered.filter((p) => p.status === opts.status);
+  } else if (Array.isArray(opts?.statuses) && opts.statuses.length > 0) {
+    filtered = filtered.filter((p) => opts.statuses.includes(p.status));
+  }
+
+  return filtered.map(p => ({
     ...normalizePaymentRecord(p),
     _bill: p.ipl_bills || p.bill || p._bill,
     _profile: p.profiles || p.profile || p._profile,
@@ -2124,3 +2267,24 @@ export async function deleteDocument(token, id) {
 
 export { IS_DEMO };
 
+
+/**
+ * Asynchronous, non-blocking external notification trigger (webhook/WA/email).
+ * Guarantees that notification dispatch never blocks client UI operations
+ * or payment verification flow.
+ */
+export async function triggerExternalNotificationAsync(type, payload = {}) {
+  Promise.resolve().then(async () => {
+    try {
+      if (IS_DEMO) return;
+      await portalApiPost('/notifications/dispatch', {
+        body: { type, payload, timestamp: new Date().toISOString() },
+      }).catch((err) => {
+        console.warn(`[Non-blocking Notification] Dispatch for ${type} failed silently:`, err?.message || err);
+      });
+    } catch (err) {
+      console.warn('[Non-blocking Notification] Internal error:', err?.message || err);
+    }
+  });
+  return { dispatched: true };
+}

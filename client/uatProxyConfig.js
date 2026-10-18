@@ -54,7 +54,8 @@ export function resolveN8nProxyConfig({ mode, env = {} }) {
   const isUat = mode === 'uat';
 
   if (!isUat) {
-    const rawTarget = env.N8N_API_BASE_URL || env.VITE_N8N_TARGET_URL || env.VITE_N8N_API_BASE_URL || '';
+    const candidate = env.N8N_API_BASE_URL || env.VITE_N8N_TARGET_URL || env.VITE_N8N_API_BASE_URL || '';
+    const rawTarget = /^https?:\/\//i.test(candidate) ? candidate : (env.N8N_API_BASE_URL || env.VITE_N8N_TARGET_URL || '');
     return {
       enabled: Boolean(rawTarget),
       isUat: false,

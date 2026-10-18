@@ -71,6 +71,79 @@ export function isHangingPayment(payment, bill, cellStatus) {
   return false;
 }
 
+function PaymentMatrixSkeleton({ matrixMonths }) {
+  const placeholderRows = Array.from({ length: 8 });
+
+  return (
+    <div className="space-y-5" aria-busy="true" aria-label="Memuat matriks pembayaran">
+      {/* Header & tahun skeleton */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-pulse">
+        <div className="space-y-2">
+          <div className="h-6 w-56 bg-forest-200/80 rounded-md" />
+          <div className="h-4 w-80 max-w-full bg-forest-100 rounded-md" />
+        </div>
+        <div className="h-9 w-40 bg-forest-100 rounded-lg" />
+      </div>
+
+      {/* Legenda Skeleton */}
+      <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl border border-forest-100/80 bg-white/70 animate-pulse">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <div className="h-3 w-3 rounded bg-forest-200" />
+            <div className="h-3 w-16 bg-forest-100 rounded" />
+          </div>
+        ))}
+      </div>
+
+      {/* Matriks Table Skeleton */}
+      <div className="pv-card relative z-0 overflow-hidden">
+        <div className="overflow-x-auto rounded-xl">
+          <table className="w-full text-xs table-fixed min-w-[960px] border-separate border-spacing-0">
+            <thead>
+              <tr className="bg-forest-800">
+                <th className="sticky left-0 z-20 bg-forest-800 px-3 py-3 text-left text-[11px] font-semibold text-gold-400 uppercase tracking-wide w-[180px] border-b border-forest-700 shadow-xs">
+                  Rumah / Warga
+                </th>
+                {matrixMonths.map((m) => (
+                  <th
+                    key={m.period}
+                    className="bg-forest-800 px-1 py-3 text-center text-[11px] font-semibold text-gold-400 uppercase w-16 border-b border-forest-700 shadow-xs"
+                  >
+                    {m.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-forest-100 bg-white">
+              {placeholderRows.map((_, rIdx) => (
+                <tr key={rIdx} className="hover:bg-forest-50/50">
+                  <td className="sticky left-0 z-10 bg-white px-3 py-2 border-b border-forest-100 shadow-xs">
+                    <div className="space-y-1.5 animate-pulse">
+                      <div className="h-3.5 w-16 bg-forest-200/90 rounded font-semibold" />
+                      <div className="h-2.5 w-24 bg-forest-100 rounded" />
+                    </div>
+                  </td>
+                  {matrixMonths.map((m) => (
+                    <td
+                      key={m.period}
+                      className="p-1 border-b border-forest-100 text-center align-middle"
+                    >
+                      <div className="h-10 w-full rounded-md bg-forest-50 border border-forest-100/70 animate-pulse flex items-center justify-center">
+                        <div className="h-2 w-8 bg-forest-100/80 rounded" />
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <span className="sr-only">Memuat matriks pembayaran...</span>
+    </div>
+  );
+}
+
 export default function PaymentMatrix() {
   const { profile, role, session, isReadOnly } = useAuth();
   const { triggerTour } = useTour();
@@ -225,20 +298,37 @@ export default function PaymentMatrix() {
     }
   }, [session?.access_token, year, role, toast, isStaff, myUnitId]);
 
+  const paymentsByBillId = useMemo(() => {
+    const map = new Map();
+    if (!productionPayments || productionPayments.length === 0) return map;
+    for (let i = 0; i < productionPayments.length; i++) {
+      const payment = productionPayments[i];
+      const paymentBillId =
+        payment.ipl_bill_id ||
+        payment.iplBillId ||
+        payment.bill_id ||
+        payment.billId ||
+        payment._bill?.id ||
+        payment.ipl_bill?.id;
+      if (paymentBillId != null) {
+        const key = String(paymentBillId);
+        const existing = map.get(key);
+        if (existing) {
+          existing.push(payment);
+        } else {
+          map.set(key, [payment]);
+        }
+      }
+    }
+    return map;
+  }, [productionPayments]);
+
   const getPaymentForBillView = useCallback((billId, preferredPaymentId = null) => {
     if (IS_DEMO) return getPaymentForBill(billId);
-    const candidates = productionPayments.filter((payment) => {
-        const paymentBillId =
-          payment.ipl_bill_id ||
-          payment.iplBillId ||
-          payment.bill_id ||
-          payment.billId ||
-          payment._bill?.id ||
-          payment.ipl_bill?.id;
-        return String(paymentBillId) === String(billId);
-      });
+    if (!billId) return null;
+    const candidates = paymentsByBillId.get(String(billId)) || [];
     return selectPreferredPayment(candidates, preferredPaymentId);
-  }, [productionPayments]);
+  }, [paymentsByBillId]);
 
   const mergePaymentDetails = useCallback((cellPayment, billId, preferredPaymentId = null) => {
     const listPayment = getPaymentForBillView(billId, preferredPaymentId);
@@ -736,12 +826,7 @@ export default function PaymentMatrix() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center p-20 space-y-4">
-        <div className="h-10 w-10 border-4 border-forest-200 border-t-gold-500 rounded-full animate-spin" />
-        <p className="text-sm text-forest-500">Memuat matriks pembayaran...</p>
-      </div>
-    );
+    return <PaymentMatrixSkeleton matrixMonths={matrixMonths} />;
   }
 
   if (loadError) {
@@ -989,12 +1074,22 @@ export default function PaymentMatrix() {
                                   setDetailModal({ bill: matchedCell.bill, payment, unit: row.unit, isHanging: true });
                                   return;
                                 }
-                                if (
+                                const isPaidStatus =
                                   matchedCell?.status === 'paid' ||
+                                  matchedCell?.payment?.status === 'verified' ||
+                                  matchedCell?.payment?.status === 'completed' ||
+                                  payment?.status === 'verified' ||
+                                  payment?.status === 'completed';
+                                const isPendingVerifStatus =
                                   matchedCell?.status === 'pending_verification' ||
+                                  matchedCell?.payment?.status === 'pending_verification' ||
+                                  payment?.status === 'pending_verification';
+                                const isRejectedStatus =
                                   matchedCell?.status === 'rejected' ||
-                                  matchedCell?.payment?.status === 'rejected'
-                                ) {
+                                  matchedCell?.payment?.status === 'rejected' ||
+                                  payment?.status === 'rejected';
+
+                                if (isPaidStatus || isPendingVerifStatus || isRejectedStatus) {
                                   setDetailModal({ bill: matchedCell.bill, payment, unit: row.unit, isHanging: false });
                                   return;
                                 }
@@ -1190,11 +1285,19 @@ function Cell({ cell, payment: propPayment, isHanging, unitId, isSelected, isSta
   }
   const { status, bill } = cell;
   const payment = propPayment || (status === 'paid' ? getPaymentForBill(bill.id) : null);
-  const isPaid = status === 'paid';
+  const isPaid =
+    status === 'paid' ||
+    cell.payment?.status === 'verified' ||
+    cell.payment?.status === 'completed' ||
+    payment?.status === 'verified' ||
+    payment?.status === 'completed';
   // Logika overdue (merah) disimpan sementara; saat dinonaktifkan (ENABLE_OVERDUE_RED_STATUS = false), dialihkan ke Belum Bayar (kuning/amber)
   const isOverdue = ENABLE_OVERDUE_RED_STATUS && status === 'overdue';
   const isPending = status === 'pending' || (!ENABLE_OVERDUE_RED_STATUS && status === 'overdue');
-  const isPendingVerif = status === 'pending_verification';
+  const isPendingVerif =
+    status === 'pending_verification' ||
+    cell.payment?.status === 'pending_verification' ||
+    payment?.status === 'pending_verification';
   const isRejected = status === 'rejected' || cell.payment?.status === 'rejected' || payment?.status === 'rejected';
   const isCancelled = status === 'cancelled';
   const isFailed = status === 'failed';
@@ -1220,8 +1323,8 @@ function Cell({ cell, payment: propPayment, isHanging, unitId, isSelected, isSta
     }
     return (
       <span
-        onClick={canInteract ? onClick : undefined}
-        className={`block h-12 rounded bg-amber-50 border border-amber-300 text-amber-800 flex flex-col items-center justify-center px-0.5 ${canInteract ? 'cursor-pointer hover:bg-amber-100' : ''}`}
+        onClick={onClick}
+        className="block h-12 rounded bg-amber-50 border border-amber-300 text-amber-800 flex flex-col items-center justify-center px-0.5 cursor-pointer hover:bg-amber-100 transition-colors"
         title={`Pembayaran sedang diproses / menggantung (${formatRupiah(bill.amount)})`}
       >
         <span className="text-[9px] font-bold leading-none">{formatShort(bill.amount)}</span>
@@ -1357,8 +1460,10 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
   const [uploadError, setUploadError] = useState('');
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
 
-  const MAX_SIZE = 2 * 1024 * 1024;
+  const MAX_RAW_SIZE = 15 * 1024 * 1024; // Batas foto mentah asli kamera HP hingga 15 MB
+  const MAX_COMPRESSED_SIZE = 2 * 1024 * 1024; // Batas file setelah kompresi (maks 2 MB)
   const ACCEPTED = ['image/jpeg', 'image/jpg', 'image/png'];
   const isMulti = bills.length > 1;
   const qrisFee = Math.ceil(total * 0.007);
@@ -1385,17 +1490,33 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
       e.target.value = '';
       return;
     }
-    if (file.size > MAX_SIZE) {
-      setUploadError('Ukuran file melebihi 2 MB.');
+    if (file.size > MAX_RAW_SIZE) {
+      setUploadError('Ukuran file foto kamera melebihi batas 15 MB.');
       setReceiptFile(null);
       e.target.value = '';
       return;
     }
+    setIsCompressing(true);
     try {
       const compressed = await compressImage(file);
-      setReceiptFile(compressed.file || file);
+      const finalFile = compressed?.file || file;
+      if (finalFile.size > MAX_COMPRESSED_SIZE) {
+        setUploadError('Ukuran file hasil kompresi masih melebihi 2 MB.');
+        setReceiptFile(null);
+        e.target.value = '';
+        return;
+      }
+      setReceiptFile(finalFile);
     } catch (err) {
+      if (file.size > MAX_COMPRESSED_SIZE) {
+        setUploadError('Gagal mengompresi gambar dan ukuran file melebihi 2 MB.');
+        setReceiptFile(null);
+        e.target.value = '';
+        return;
+      }
       setReceiptFile(file);
+    } finally {
+      setIsCompressing(false);
     }
   };
 
@@ -1503,15 +1624,22 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
                 type="file"
                 accept="image/jpeg,image/png"
                 onChange={handleFile}
-                className="block w-full text-xs text-forest-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-forest-800 file:text-gold-400 hover:file:bg-forest-700"
+                disabled={isCompressing || isSubmitting}
+                className="block w-full text-xs text-forest-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-forest-800 file:text-gold-400 hover:file:bg-forest-700 disabled:opacity-50"
               />
-              {receiptFile && (
+              {isCompressing && (
+                <p className="mt-2 text-[11px] text-forest-600 flex items-center gap-1.5 animate-pulse">
+                  <span className="inline-block h-3 w-3 border-2 border-forest-600 border-t-transparent rounded-full animate-spin" />
+                  Mengompresi foto bukti...
+                </p>
+              )}
+              {!isCompressing && receiptFile && (
                 <p className="mt-2 text-[11px] text-emerald-700 flex items-center gap-1">
                   ✓ {receiptFile.name} ({(receiptFile.size / 1024).toFixed(0)} KB)
                 </p>
               )}
               <p className="mt-1.5 text-[10px] text-forest-400">
-                Format: JPG atau PNG. Maks 2 MB.
+                Format: JPG atau PNG (foto kamera HP hingga 15 MB otomatis dikompresi).
               </p>
             </div>
             {uploadError && (
@@ -1545,11 +1673,11 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
         </div>
 
         <div className="flex gap-2 pt-2">
-          <button type="button" onClick={onClose} disabled={isSubmitting} className="pv-btn-ghost flex-1 text-sm disabled:opacity-50">
+          <button type="button" onClick={onClose} disabled={isSubmitting || isCompressing} className="pv-btn-ghost flex-1 text-sm disabled:opacity-50">
             Batal
           </button>
-          <button type="submit" disabled={isSubmitting} className="pv-btn-primary flex-1 text-sm disabled:opacity-50">
-            {isSubmitting ? 'Memproses...' : method === 'qris' ? 'Lanjut ke QRIS' : 'Kirim Bukti Transfer'}
+          <button type="submit" disabled={isSubmitting || isCompressing} className="pv-btn-primary flex-1 text-sm disabled:opacity-50">
+            {isSubmitting ? 'Memproses...' : isCompressing ? 'Mengompresi...' : method === 'qris' ? 'Lanjut ke QRIS' : 'Kirim Bukti Transfer'}
           </button>
         </div>
       </form>
@@ -1572,6 +1700,7 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
   const [receiptFile, setReceiptFile] = useState(null);
   const [uploadError, setUploadError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   // Khusus admin/bendahara: nominal tagihan dapat diubah
   const canEditNominal = isBendaharaOrAbove(role) && canWrite;
@@ -1593,7 +1722,8 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
     setCustomAmounts((prev) => ({ ...prev, [billId]: num }));
   };
 
-  const MAX_SIZE = 2 * 1024 * 1024; // n8n manual payment endpoint limit
+  const MAX_RAW_SIZE = 15 * 1024 * 1024; // Batas foto mentah asli kamera HP hingga 15 MB
+  const MAX_COMPRESSED_SIZE = 2 * 1024 * 1024; // n8n manual payment endpoint limit (setelah kompresi)
   const ACCEPTED = ['image/jpeg', 'image/jpg', 'image/png'];
 
   // bills diasumsikan satu unit, sudah runut & terurut (divalidasi sebelum modal).
@@ -1622,17 +1752,33 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
       e.target.value = '';
       return;
     }
-    if (file.size > MAX_SIZE) {
-      setUploadError('Ukuran file melebihi 2 MB.');
+    if (file.size > MAX_RAW_SIZE) {
+      setUploadError('Ukuran file foto kamera melebihi batas 15 MB.');
       setReceiptFile(null);
       e.target.value = '';
       return;
     }
+    setIsCompressing(true);
     try {
       const compressed = await compressImage(file);
-      setReceiptFile(compressed.file || file);
+      const finalFile = compressed?.file || file;
+      if (finalFile.size > MAX_COMPRESSED_SIZE) {
+        setUploadError('Ukuran file hasil kompresi masih melebihi 2 MB.');
+        setReceiptFile(null);
+        e.target.value = '';
+        return;
+      }
+      setReceiptFile(finalFile);
     } catch (err) {
+      if (file.size > MAX_COMPRESSED_SIZE) {
+        setUploadError('Gagal mengompresi gambar dan ukuran file melebihi 2 MB.');
+        setReceiptFile(null);
+        e.target.value = '';
+        return;
+      }
       setReceiptFile(file);
+    } finally {
+      setIsCompressing(false);
     }
   };
 
@@ -1798,15 +1944,22 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
                 type="file"
                 accept="image/jpeg,image/png"
                 onChange={handleFile}
-                className="block w-full text-xs text-forest-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-forest-800 file:text-gold-400 hover:file:bg-forest-700"
+                disabled={isCompressing || isSubmitting}
+                className="block w-full text-xs text-forest-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-forest-800 file:text-gold-400 hover:file:bg-forest-700 disabled:opacity-50"
               />
-              {receiptFile && (
+              {isCompressing && (
+                <p className="mt-2 text-[11px] text-forest-600 flex items-center gap-1.5 animate-pulse">
+                  <span className="inline-block h-3 w-3 border-2 border-forest-600 border-t-transparent rounded-full animate-spin" />
+                  Mengompresi foto bukti...
+                </p>
+              )}
+              {!isCompressing && receiptFile && (
                 <p className="mt-2 text-[11px] text-emerald-700 flex items-center gap-1">
                   ✓ {receiptFile.name} ({(receiptFile.size / 1024).toFixed(0)} KB)
                 </p>
               )}
               <p className="mt-1.5 text-[10px] text-forest-400">
-                Format: JPG atau PNG. Maks 2 MB.
+                Format: JPG atau PNG (foto kamera HP hingga 15 MB otomatis dikompresi).
               </p>
             </div>
             {uploadError && (
@@ -1841,11 +1994,11 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
         </div>
 
         <div className="flex gap-2 pt-2">
-          <button type="button" onClick={onClose} disabled={isSubmitting} className="pv-btn-ghost flex-1 text-sm disabled:opacity-50">
+          <button type="button" onClick={onClose} disabled={isSubmitting || isCompressing} className="pv-btn-ghost flex-1 text-sm disabled:opacity-50">
             Batal
           </button>
-          <button type="submit" disabled={isSubmitting} className="pv-btn-primary flex-1 text-sm disabled:opacity-50">
-            {isSubmitting ? 'Memproses...' : method === 'qris' ? 'Lanjut ke QRIS' : 'Catat Pembayaran'}
+          <button type="submit" disabled={isSubmitting || isCompressing} className="pv-btn-primary flex-1 text-sm disabled:opacity-50">
+            {isSubmitting ? 'Memproses...' : isCompressing ? 'Mengompresi...' : method === 'qris' ? 'Lanjut ke QRIS' : 'Catat Pembayaran'}
           </button>
         </div>
       </form>
@@ -1861,7 +2014,19 @@ function formatPeriodShort(period) {
   return `${monthName} ${y}`;
 }
 
-function isImagePaymentProof(payment) {
+export function isImagePaymentProof(payment) {
+  let sourceUrl =
+    (typeof payment === 'string' ? payment : null) ||
+    payment?.proof_file_url ||
+    payment?.receipt_file_url ||
+    payment?.proof_url ||
+    payment?.file_url ||
+    payment?.proof_file_path ||
+    payment?.receipt_file ||
+    payment?.metadata?.proof_file_url ||
+    payment?.metadata?.file_url ||
+    '';
+
   const mimeType = String(payment?.proof_file_mime_type || payment?.receipt_file_mime_type || '').toLowerCase();
   const fileName = String(
     payment?.proof_file_name ||
@@ -1870,13 +2035,7 @@ function isImagePaymentProof(payment) {
     payment?.receiptFile ||
     ''
   ).toLowerCase();
-  const fileUrl = String(
-    payment?.proof_file_url ||
-    payment?.receipt_file_url ||
-    payment?.proof_url ||
-    payment?.proof_file_path ||
-    ''
-  ).toLowerCase();
+  const fileUrl = String(sourceUrl).toLowerCase();
 
   return (
     mimeType.startsWith('image/') ||
@@ -1889,26 +2048,24 @@ function isImagePaymentProof(payment) {
   );
 }
 
-function getPaymentProofPreviewUrl(payment) {
+export function getPaymentProofPreviewUrl(payment) {
   let sourceUrl =
+    (typeof payment === 'string' ? payment : null) ||
     payment?.proof_file_url ||
     payment?.receipt_file_url ||
     payment?.proof_url ||
+    payment?.file_url ||
     payment?.proof_file_path ||
     payment?.receipt_file ||
     payment?.metadata?.proof_file_url ||
-    payment?.metadata?.drive_url ||
     payment?.metadata?.file_url;
 
   if (!sourceUrl) return null;
-
   sourceUrl = String(sourceUrl).trim();
 
   // 1. Google Drive link
   const driveMatch = sourceUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/i);
   if (driveMatch?.[1] && driveMatch[1] !== 'undefined') {
-    // Use the image CDN directly. The Drive thumbnail endpoint redirects to
-    // this host, and the direct URL is more reliable inside an <img> preview.
     return `https://lh3.googleusercontent.com/d/${encodeURIComponent(driveMatch[1])}=w1200`;
   }
 
@@ -1917,7 +2074,39 @@ function getPaymentProofPreviewUrl(payment) {
     return sourceUrl;
   }
 
-  // 3. Supabase Storage relative file path (e.g. "2026-09__unit-13__payment-...")
+  // 3. Supabase storage relative path
+  const cleanPath = sourceUrl.replace(/^payments\//, '');
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mzjgliclzihrdjaqzmqg.supabase.co';
+  return `${supabaseUrl.replace(/\/+$/, '')}/storage/v1/object/public/payments/${encodeURIComponent(cleanPath)}`;
+}
+
+export function getPaymentProofDirectUrl(payment) {
+  let sourceUrl =
+    (typeof payment === 'string' ? payment : null) ||
+    payment?.proof_file_url ||
+    payment?.receipt_file_url ||
+    payment?.proof_url ||
+    payment?.file_url ||
+    payment?.proof_file_path ||
+    payment?.receipt_file ||
+    payment?.metadata?.proof_file_url ||
+    payment?.metadata?.file_url;
+
+  if (!sourceUrl) return '';
+  sourceUrl = String(sourceUrl).trim();
+
+  // 1. Google Drive link
+  const driveMatch = sourceUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/i);
+  if (driveMatch?.[1] && driveMatch[1] !== 'undefined') {
+    return `https://drive.google.com/file/d/${driveMatch[1]}/view`;
+  }
+
+  // 2. Full HTTP/HTTPS URL
+  if (sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://')) {
+    return sourceUrl;
+  }
+
+  // 3. Supabase storage relative path
   const cleanPath = sourceUrl.replace(/^payments\//, '');
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mzjgliclzihrdjaqzmqg.supabase.co';
   return `${supabaseUrl.replace(/\/+$/, '')}/storage/v1/object/public/payments/${encodeURIComponent(cleanPath)}`;
@@ -1970,21 +2159,25 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
   }, [bill?.id, bill?.period, bill?.unit_id, bill?.payment_id, unit?.id, session?.access_token]);
 
   // Merge: asyncPayment fields take priority over cellPayment for proof/date fields
+  // Merge: asyncPayment fields take priority over cellPayment for proof/date fields
   const activePayment = useMemo(() => {
     const base = payment || {};
     const fetched = asyncPayment || {};
     const merged = {
       ...base,
       ...fetched,
-      // For these critical fields, prefer fetched (async) over cell payment
       id: fetched.id || base.id,
+      unit_id: fetched.unit_id || base.unit_id || fetched.unitId || base.unitId,
       status: fetched.status || base.status,
       method: fetched.method || base.method || fetched.payment_method || base.payment_method,
       paid_at: fetched.paid_at || base.paid_at,
       created_at: fetched.created_at || base.created_at,
+      proof_file_id: fetched.proof_file_id || base.proof_file_id || fetched.metadata?.proof_file_id || base.metadata?.proof_file_id,
+      proof_file_provider: fetched.proof_file_provider || base.proof_file_provider,
       proof_file_url: fetched.proof_file_url || base.proof_file_url,
       proof_file_name: fetched.proof_file_name || base.proof_file_name,
       proof_file_path: fetched.proof_file_path || base.proof_file_path,
+      proof_file_mime_type: fetched.proof_file_mime_type || base.proof_file_mime_type,
       receipt_file: fetched.receipt_file || base.receipt_file,
       receipt_file_url: fetched.receipt_file_url || base.receipt_file_url,
       ipl_bill_id: fetched.ipl_bill_id || base.ipl_bill_id,
@@ -1994,29 +2187,58 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
         ...(fetched.metadata || {}),
       },
     };
-    // If neither payment nor asyncPayment has any data, return null
     if (!payment && !asyncPayment) return null;
     return merged;
   }, [payment, asyncPayment]);
-
 
   const resolvedBill = bill;
   const targetUnit = unit || (IS_DEMO && bill?.unit_id ? getUnitById(bill.unit_id) : null);
   const resolvedUnitId = targetUnit?.id ?? bill?.unit_id ?? activePayment?.unit_id;
 
-  const isMyUnit =
-    (myUnitId && String(resolvedUnitId) === String(myUnitId)) ||
-    (profile?.email && targetUnit?._occupant?.email && String(profile.email).toLowerCase() === String(targetUnit._occupant.email).toLowerCase()) ||
-    (profile?.id && bill?.resident_id && String(bill.resident_id) === String(profile.id)) ||
-    (profile?.id && activePayment?.resident_id && String(activePayment.resident_id) === String(profile.id));
-
   const canViewReceipt = isStaffRole(role) || isMyUnit;
+
+  const isMyUnit = Boolean(
+    (myUnitId && resolvedUnitId && String(resolvedUnitId) === String(myUnitId)) ||
+    (profile?.unit_id && resolvedUnitId && String(resolvedUnitId) === String(profile.unit_id)) ||
+    (profile?.unitId && resolvedUnitId && String(resolvedUnitId) === String(profile.unitId)) ||
+    (profile?.unit?.id && resolvedUnitId && String(resolvedUnitId) === String(profile.unit.id)) ||
+    (targetUnit?.block && targetUnit?.unit_number && (
+      (profile?.unit?.block && profile?.unit?.unit_number &&
+        String(profile.unit.block).trim().toLowerCase() === String(targetUnit.block).trim().toLowerCase() &&
+        String(profile.unit.unit_number).trim() === String(targetUnit.unit_number).trim()) ||
+      (profile?.block && profile?.unit_number &&
+        String(profile.block).trim().toLowerCase() === String(targetUnit.block).trim().toLowerCase() &&
+        String(profile.unit_number).trim() === String(targetUnit.unit_number).trim())
+    )) ||
+    (profile?.id && targetUnit?.owner_id && String(targetUnit.owner_id) === String(profile.id)) ||
+    (profile?.id && targetUnit?.occupant_id && String(targetUnit.occupant_id) === String(profile.id)) ||
+    (profile?.id && targetUnit?._occupant?.id && String(targetUnit._occupant.id) === String(profile.id)) ||
+    (profile?.email && targetUnit?._occupant?.email && String(profile.email).trim().toLowerCase() === String(targetUnit._occupant.email).trim().toLowerCase()) ||
+    (profile?.email && targetUnit?.resident?.email && String(profile.email).trim().toLowerCase() === String(targetUnit.resident.email).trim().toLowerCase()) ||
+    (profile?.id && bill?.resident_id && String(bill.resident_id) === String(profile.id)) ||
+    (profile?.id && activePayment?.resident_id && String(activePayment.resident_id) === String(profile.id))
+  );
+
+  
   const canVerify = isBendaharaOrAbove(role) && canModifyData(role);
   const canRepair = isBendaharaOrAbove(role) && canModifyData(role);
   const isHanging = Boolean(initialIsHanging || isHangingPayment(activePayment, resolvedBill, resolvedBill?.status));
   const paymentMethod = activePayment?.method || activePayment?.payment_method || activePayment?.paymentMethod;
 
+  const driveId =
+    activePayment?.proof_file_id ||
+    activePayment?.metadata?.proof_file_id ||
+    extractGoogleDriveFileId(
+      activePayment?.proof_file_url ||
+      activePayment?.proof_url ||
+      activePayment?.file_url ||
+      activePayment?.metadata?.drive_url
+    );
+
+  const directProofUrl = getPaymentProofDirectUrl(activePayment);
+
   let proofFileUrl =
+    directProofUrl ||
     activePayment?.proof_file_url ||
     activePayment?.receipt_file_url ||
     activePayment?.proof_url ||
@@ -2038,18 +2260,22 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
     activePayment?.metadata?.receipt_file_name ||
     '';
 
-  if (!proofFileName && proofFileUrl) {
+  if (!proofFileName && driveId) {
+    proofFileName = `Bukti Transfer Google Drive (${driveId.slice(0, 8)}...)`;
+  } else if (!proofFileName && proofFileUrl) {
     const cleanUrl = String(proofFileUrl).split('?')[0];
     const segment = cleanUrl.split('/').pop();
     proofFileName = (segment && segment.includes('.')) ? segment : 'Bukti Transfer';
   }
 
-  if (!proofFileUrl && proofFileName && (proofFileName.startsWith('http://') || proofFileName.startsWith('https://'))) {
-    proofFileUrl = proofFileName;
-  }
-
-  const hasProofFile = Boolean(proofFileUrl || proofFileName);
-  const proofPreviewPayment = { ...activePayment, proof_file_url: proofFileUrl, proof_file_name: proofFileName };
+  const isGoogleDriveProof = Boolean(driveId);
+  const hasProofFile = Boolean(proofFileUrl || proofFileName || driveId);
+  const proofPreviewPayment = {
+    ...activePayment,
+    proof_file_id: driveId,
+    proof_file_url: proofFileUrl,
+    proof_file_name: proofFileName,
+  };
   const proofPreviewUrl = getPaymentProofPreviewUrl(proofPreviewPayment);
   const canPreviewProofImage = Boolean(proofPreviewUrl && isImagePaymentProof(proofPreviewPayment));
   const resolvedPaidAt = getResolvedPaymentDate(activePayment, resolvedBill);
@@ -2085,6 +2311,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
 
   const [isRevising, setIsRevising] = useState(false);
   const [newReceipt, setNewReceipt] = useState(null);
+  const [isCompressingRevision, setIsCompressingRevision] = useState(false);
   const [reviseNote, setReviseNote] = useState(payment?.metadata?.note || '');
   const [uploadError, setUploadError] = useState('');
   const [isActing, setIsActing] = useState(false);
@@ -2213,16 +2440,30 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
     setUploadError('');
     const file = e.target.files?.[0];
     if (!file) { setNewReceipt(null); return; }
-    if (file.size > 3 * 1024 * 1024) {
-      setUploadError('Ukuran file maksimal 3 MB.');
+    if (file.size > 15 * 1024 * 1024) {
+      setUploadError('Ukuran file foto kamera melebihi batas 15 MB.');
       setNewReceipt(null);
       return;
     }
+    setIsCompressingRevision(true);
     try {
       const compressed = await compressImage(file);
-      setNewReceipt(compressed);
+      const finalFile = compressed?.file || file;
+      if (finalFile.size > 2 * 1024 * 1024) {
+        setUploadError('Ukuran file hasil kompresi masih melebihi 2 MB.');
+        setNewReceipt(null);
+        return;
+      }
+      setNewReceipt(finalFile);
     } catch (err) {
+      if (file.size > 2 * 1024 * 1024) {
+        setUploadError('Gagal mengompresi gambar dan ukuran file melebihi 2 MB.');
+        setNewReceipt(null);
+        return;
+      }
       setNewReceipt(file);
+    } finally {
+      setIsCompressingRevision(false);
     }
   };
 
@@ -2408,9 +2649,15 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
             <h4 className="font-semibold text-xs text-forest-800 uppercase tracking-wide">Revisi Bukti Transfer</h4>
             <div>
               <label className="block text-xs font-medium text-forest-700 mb-1">File Bukti Baru</label>
-              <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="text-xs w-full" />
-              {newReceipt && <p className="text-[11px] text-emerald-600 mt-1">✓ File siap diunggah: {newReceipt.name}</p>}
-              {uploadError && <p className="text-[11px] text-red-500 mt-1">{uploadError}</p>}
+              <input type="file" accept="image/*,.pdf" onChange={handleFileChange} disabled={isCompressingRevision} className="text-xs w-full disabled:opacity-50" />
+              {isCompressingRevision && (
+                <p className="mt-1 text-[11px] text-forest-600 flex items-center gap-1.5 animate-pulse">
+                  <span className="inline-block h-2.5 w-2.5 border-2 border-forest-600 border-t-transparent rounded-full animate-spin" />
+                  Mengompresi foto bukti...
+                </p>
+              )}
+              {!isCompressingRevision && newReceipt && <p className="text-[11px] text-emerald-600 mt-1">✓ File siap diunggah: {newReceipt.name}</p>}
+              {uploadError && <p className="text-[11px] text-red-500 mt-1">⚠️ {uploadError}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-forest-700 mb-1">Catatan Tambahan</label>
@@ -2423,8 +2670,10 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
               />
             </div>
             <div className="flex gap-2 pt-1">
-              <button type="submit" className="pv-btn-primary flex-1 text-xs py-1.5">Kirim Revisi</button>
-              <button type="button" onClick={() => setIsRevising(false)} className="pv-btn-ghost text-xs py-1.5">Batal</button>
+              <button type="submit" disabled={isCompressingRevision} className="pv-btn-primary flex-1 text-xs py-1.5 disabled:opacity-50">
+                {isCompressingRevision ? 'Mengompresi...' : 'Kirim Revisi'}
+              </button>
+              <button type="button" onClick={() => setIsRevising(false)} disabled={isCompressingRevision} className="pv-btn-ghost text-xs py-1.5 disabled:opacity-50">Batal</button>
             </div>
           </form>
         ) : (
@@ -2476,58 +2725,88 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
               <p className="text-xs text-forest-500 font-medium mb-1.5">Bukti Bayar</p>
               {canViewReceipt ? (
                 hasProofFile ? (
-                  <>
-                    {canPreviewProofImage && !proofPreviewError && (
-                      <button
-                        type="button"
-                        onClick={() => setIsProofPreviewOpen(true)}
-                        className="group mb-2 block w-full overflow-hidden rounded-lg border border-forest-200 bg-forest-50 text-left transition-colors hover:border-gold-300 focus:outline-none focus:ring-2 focus:ring-gold-400/40"
-                        aria-label="Perbesar bukti transfer"
-                      >
-                        <div className="flex min-h-36 items-center justify-center bg-forest-100 p-2">
-                          <img
-                            src={proofPreviewUrl}
-                            alt={proofFileName || 'Bukti transfer'}
-                            referrerPolicy="no-referrer"
-                            className="max-h-52 w-full rounded-md object-contain transition-transform group-hover:scale-[1.01]"
-                            onError={() => setProofPreviewError(true)}
-                          />
+                  <div className="space-y-2">
+                    {canPreviewProofImage && !proofPreviewError ? (
+                      <div className="overflow-hidden rounded-lg border border-forest-200 bg-forest-50">
+                        <button
+                          type="button"
+                          onClick={() => setIsProofPreviewOpen(true)}
+                          className="group block w-full text-left focus:outline-none focus:ring-2 focus:ring-gold-400/40"
+                          aria-label="Perbesar bukti transfer"
+                        >
+                          <div className="relative flex min-h-36 items-center justify-center bg-forest-100 p-2">
+                            <img
+                              src={proofPreviewUrl}
+                              alt={proofFileName || 'Bukti transfer'}
+                              referrerPolicy="no-referrer"
+                              className="max-h-52 w-full rounded-md object-contain transition-transform group-hover:scale-[1.01]"
+                              onError={() => setProofPreviewError(true)}
+                            />
+                          </div>
+                        </button>
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-forest-200 bg-white px-3 py-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-base">{isGoogleDriveProof ? '📁' : '📎'}</span>
+                            <span className="truncate text-xs font-medium text-forest-700">
+                              {proofFileName || 'Bukti transfer'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setIsProofPreviewOpen(true)}
+                              className="text-xs font-semibold text-forest-700 hover:text-forest-900"
+                            >
+                              🔍 Perbesar
+                            </button>
+                            <a
+                              href={directProofUrl || proofFileUrl || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded bg-forest-50 px-2.5 py-1 text-xs font-semibold text-gold-700 hover:bg-forest-100 hover:text-gold-800 transition-colors"
+                            >
+                              <span>{isGoogleDriveProof ? 'Buka di Google Drive ↗' : 'Buka File ↗'}</span>
+                            </a>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between gap-2 border-t border-forest-200 px-3 py-2">
-                          <span className="truncate text-xs font-medium text-forest-700">
-                            {proofFileName || 'Bukti transfer'}
-                          </span>
-                          <span className="shrink-0 text-xs font-semibold text-gold-700">
-                            Perbesar
-                          </span>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-forest-200 bg-white p-3.5 space-y-2 shadow-xs">
+                        {proofPreviewError && (
+                          <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded">
+                            ⚠️ Preview gambar tidak dapat dimuat langsung dari CDN {isGoogleDriveProof ? 'Google Drive' : 'penyimpanan'}. Gunakan tombol di bawah untuk membuka file asli secara langsung.
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xl">{isGoogleDriveProof ? '📁' : '📎'}</span>
+                            <div className="min-w-0">
+                              <span className="block truncate text-xs font-medium text-forest-800">
+                                {proofFileName || (isGoogleDriveProof ? 'Bukti Transfer Google Drive' : 'Bukti Lampiran')}
+                              </span>
+                              {isGoogleDriveProof && (
+                                <span className="block text-[10px] text-forest-500">Google Drive Document / File</span>
+                              )}
+                            </div>
+                          </div>
+                          <a
+                            href={directProofUrl || proofFileUrl || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => {
+                              if (!directProofUrl && !proofFileUrl) {
+                                e.preventDefault();
+                                alert(`File bukti tercatat: ${proofFileName}`);
+                              }
+                            }}
+                            className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-forest-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-forest-700 transition-colors shadow-xs"
+                          >
+                            <span>{isGoogleDriveProof ? 'Buka di Google Drive ↗' : 'Unduh / Buka 🔗'}</span>
+                          </a>
                         </div>
-                      </button>
+                      </div>
                     )}
-                    {(!canPreviewProofImage || proofPreviewError) && (
-                  <div className="rounded-lg border border-forest-200 bg-white p-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xl">📎</span>
-                      <span className="truncate text-xs font-medium text-forest-700">
-                        {proofFileName || 'Bukti Lampiran'}
-                      </span>
-                    </div>
-                    <a
-                      href={proofFileUrl || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => {
-                        if (!proofFileUrl) {
-                          e.preventDefault();
-                          alert(`File bukti tercatat: ${proofFileName}`);
-                        }
-                      }}
-                      className="text-xs font-semibold text-forest-800 hover:text-gold-600 transition-colors"
-                    >
-                      Unduh / Buka 🔗
-                    </a>
                   </div>
-                    )}
-                  </>
                 ) : (
                   <p className="text-xs text-forest-400 italic">{missingProofText}</p>
                 )
@@ -2536,97 +2815,6 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
                   <span>🔒</span>
                   <span>Anda tidak memiliki izin untuk melihat bukti pembayaran unit lain.</span>
                 </div>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* Tombol Aksi */}
-        <div className="pt-2 flex flex-col gap-2">
-          {canRepair && !isEditing && (
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              className="pv-btn-primary w-full text-xs py-2.5 bg-amber-600 hover:bg-amber-700 flex items-center justify-center gap-1.5 shadow-sm"
-            >
-              <span>✏️</span>
-              <span>Perbaiki / Edit Transaksi</span>
-            </button>
-          )}
-
-          {payment?.status === 'rejected' && isMyUnit && onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="pv-btn-primary w-full text-xs py-2"
-            >
-              Pilih Tagihan untuk Bayar Ulang
-            </button>
-          )}
-          {(resolvedBill.status === 'paid' || payment?.status === 'verified' || payment?.status === 'completed') && (
-            <div className="grid grid-cols-2 gap-2 pb-1 border-b border-forest-100">
-              <button
-                type="button"
-                onClick={() => {
-                  downloadDigitalReceipt({ bill: resolvedBill, unit: targetUnit });
-                }}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-forest-300 bg-white px-3 py-2 text-xs font-semibold text-forest-800 shadow-sm hover:bg-forest-50 transition-colors"
-              >
-                📥 Download Kuitansi
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!canModifyData(role)) {
-                    toast.error('Akun read-only tidak dapat mengirim kuitansi email.');
-                    return;
-                  }
-                  toast.info('Mengirim kuitansi digital ke email...');
-                  const res = await sendEmailReceipt({ bill, unit: targetUnit });
-                  toast.success(res.message);
-                }}
-                disabled={!canModifyData(role)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gold-300 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 shadow-sm hover:bg-gold-100 transition-colors disabled:opacity-50"
-              >
-                📧 Kirim ke Email
-              </button>
-            </div>
-          )}
-
-          {payment?.status === 'pending_verification' && canVerify && !isEditing && (
-            <div className="flex gap-2">
-              <button type="button" onClick={handleVerify} disabled={isActing} className="pv-btn-primary flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
-                ✓ Verifikasi Lunas
-              </button>
-              <button type="button" onClick={handleReject} disabled={isActing} className="pv-btn-ghost flex-1 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50">
-                ✕ Tolak Bukti
-              </button>
-            </div>
-          )}
-
-          {payment?.status === 'rejected' && (isMyUnit || isStaffRole(role)) && !isRevising && canModifyData(role) && !isEditing && (
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setIsRevising(true)} className="pv-btn-primary flex-1 text-xs">
-                🔄 Revisi & Upload Ulang
-              </button>
-              <button type="button" onClick={handleCancel} disabled={isActing} className="pv-btn-ghost flex-1 text-xs border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50">
-                🗑 Batalkan
-              </button>
-            </div>
-          )}
-
-          {(isHanging || payment?.status === 'pending_verification') && (isMyUnit || isStaffRole(role)) && canModifyData(role) && !isEditing && (
-            <button type="button" onClick={handleCancel} disabled={isActing} className="pv-btn-ghost w-full text-xs border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-1">
-              <span>🗑</span>
-              <span>Batalkan Transaksi {isHanging ? 'Menggantung' : 'Pembayaran'}</span>
-            </button>
-          )}
-
-          <button type="button" onClick={onClose} className="pv-btn-ghost w-full text-sm">
-            Tutup
-          </button>
-        </div>
-      </div>
     </Modal>
 
       {isProofPreviewOpen && proofPreviewUrl && (
@@ -2637,13 +2825,24 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
           aria-label="Preview bukti transfer"
           onClick={() => setIsProofPreviewOpen(false)}
         >
-          <button
-            type="button"
-            onClick={() => setIsProofPreviewOpen(false)}
-            className="absolute right-3 top-3 rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold text-forest-900 shadow-lg hover:bg-white sm:right-5 sm:top-5"
-          >
-            Tutup
-          </button>
+          <div className="absolute right-3 top-3 flex items-center gap-2 sm:right-5 sm:top-5 z-10">
+            <a
+              href={directProofUrl || proofFileUrl || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold text-forest-900 shadow-lg hover:bg-white inline-flex items-center gap-1"
+            >
+              <span>{isGoogleDriveProof ? 'Buka di Google Drive ↗' : 'Buka File Asli ↗'}</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => setIsProofPreviewOpen(false)}
+              className="rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold text-forest-900 shadow-lg hover:bg-white"
+            >
+              Tutup
+            </button>
+          </div>
           <img
             src={proofPreviewUrl}
             alt={proofFileName || 'Bukti transfer'}
