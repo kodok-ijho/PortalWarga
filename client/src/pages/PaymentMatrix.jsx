@@ -2348,41 +2348,68 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
     setIsProofPreviewOpen(false);
   }, [payment?.id, proofFileUrl]);
 
+  const targetPaymentId = activePayment?.id || payment?.id || bill?.payment_id;
+  const currentStatus = activePayment?.status || payment?.status;
+
   const handleVerify = async () => {
-    if (!payment || isActing) return;
+    if (!targetPaymentId || isActing) return;
     setIsActing(true);
     try {
       if (IS_DEMO) {
-        verifyPayment(payment.id, { verifiedBy: roleLabel(role) });
+        verifyPayment(targetPaymentId, { verifiedBy: roleLabel(role) });
       } else {
-        await approveManualPayment(session?.access_token, { payment_id: payment.id });
+        await approveManualPayment(session?.access_token, { payment_id: targetPaymentId });
       }
       toast.success('Pembayaran berhasil diverifikasi & status tagihan menjadi Lunas!');
       if (onRefresh) onRefresh();
       onClose();
     } catch (err) {
-      toast.error(err.message || 'Gagal memverifikasi pembayaran.');
+      const errorMsg = String(err?.message || '');
+      const isAlreadyHandled =
+        errorMsg.toLowerCase().includes('tidak menunggu verifikasi') ||
+        errorMsg.toLowerCase().includes('already') ||
+        errorMsg.toLowerCase().includes('invalid_status');
+
+      if (isAlreadyHandled) {
+        toast.info('Status pembayaran sudah diproses di server (Lunas). Memperbarui matriks...');
+        if (onRefresh) onRefresh();
+        onClose();
+      } else {
+        toast.error(err.message || 'Gagal memverifikasi pembayaran.');
+      }
     } finally {
       setIsActing(false);
     }
   };
 
   const handleReject = async () => {
-    if (!payment || isActing) return;
+    if (!targetPaymentId || isActing) return;
     const reason = prompt('Masukkan alasan penolakan bukti pembayaran:');
     if (reason === null) return;
     setIsActing(true);
     try {
       if (IS_DEMO) {
-        rejectPayment(payment.id, { rejectedBy: roleLabel(role), reason: reason || 'Bukti transfer tidak valid/blur' });
+        rejectPayment(targetPaymentId, { rejectedBy: roleLabel(role), reason: reason || 'Bukti transfer tidak valid/blur' });
       } else {
-        await rejectManualPayment(session?.access_token, { payment_id: payment.id, note: reason || 'Bukti transfer tidak valid/blur' });
+        await rejectManualPayment(session?.access_token, { payment_id: targetPaymentId, note: reason || 'Bukti transfer tidak valid/blur' });
       }
       toast.warning('Pembayaran ditolak. Warga dapat mengunggah ulang bukti transfer.');
       if (onRefresh) onRefresh();
       onClose();
     } catch (err) {
-      toast.error(err.message || 'Gagal menolak pembayaran.');
+      const errorMsg = String(err?.message || '');
+      const isAlreadyHandled =
+        errorMsg.toLowerCase().includes('tidak menunggu verifikasi') ||
+        errorMsg.toLowerCase().includes('already') ||
+        errorMsg.toLowerCase().includes('invalid_status');
+
+      if (isAlreadyHandled) {
+        toast.info('Status pembayaran sudah diproses di server. Memperbarui matriks...');
+        if (onRefresh) onRefresh();
+        onClose();
+      } else {
+        toast.error(err.message || 'Gagal menolak pembayaran.');
+      }
     } finally {
       setIsActing(false);
     }
@@ -2529,7 +2556,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
             </p>
           </div>
         )}
-        {payment?.status === 'pending_verification' && !isHanging && (
+        {currentStatus === 'pending_verification' && !isHanging && (
           <div className="rounded-lg bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800 flex items-center gap-2">
             <span className="text-lg">⏳</span>
             <div>
@@ -2538,7 +2565,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
             </div>
           </div>
         )}
-        {payment?.status === 'rejected' && (
+        {currentStatus === 'rejected' && (
           <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-800 space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-lg">✕</span>
@@ -2872,7 +2899,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
               Pilih Tagihan untuk Bayar Ulang
             </button>
           )}
-          {(resolvedBill.status === 'paid' || payment?.status === 'verified' || payment?.status === 'completed') && canViewReceipt && (
+          {(resolvedBill.status === 'paid' || currentStatus === 'verified' || currentStatus === 'completed' || payment?.status === 'verified' || payment?.status === 'completed') && canViewReceipt && (
             <div className="grid grid-cols-2 gap-2 pb-1 border-b border-forest-100">
               <button
                 type="button"
@@ -2902,7 +2929,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
             </div>
           )}
 
-          {payment?.status === 'pending_verification' && canVerify && !isEditing && (
+          {currentStatus === 'pending_verification' && canVerify && !isEditing && (
             <div className="flex gap-2">
               <button type="button" onClick={handleVerify} disabled={isActing} className="pv-btn-primary flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
                 ✓ Verifikasi Lunas
@@ -2913,7 +2940,7 @@ function PaymentDetailModal({ bill, payment, unit, role, myUnitId, profile, sess
             </div>
           )}
 
-          {payment?.status === 'rejected' && (isMyUnit || isStaffRole(role)) && !isRevising && canModifyData(role) && !isEditing && (
+          {currentStatus === 'rejected' && (isMyUnit || isStaffRole(role)) && !isRevising && canModifyData(role) && !isEditing && (
             <div className="flex gap-2">
               <button type="button" onClick={() => setIsRevising(true)} className="pv-btn-primary flex-1 text-xs">
                 🔄 Revisi & Upload Ulang

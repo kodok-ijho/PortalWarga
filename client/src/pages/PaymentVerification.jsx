@@ -34,7 +34,7 @@ import {
   downloadDigitalReceipt,
   sendEmailReceipt,
 } from '../services/mockData';
-import { AiOutlineCheck, AiOutlineClose, AiOutlineEye, AiOutlineClockCircle, AiOutlineEdit } from 'react-icons/ai';
+import { AiOutlineCheck, AiOutlineClose, AiOutlineEye, AiOutlineClockCircle, AiOutlineEdit, AiOutlineReload } from 'react-icons/ai';
 import { useToast } from '../hooks/useToast';
 
 const TABS = [
@@ -80,6 +80,16 @@ function pendingPaymentsFromMatrix(matrixRows) {
         hasProof: Boolean(source.proof_file_url || source.proof_file_name || source.receipt_file),
       });
       const cellStatus = cell.status || bill.status;
+      // If cell or payment is explicitly completed/verified/paid, never treat as pending verification
+      if (
+        cellStatus === 'paid' ||
+        cellStatus === 'completed' ||
+        cellStatus === 'verified' ||
+        paymentStatus === 'verified' ||
+        source.status === 'completed'
+      ) {
+        return [];
+      }
       if (!isPendingVerificationStatus(cellStatus) && !isPendingVerificationStatus(paymentStatus)) {
         return [];
       }
@@ -122,18 +132,29 @@ function mergePaymentSources(payments, matrixRows) {
     const billKey = `bill:${matrixPayment.ipl_bill_id}`;
     const existingIndex = indexByKey.get(paymentKey) ?? indexByKey.get(billKey);
     if (existingIndex === undefined) {
+      const normStatus = normalizePaymentStatus(matrixPayment?.status);
+      if (normStatus === 'verified' || normStatus === 'rejected' || matrixPayment?.status === 'completed') {
+        return;
+      }
       indexByKey.set(paymentKey, merged.length);
       indexByKey.set(billKey, merged.length);
       merged.push(matrixPayment);
       return;
     }
 
+    const currentExisting = merged[existingIndex];
+    const existingNorm = normalizePaymentStatus(currentExisting?.status);
+    // If the database record is already completed, verified, or rejected, NEVER revert it to pending_verification!
+    if (existingNorm === 'verified' || existingNorm === 'rejected' || currentExisting?.status === 'completed') {
+      return;
+    }
+
     merged[existingIndex] = {
       ...matrixPayment,
-      ...merged[existingIndex],
-      status: 'pending_verification',
-      _bill: merged[existingIndex]._bill || matrixPayment._bill,
-      _profile: merged[existingIndex]._profile || matrixPayment._profile,
+      ...currentExisting,
+      status: currentExisting?.status || 'pending_verification',
+      _bill: currentExisting._bill || matrixPayment._bill,
+      _profile: currentExisting._profile || matrixPayment._profile,
     };
   });
 
@@ -144,7 +165,12 @@ export default function PaymentVerification() {
   const { role, profile, session, isReadOnly } = useAuth();
   const toast = useToast();
   const canWrite = canModifyData(role) && !isReadOnly;
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [reloadSignal, setReloadSignal] = useState(0);
+
+  const handleManualRefresh = () => {
+    matrixCacheRef.current = null;
+    setReloadSignal((sig) => sig + 1);
+  };
   const [activeTab, setActiveTab] = useState('pending');
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [modalMode, setModalMode] = useState(null); // 'detail' | 'reject' | 'edit'
@@ -233,7 +259,7 @@ export default function PaymentVerification() {
     };
     loadData();
     return () => { active = false; };
-  }, [refreshKey, session?.access_token]);
+  }, [reloadSignal, session?.access_token]);
 
   useEffect(() => {
     setReceiptPreviewError(false);
@@ -318,15 +344,41 @@ export default function PaymentVerification() {
       } else {
         await approveManualPayment(session?.access_token, { payment_id: payment.id });
       }
+      matrixCacheRef.current = null;
       toast.success('Pembayaran berhasil diverifikasi.');
       // Over-fetching pruned: no setIsLoading(true) and no re-fetching 1-year matrix
     } catch (err) {
-      // 2. Graceful rollback on failure
-      setPayments(previousPayments);
-      setSelectedPayment(previousSelectedPayment);
-      setModalMode(previousModalMode);
-      toast.error(err.message || 'Gagal memverifikasi pembayaran.');
+      const errorMsg = String(err?.message || '');
+      const isAlreadyHandled =
+        errorMsg.toLowerCase().includes('tidak menunggu verifikasi') ||
+        errorMsg.toLowerCase().includes('already') ||
+        errorMsg.toLowerCase().includes('invalid_status');
+
+      if (isAlreadyHandled) {
+        // Already processed on backend: keep it verified and clear matrix cache
+        matrixCacheRef.current = null;
+        setPayments((prev) =>
+          prev.map((p) =>
+            p.id === payment.id
+              ? {
+                  ...p,
+                  status: 'verified',
+                  verified_by: verifiedBy,
+                  verified_at: verifiedAt,
+                }
+              : p
+          )
+        );
+        toast.info('Status pembayaran sudah diproses di server (Lunas).');
+      } else {
+        // 2. Graceful rollback on actual unexpected failure
+        setPayments(previousPayments);
+        setSelectedPayment(previousSelectedPayment);
+        setModalMode(previousModalMode);
+        toast.error(err.message || 'Gagal memverifikasi pembayaran.');
+      }
     } finally {
+      matrixCacheRef.current = null;
       setActiveActionId(null);
     }
   };
@@ -382,6 +434,7 @@ export default function PaymentVerification() {
       } else {
         await rejectManualPayment(session?.access_token, { payment_id: paymentToReject.id, note: reason });
       }
+      matrixCacheRef.current = null;
       toast.warning('Pembayaran ditolak.');
     } catch (err) {
       // 2. Graceful rollback
@@ -492,12 +545,24 @@ export default function PaymentVerification() {
             Verifikasi bukti transfer pembayaran IPL dari warga
           </p>
         </div>
-        {pendingPayments.length > 0 && (
-          <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1.5 text-xs font-semibold text-orange-800 sm:text-sm">
-            <AiOutlineClockCircle />
-            {pendingPayments.length} Menunggu
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {pendingPayments.length > 0 && (
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1.5 text-xs font-semibold text-orange-800 sm:text-sm">
+              <AiOutlineClockCircle />
+              {pendingPayments.length} Menunggu
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isLoading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-forest-200 bg-white px-3 py-1.5 text-xs font-medium text-forest-700 hover:bg-forest-50 transition-colors disabled:opacity-50"
+            title="Muat Ulang Data"
+          >
+            <AiOutlineReload className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
