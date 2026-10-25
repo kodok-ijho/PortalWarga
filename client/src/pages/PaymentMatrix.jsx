@@ -35,6 +35,7 @@ import {
   selectPreferredPayment,
   createQrisPayment,
   verifyQrisPayment,
+  QRIS_FEE_RATE,
   IS_DEMO,
 } from '../services/dataService';
 import { portalApiPost } from '../services/apiClient';
@@ -1466,7 +1467,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
   const MAX_COMPRESSED_SIZE = 2 * 1024 * 1024; // Batas file setelah kompresi (maks 2 MB)
   const ACCEPTED = ['image/jpeg', 'image/jpg', 'image/png'];
   const isMulti = bills.length > 1;
-  const qrisFee = Math.ceil(total * 0.007);
+  const qrisFee = Math.ceil(total * QRIS_FEE_RATE);
   const totalWithQrisFee = total + qrisFee;
 
   useEffect(() => {
@@ -1562,7 +1563,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
                 <span>{formatRupiah(total)}</span>
               </div>
               <div className="flex justify-between text-amber-800 font-medium">
-                <span>Biaya Layanan QRIS (0,7%):</span>
+                <span>Biaya Layanan QRIS (0,75%):</span>
                 <span>+ {formatRupiah(qrisFee)}</span>
               </div>
             </div>
@@ -1592,7 +1593,7 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
                     : 'bg-white text-forest-600 border-forest-200 hover:bg-forest-50'
                 }`}
               >
-                💳 QRIS (+0,7%)
+                💳 QRIS (+0,75%)
               </button>
             )}
             <button
@@ -1651,10 +1652,10 @@ function ResidentPayModal({ bills, total, canUseQris, onConfirm, onClose }) {
         {method === 'qris' && (
           <div data-tour="pay-qris-guide" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
             <p className="font-semibold text-amber-950 flex items-center gap-1.5">
-              <span>ℹ️</span> Biaya Layanan Administrasi QRIS (0,7%)
+              <span>ℹ️</span> Biaya Layanan Administrasi QRIS (0,75%)
             </p>
             <p className="text-[11px] leading-relaxed text-amber-800">
-              Sesuai ketentuan Bank Indonesia (MDR QRIS), transaksi QRIS dikenakan biaya layanan administrasi <strong>0,7% ({formatRupiah(qrisFee)})</strong> yang dibebankan kepada warga / pembayar.
+              Sesuai ketentuan Bank Indonesia (MDR QRIS), transaksi QRIS dikenakan biaya layanan administrasi <strong>0,75% ({formatRupiah(qrisFee)})</strong> yang dibebankan kepada warga / pembayar.
             </p>
           </div>
         )}
@@ -1733,7 +1734,7 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
         (sum, bill) => sum + Number(bill.amount || 0) + Number(bill.late_fee || 0),
         0
       );
-  const qrisFee = Math.ceil(total * 0.007);
+  const qrisFee = Math.ceil(total * QRIS_FEE_RATE);
   const totalWithQrisFee = total + qrisFee;
   const unitLabel = unit ? `${unit.block} no ${unit.unit_number}` : '';
   const isMulti = bills.length > 1;
@@ -1882,7 +1883,7 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
                 <span>{formatRupiah(total)}</span>
               </div>
               <div className="flex justify-between text-amber-800 font-medium">
-                <span>Biaya Layanan QRIS (0,7%):</span>
+                <span>Biaya Layanan QRIS (0,75%):</span>
                 <span>+ {formatRupiah(qrisFee)}</span>
               </div>
             </div>
@@ -1904,17 +1905,17 @@ function ManualPaymentModal({ bills, unit, role, canWrite, canUseQris, onConfirm
           <div className={`grid ${methodCount >= 3 ? 'grid-cols-3' : methodCount === 2 ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
             {canRecordCash && methodBtn('cash', '💵 Tunai')}
             {canRecordTransfer && methodBtn('bank_transfer', '🏦 Transfer')}
-            {canUseQris && methodBtn('qris', '💳 QRIS (+0,7%)')}
+            {canUseQris && methodBtn('qris', '💳 QRIS (+0,75%)')}
           </div>
         </div>
 
         {method === 'qris' && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
             <p className="font-semibold text-amber-950 flex items-center gap-1.5">
-              <span>ℹ️</span> Biaya Layanan Administrasi QRIS (0,7%)
+              <span>ℹ️</span> Biaya Layanan Administrasi QRIS (0,75%)
             </p>
             <p className="text-[11px] leading-relaxed text-amber-800">
-              Sesuai ketentuan Bank Indonesia (MDR QRIS), transaksi QRIS dikenakan biaya layanan administrasi <strong>0,7% ({formatRupiah(qrisFee)})</strong> yang dibebankan kepada warga / pembayar.
+              Sesuai ketentuan Bank Indonesia (MDR QRIS), transaksi QRIS dikenakan biaya layanan administrasi <strong>0,75% ({formatRupiah(qrisFee)})</strong> yang dibebankan kepada warga / pembayar.
             </p>
           </div>
         )}

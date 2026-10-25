@@ -86,7 +86,7 @@ export const TOURS_CONFIG = {
         targetSelector: '[data-tour="pay-qris-guide"]',
         fallbackSelector: 'form',
         title: 'Pembayaran Instan QRIS 📱',
-        description: 'Scan kode QR langsung dari M-Banking/E-Wallet atau unduh gambar QRIS ke galeri HP. Sesuai regulasi Bank Indonesia, ada biaya layanan administrasi 0,7% yang dibebankan kepada pembayar.',
+        description: 'Scan kode QR langsung dari M-Banking/E-Wallet atau unduh gambar QRIS ke galeri HP. Sesuai regulasi Bank Indonesia, ada biaya layanan administrasi 0,75% yang dibebankan kepada pembayar.',
       },
     ],
   },

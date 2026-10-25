@@ -1259,6 +1259,8 @@ function qrisRoute(provider, suffix) {
   return `/payments/qris/${suffix}`;
 }
 
+export const QRIS_FEE_RATE = 0.0075;
+
 // Create one QRIS checkout. Ownership and amount are resolved by the API.
 export async function createQrisPayment(token, { bill_ids, provider } = {}) {
   if (!Array.isArray(bill_ids) || bill_ids.length === 0) {
@@ -1275,7 +1277,7 @@ export async function createQrisPayment(token, { bill_ids, provider } = {}) {
       parent_order_id: `DEMO-QRIS-${Date.now()}`,
       base_amount: 0,
       qris_fee_amount: 0,
-      qris_fee_rate: 0.007,
+      qris_fee_rate: QRIS_FEE_RATE,
       total_amount: 0,
       bills: bill_ids.map((id) => ({ id })),
       demo: true,
@@ -1289,7 +1291,7 @@ export async function createQrisPayment(token, { bill_ids, provider } = {}) {
 
   const resolvedProvider = normalizeQrisProvider(data?.provider || normalizedProvider);
   const totalAmount = Number(data?.total_amount ?? data?.total ?? 0);
-  const baseAmount = Number(data?.base_amount ?? (data?.qris_fee_amount ? totalAmount - Number(data?.qris_fee_amount) : Math.round(totalAmount / 1.007)));
+  const baseAmount = Number(data?.base_amount ?? (data?.qris_fee_amount ? totalAmount - Number(data?.qris_fee_amount) : Math.round(totalAmount / (1 + QRIS_FEE_RATE))));
   const feeAmount = Number(data?.qris_fee_amount ?? (totalAmount - baseAmount));
 
   return {
@@ -1298,7 +1300,7 @@ export async function createQrisPayment(token, { bill_ids, provider } = {}) {
     provider_label: data?.provider_label || getQrisProviderLabel(resolvedProvider),
     base_amount: baseAmount,
     qris_fee_amount: feeAmount,
-    qris_fee_rate: 0.007,
+    qris_fee_rate: QRIS_FEE_RATE,
     total_amount: totalAmount,
     bills: Array.isArray(data?.bills) ? data.bills : [],
   };
@@ -1310,7 +1312,7 @@ export async function createNonIplQrisPayment(token, { amount, base_amount, qris
   if (!base || base <= 0) {
     throw new Error('Nominal pembayaran harus lebih dari 0.');
   }
-  const fee = Number(qris_fee_amount || Math.ceil(base * 0.007));
+  const fee = Number(qris_fee_amount || Math.ceil(base * QRIS_FEE_RATE));
   const total = base + fee;
   const normalizedProvider = normalizeQrisProvider(provider || 'doku');
 
@@ -1321,7 +1323,7 @@ export async function createNonIplQrisPayment(token, { amount, base_amount, qris
       parent_order_id: `DEMO-NONIPL-${Date.now()}`,
       base_amount: base,
       qris_fee_amount: fee,
-      qris_fee_rate: 0.007,
+      qris_fee_rate: QRIS_FEE_RATE,
       total_amount: total,
       qr_content: `00020101021226550012COM.DOKU.WWW011893600899000010181002061018100303UKE51440014ID.CO.QRIS.WWW0215ID10265631295470303UKE5204864153033605407${total.toFixed(2)}5802ID5921Palm Village - Social6005BOGOR61051691462440703A015033DEMO-NONIPL-${Date.now()}6304ABCD`,
       demo: true,
@@ -1350,7 +1352,7 @@ export async function createNonIplQrisPayment(token, { amount, base_amount, qris
     provider_label: data?.provider_label || getQrisProviderLabel(resolvedProvider),
     base_amount: resolvedBase,
     qris_fee_amount: resolvedFee,
-    qris_fee_rate: 0.007,
+    qris_fee_rate: QRIS_FEE_RATE,
     total_amount: totalAmount,
     qr_content: data?.qr_content || data?.raw?.qrContent || '',
     parent_order_id: data?.parent_order_id || data?.order_id || '',

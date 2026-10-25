@@ -9,6 +9,7 @@ import {
   approveNonIplIncome,
   rejectNonIplIncome,
   createNonIplQrisPayment,
+  QRIS_FEE_RATE,
   fetchEvents,
   fetchMyEventAccess,
   fetchNonIplIncomes,
@@ -127,7 +128,7 @@ export default function NonIplIncomes() {
       setSubmitting(true);
       try {
         const baseAmount = Number(form.amount);
-        const qrisFee = Math.ceil(baseAmount * 0.007);
+        const qrisFee = Math.ceil(baseAmount * QRIS_FEE_RATE);
         const totalAmount = baseAmount + qrisFee;
         const desc = `${form.category} - ${form.source_name} (${form.scope === 'event' ? getEventName(form.event_id) : 'Kas Umum'})`;
         const qrisData = await createNonIplQrisPayment(token, {
@@ -520,12 +521,12 @@ export default function NonIplIncomes() {
 
           {form.payment_method === 'qris' && (() => {
             const nonIplAmount = Number(form.amount || 0);
-            const nonIplFee = Math.ceil(nonIplAmount * 0.007);
+            const nonIplFee = Math.ceil(nonIplAmount * QRIS_FEE_RATE);
             const nonIplTotal = nonIplAmount + nonIplFee;
             return (
               <div className="md:col-span-2 rounded-xl bg-purple-50/70 p-4 border border-purple-200 space-y-2.5">
                 <h4 className="text-xs font-bold uppercase tracking-wide text-purple-900 flex items-center gap-1.5">
-                  <span>📱</span> Pembayaran QRIS Resmi Palm Village (+0,7%)
+                  <span>📱</span> Pembayaran QRIS Resmi Palm Village (+0,75%)
                 </h4>
                 <p className="text-xs text-purple-800 leading-relaxed">
                   Setelah Anda klik tombol <strong>"Buka Pembayaran QRIS →"</strong> di bawah, kode QRIS resmi akan dibuat secara instan. Anda dapat langsung memindai kode QR atau mengunduh gambarnya untuk pembayaran lewat galeri M-Banking / E-Wallet.
@@ -538,7 +539,7 @@ export default function NonIplIncomes() {
                       <span>{formatRupiah(nonIplAmount)}</span>
                     </div>
                     <div className="flex justify-between text-amber-800 font-medium">
-                      <span>Biaya Layanan QRIS (0,7%):</span>
+                      <span>Biaya Layanan QRIS (0,75%):</span>
                       <span>+ {formatRupiah(nonIplFee)}</span>
                     </div>
                     <div className="flex justify-between pt-1 border-t border-purple-100 font-bold text-forest-900">
@@ -549,7 +550,7 @@ export default function NonIplIncomes() {
                 )}
 
                 <div className="rounded-lg bg-amber-50 border border-amber-300 p-2.5 text-[11px] text-amber-900 leading-relaxed">
-                  <strong>ℹ️ Disclaimer Biaya QRIS:</strong> Sesuai regulasi Bank Indonesia (MDR QRIS), transaksi QRIS dikenakan biaya administrasi <strong>0,7% {nonIplAmount > 0 ? `(${formatRupiah(nonIplFee)})` : ''}</strong> yang dibebankan kepada pembayar.
+                  <strong>ℹ️ Disclaimer Biaya QRIS:</strong> Sesuai regulasi Bank Indonesia (MDR QRIS), transaksi QRIS dikenakan biaya administrasi <strong>0,75% {nonIplAmount > 0 ? `(${formatRupiah(nonIplFee)})` : ''}</strong> yang dibebankan kepada pembayar.
                 </div>
               </div>
             );
