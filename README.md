@@ -10,6 +10,23 @@ Kelola data warga, tagihan IPL (Iuran Pemeliharaan Lingkungan), pembayaran QRIS,
 
 ---
 
+## Changelog v1.5.1 — QRIS Fee Adjustment & Document Management RLS Hardening
+
+- **Penyesuaian Biaya Administrasi QRIS Menjadi 0,75%**: Pembaruan tarif Merchant Discount Rate (MDR) QRIS Palm Village dari 0,7% menjadi 0,75% secara terpadu di data service (`QRIS_FEE_RATE = 0.0075`), modal pembayaran warga & pengurus (IPL & Non-IPL), struk unduhan kuitansi, panduan onboarding/tour, serta integrasi test suite otomatis (`tests/qris-fee-rate.test.mjs`).
+- **Penerapan RLS & Storage Policy Modul Dokumen**: Penegakan Row Level Security (RLS) pada tabel `public.documents` dan bucket storage `documents` di Supabase Production (`202610190001_documents_rls_and_storage_policies.sql`). Dokumen resmi warga (Tata Tertib, Formulir, Surat Edaran) kini persisten dan dapat diakses/diunduh oleh seluruh warga aktif tanpa tersembunyi saat halaman dimuat ulang (refresh).
+- **Perbaikan Idempotensi & Cache Verifikasi Pembayaran**: Eliminasi stale cache matriks tahunan dan resolusi `targetPaymentId` pada modal detail pembayaran manual, mencegah error 409 (*status pembayaran sedang tidak menunggu verifikasi*) dan menjaga konsistensi data verifikasi.
+
+---
+
+## Changelog v1.5.0 — Performance Optimization, Mobile UX & Granular Authorization
+
+- **Optimasi Performa Matriks & Kompresi Klien**: Kompresi gambar bukti transfer sisi klien (<500 KB), memoized (1)$ payment lookup, dan indeks komposit query status transaksi di database untuk navigasi kilat tanpa lag.
+- **Peningkatan UX Mobile & Sticky Matrix Header**: Antarmuka responsif ramah layar HP, scrollbar matriks fleksibel, dan header sticky yang memudahkan verifikasi pembayaran langsung dari perangkat mobile.
+- **Otorisasi Ketat Bukti Bayar & Dukungan Google Drive**: Perlindungan privasi bukti transfer (hanya pemilik unit, bendahara, pengurus, dan admin yang dapat mengakses) serta dukungan preview/direct URL untuk tautan bukti bayar Google Drive.
+- **Full Loading Google Sign-In & Restrukturisasi Menu**: Layar loading interaktif saat validasi Google OAuth (#3) dan relokasi menu Dokumen ke dalam grup Warga & Rumah (#5).
+
+---
+
 ## Changelog v1.4.3 — Zero Nominal IPL Recording, Financial Report Sorting & Self-Healing Payments
 
 - **Pencatatan IPL Nominal Rp 0 oleh Admin & Bendahara**: Kemampuan mengubah nominal pembayaran menjadi Rp 0 (misalnya untuk unit/bulan yang dibebaskan atau disubsidi khusus) disertai perlindungan ketat yang memblokir angka negatif (minus / < 0) di Frontend UI, PostgreSQL DB trigger, dan backend API n8n.

@@ -14,7 +14,7 @@ import pkg from '../../package.json';
 import AuthLoadingScreen from '../components/AuthLoadingScreen';
 
 const GOOGLE_SCRIPT_ID = 'google-identity-services';
-const APP_VERSION = `v${pkg.version || '1.4.3'}`;
+const APP_VERSION = `v${pkg.version || '1.5.1'}`;
 
 export default function Login() {
   const {
