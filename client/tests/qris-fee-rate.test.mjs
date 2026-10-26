@@ -53,17 +53,25 @@ assert.equal(fee1, 750, 'Fee for 100,000 must be 750 (0.75%)');
 assert.equal(total1, 100750, 'Total for 100,000 must be 100,750');
 assert.equal(Math.round(total1 / (1 + RATE)), base1, 'Reverse base calculation must recover 100,000');
 
-// Sample 2: Rp 150.000 (typical standard IPL)
-const base2 = 150000;
+// Sample 2: Rp 140.000 (Case reported by user: 140,000 with 0.75% fee = 1,050 -> Total: 141,050)
+const base2 = 140000;
 const fee2 = Math.ceil(base2 * RATE);
 const total2 = base2 + fee2;
-assert.equal(fee2, 1125, 'Fee for 150,000 must be 1,125 (0.75%)');
-assert.equal(total2, 151125, 'Total for 150,000 must be 151,125');
-assert.equal(Math.round(total2 / (1 + RATE)), base2, 'Reverse base calculation must recover 150,000');
+assert.equal(fee2, 1050, 'Fee for 140,000 must be 1,050 (0.75%), NOT 980 (0.7%)');
+assert.equal(total2, 141050, 'Total for 140,000 must be 141,050, NOT 140,980');
+assert.equal(Math.round(total2 / (1 + RATE)), base2, 'Reverse base calculation must recover 140,000');
 
-// Sample 3: Ceiling behavior for non-integer multiplication
-const base3 = 33333; // 33333 * 0.0075 = 249.9975 -> ceil to 250
+// Sample 3: Rp 150.000 (typical standard IPL)
+const base3 = 150000;
 const fee3 = Math.ceil(base3 * RATE);
-assert.equal(fee3, 250, 'Fee for 33,333 must be rounded up to 250');
+const total3 = base3 + fee3;
+assert.equal(fee3, 1125, 'Fee for 150,000 must be 1,125 (0.75%)');
+assert.equal(total3, 151125, 'Total for 150,000 must be 151,125');
+assert.equal(Math.round(total3 / (1 + RATE)), base3, 'Reverse base calculation must recover 150,000');
+
+// Sample 4: Ceiling behavior for non-integer multiplication
+const base4 = 33333; // 33333 * 0.0075 = 249.9975 -> ceil to 250
+const fee4 = Math.ceil(base4 * RATE);
+assert.equal(fee4, 250, 'Fee for 33,333 must be rounded up to 250');
 
 console.log('✅ All QRIS Fee Rate (0.75%) tests passed successfully!');
