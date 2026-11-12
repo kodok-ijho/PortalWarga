@@ -16,7 +16,7 @@ const validate = node({ type: 'n8n-nodes-base.code', version: 2, config: { name:
 const p=$input.first()?.json??{},r=$items('Extract App Token',0,0)?.[0]?.json??{},j=$items('Verify App JWT',0,0)?.[0]?.json??{},q=j.payload&&typeof j.payload==='object'?j.payload:j,now=new Date().toISOString(),id=r.request_id||'event_members_revoke_'+Date.now(),fail=(statusCode,code,message,details={})=>({allowed:false,statusCode,response:{ok:false,data:null,error:{code,message,details},meta:{request_id:id,timestamp:now}}}),b=r.body??{},uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 if(q.iss!=='portal-palm-village'||q.aud!=='portal-palm-village-web'||!q.sub)return[{json:fail(401,'INVALID_TOKEN','Sesi tidak valid.')}];
 if(!p.id||p.is_active!==true||p.approval_status!=='approved')return[{json:fail(403,'FORBIDDEN','Akun belum dapat mengakses endpoint ini.')}];
-if(p.role!=='admin')return[{json:fail(403,'FORBIDDEN_ROLE','Hanya Admin yang dapat mencabut assignment event.',{required_role:'admin',actor_role:p.role})}];
+if(p.role!=='admin'&&p.role!=='bendahara')return[{json:fail(403,'FORBIDDEN_ROLE','Hanya Admin atau Bendahara yang dapat mencabut assignment event.',{required_role:'admin,bendahara',actor_role:p.role})}];
 const assignment_id=b.assignment_id??b.id??'';
 if(!uuid.test(assignment_id))return[{json:fail(400,'VALIDATION_ERROR','assignment_id harus UUID yang valid.',{field:'assignment_id'})}];
 return[{json:{allowed:true,assignment_id,note:b.note||null,actor:{id:p.id,email:p.email},request_id:id}}];

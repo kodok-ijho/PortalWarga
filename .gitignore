@@ -16,7 +16,9 @@ pnpm-debug.log*
 /.cache
 /.temp
 client/dist/
+client/dist-demo/
 client/build/
+client/tests/.error-boundary.test-build.mjs
 **/dist/
 **/build/
 

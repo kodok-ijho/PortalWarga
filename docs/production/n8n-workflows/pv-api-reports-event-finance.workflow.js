@@ -334,7 +334,7 @@ const buildReportResponse = node({
         "}\n" +
         "const canManageGeneral = actor.role === 'admin' || actor.role === 'bendahara';\n" +
         "if (!canManageGeneral) {\n" +
-        "  const hasAccess = assignments.some(a => a.assignment_role === 'event_treasurer' || a.assignment_role === 'coordinator_member');\n" +
+        "  const hasAccess = assignments.some(a => a.assignment_role === 'event_leader' || a.assignment_role === 'event_treasurer' || a.assignment_role === 'coordinator_member');\n" +
         "  if (!hasAccess) {\n" +
         "    return [{ json: failure(403, 'FORBIDDEN', 'Anda tidak berhak melihat laporan keuangan event ini.') }];\n" +
         "  }\n" +

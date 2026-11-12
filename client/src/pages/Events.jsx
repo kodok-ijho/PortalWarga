@@ -64,6 +64,7 @@ export default function Events() {
   const profileId = profile?.id;
   const isAdmin = role === 'admin' && !isReadOnly;
   const isFinanceManager = role === 'admin' || role === 'bendahara';
+  const canManageMaster = isFinanceManager && !isReadOnly;
   const [events, setEvents] = useState([]);
   const [access, setAccess] = useState({ events: [], global: {} });
   const [members, setMembers] = useState({});
@@ -84,7 +85,7 @@ export default function Events() {
       ]);
       setEvents(Array.isArray(eventRows) ? eventRows : []);
       setAccess(accessData || { events: [], global: {} });
-      if (isAdmin) {
+      if (canManageMaster) {
         const userRows = await fetchUsers(token);
         setUsers((userRows || []).filter((user) => user.is_active !== false && user.approval_status !== 'rejected'));
       }
@@ -93,7 +94,7 @@ export default function Events() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, profileId, role, toast, token]);
+  }, [canManageMaster, profileId, role, toast, token]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -156,6 +157,15 @@ export default function Events() {
       toast.error('Pilih profil dan peran panitia.');
       return;
     }
+    const currentMembers = (members[eventId] || []).filter((m) => !m.revoked_at);
+    if (value.assignment_role === 'event_leader') {
+      const existingLeader = currentMembers.find((m) => m.assignment_role === 'event_leader');
+      if (existingLeader) {
+        const leaderName = existingLeader.profile_name || users.find((u) => u.id === existingLeader.profile_id)?.full_name || 'yang sudah ada';
+        toast.error(`Event ini sudah memiliki Ketua aktif (${leaderName}). Cabut penugasan ketua lama terlebih dahulu jika ada pergantian.`);
+        return;
+      }
+    }
     try {
       await assignEventMember(token, {
         event_id: eventId,
@@ -202,7 +212,7 @@ export default function Events() {
             <option value="cancelled">Dibatalkan</option>
             <option value="archived">Diarsipkan</option>
           </select>
-          {isAdmin && (
+          {canManageMaster && (
             <button type="button" className="pv-btn-primary whitespace-nowrap" onClick={() => {
               setForm(EMPTY_FORM);
               setEditingEvent(null);
@@ -214,7 +224,7 @@ export default function Events() {
         </div>
       </div>
 
-      {showForm && isAdmin && (
+      {showForm && canManageMaster && (
         <form className="pv-card grid gap-3 p-5 md:grid-cols-2" onSubmit={submitEvent}>
           <div className="md:col-span-2">
             <h2 className="text-base font-bold text-forest-900">{editingEvent ? 'Edit Data Event' : 'Buat Event Baru'}</h2>
@@ -252,10 +262,12 @@ export default function Events() {
         <div className="grid gap-4 md:grid-cols-2">
           {filteredEvents.map((event) => {
             const isAssigned = assignedEventIds.has(event.id);
-            const canManage = isAdmin || isFinanceManager || isAssigned;
+            const canManage = canManageMaster || isAssigned;
             const eventMembers = (members[event.id] || []).filter(m => !m.revoked_at);
             const leader = eventMembers.find(m => m.assignment_role === 'event_leader');
-            const treasurer = eventMembers.find(m => m.assignment_role === 'event_treasurer');
+            const treasurers = eventMembers.filter(m => m.assignment_role === 'event_treasurer');
+            const leaderName = leader ? (leader.profile_name || users.find(u => u.id === leader.profile_id)?.full_name || 'Terisi') : null;
+            const treasurerNames = treasurers.map(t => t.profile_name || users.find(u => u.id === t.profile_id)?.full_name || 'Terisi');
 
             return (
               <article key={event.id} className="pv-card flex flex-col justify-between p-5">
@@ -294,10 +306,10 @@ export default function Events() {
                   {/* Committee status highlights */}
                   <div className="mt-3 flex flex-wrap gap-2 text-xs">
                     <span className={`px-2 py-0.5 rounded border ${leader ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                      {leader ? `👑 Ketua: ${leader.profile_name || 'Terisi'}` : '⚠️ Ketua belum di-assign'}
+                      {leader ? `👑 Ketua: ${leaderName}` : '⚠️ Ketua belum di-assign'}
                     </span>
-                    <span className={`px-2 py-0.5 rounded border ${treasurer ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                      {treasurer ? `💰 Bendahara: ${treasurer.profile_name || 'Terisi'}` : '⚠️ Bendahara belum di-assign'}
+                    <span className={`px-2 py-0.5 rounded border ${treasurers.length > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                      {treasurers.length > 0 ? `💰 Bendahara: ${treasurerNames.join(', ')}` : '⚠️ Bendahara belum di-assign'}
                     </span>
                   </div>
                 </div>
@@ -308,7 +320,7 @@ export default function Events() {
                     <button type="button" className="pv-btn-ghost py-1.5 text-xs" onClick={() => loadMembers(event.id)}>
                       {members[event.id] ? 'Tutup Panitia' : 'Kelola Panitia'}
                     </button>
-                    {isAdmin && (
+                    {canManageMaster && (
                       <div className="ml-auto flex items-center gap-2">
                         <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => {
                           setEditingEvent(event);
@@ -350,15 +362,16 @@ export default function Events() {
                         <div className="space-y-2 mb-4">
                           {eventMembers.map((member) => {
                             const badge = formatRoleBadge(member.assignment_role, member.custom_role_title);
+                            const memberName = member.profile_name || users.find(u => u.id === member.profile_id)?.full_name || member.profile_id;
                             return (
                               <div key={member.id} className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-forest-100 text-sm">
                                 <div>
-                                  <span className="font-semibold text-forest-900">{member.profile_name || member.profile_id}</span>
+                                  <span className="font-semibold text-forest-900">{memberName}</span>
                                   <span className={`ml-2 inline-block px-2 py-0.5 rounded text-xs border ${badge.className}`}>
                                     {badge.label}
                                   </span>
                                 </div>
-                                {isAdmin && (
+                                {canManageMaster && (
                                   <button type="button" className="text-xs text-red-600 hover:underline px-2 py-1" onClick={() => revoke(event.id, member.id)}>
                                     Cabut
                                   </button>
@@ -369,7 +382,7 @@ export default function Events() {
                         </div>
                       )}
 
-                      {isAdmin && (
+                      {canManageMaster && (
                         <div className="mt-3 pt-3 border-t border-forest-200/60">
                           <p className="text-xs font-semibold text-forest-700 mb-2">+ Tugaskan Panitia Baru</p>
                           <div className="grid gap-2 sm:grid-cols-2">
@@ -413,7 +426,7 @@ export default function Events() {
                     </div>
                   )}
 
-                  {!isAdmin && canManage && (
+                  {!canManageMaster && canManage && (
                     <p className="mt-3 text-xs text-forest-500">Akses Anda: {isFinanceManager ? 'Pengelola Keuangan Global' : 'Panitia Event Terdaftar'}.</p>
                   )}
                 </div>

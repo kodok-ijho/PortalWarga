@@ -282,7 +282,7 @@ const buildAccessResponse = node({
         "const assignmentMap = new Map(activeAssignments.map((row) => [row.event_id, row]));\n" +
         "const canViewAllEvents = actorRole === 'admin' || actorRole === 'bendahara';\n" +
         "const canManageGeneralFinance = actorRole === 'admin' || actorRole === 'bendahara';\n" +
-        "const canManageEventGlobal = actorRole === 'admin';\n" +
+        "const canManageEventGlobal = actorRole === 'admin' || actorRole === 'bendahara';\n" +
         "const eventsAccess = eventRows\n" +
         "  .filter((event) => event && !event.deleted_at)\n" +
         "  .map((event) => {\n" +

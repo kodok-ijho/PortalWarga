@@ -53,12 +53,12 @@ Error:
 | --- | --- | --- | --- |
 | `PV API - Events List` | `/events/list` | Admin/Bendahara all, assigned users scoped | `events` |
 | `PV API - Events Detail` | `/events/detail` | Same as list | `event` |
-| `PV API - Events Create` | `/events/create` | Admin only | `event` |
-| `PV API - Events Update` | `/events/update` | Admin only | `event` |
-| `PV API - Events Delete` | `/events/delete` | Admin only | `event` |
-| `PV API - Event Members List` | `/events/members/list` | Admin all, assigned users self/event scoped | `members` |
-| `PV API - Event Members Assign` | `/events/members/assign` | Admin only | `member` |
-| `PV API - Event Members Revoke` | `/events/members/revoke` | Admin only | `member` |
+| `PV API - Events Create` | `/events/create` | Admin / Bendahara | `event` |
+| `PV API - Events Update` | `/events/update` | Admin / Bendahara | `event` |
+| `PV API - Events Delete` | `/events/delete` | Admin / Bendahara | `event` |
+| `PV API - Event Members List` | `/events/members/list` | Admin / Bendahara all, assigned users self/event scoped | `members` |
+| `PV API - Event Members Assign` | `/events/members/assign` | Admin / Bendahara | `member` |
+| `PV API - Event Members Revoke` | `/events/members/revoke` | Admin / Bendahara | `member` |
 | `PV API - Events My Access` | `/events/my-access` | Any approved active user | `global`, `events` |
 | `PV API - Incomes List` | `/incomes/list` | Admin/Bendahara general and all events, assigned event users scoped | `incomes` |
 | `PV API - Incomes Create` | `/incomes/create` | Admin/Bendahara general and all events, event treasurer assigned event only | `income` |

@@ -277,7 +277,7 @@ const buildEventList = node({
         "const activeAssignments = assignmentRows.filter((row) => row && row.profile_id === actor.id && !row.revoked_at);\n" +
         "const assignmentMap = new Map(activeAssignments.map((row) => [row.event_id, row]));\n" +
         "const canViewAll = actorRole === 'admin' || actorRole === 'bendahara';\n" +
-        "const canManageMaster = actorRole === 'admin';\n" +
+        "const canManageMaster = actorRole === 'admin' || actorRole === 'bendahara';\n" +
         "function normalizeEvent(event) {\n" +
         "  const id = event.id;\n" +
         "  const eventCode = event.event_code || (id ? 'EVT-' + String(id).replace(/-/g, '').toUpperCase() : null);\n" +
