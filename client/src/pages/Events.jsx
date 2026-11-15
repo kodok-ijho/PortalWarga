@@ -68,6 +68,8 @@ export default function Events() {
   const [events, setEvents] = useState([]);
   const [access, setAccess] = useState({ events: [], global: {} });
   const [members, setMembers] = useState({});
+  const [loadingMembers, setLoadingMembers] = useState({});
+  const [expandedEvents, setExpandedEvents] = useState({});
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -77,6 +79,19 @@ export default function Events() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [editingEvent, setEditingEvent] = useState(null);
 
+  const loadMembers = useCallback(async (eventId) => {
+    if (!token) return;
+    setLoadingMembers((current) => ({ ...current, [eventId]: true }));
+    try {
+      const rows = await fetchEventMembers(token, eventId);
+      setMembers((current) => ({ ...current, [eventId]: rows || [] }));
+    } catch (error) {
+      console.error(`Gagal mengambil anggota event ${eventId}:`, error);
+    } finally {
+      setLoadingMembers((current) => ({ ...current, [eventId]: false }));
+    }
+  }, [token]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -84,14 +99,20 @@ export default function Events() {
         fetchEvents(token, { role, profileId }),
         fetchMyEventAccess(token, { role, profileId }),
       ]);
-      setEvents(Array.isArray(eventRows) ? eventRows : []);
+      const validEvents = Array.isArray(eventRows) ? eventRows : [];
+      setEvents(validEvents);
       setAccess(accessData || { events: [], global: {} });
+      setLoading(false);
+
+      // Background fetch members for each event so badges are accurate immediately
+      validEvents.forEach((ev) => {
+        loadMembers(ev.id);
+      });
     } catch (error) {
       toast.error(error.message || 'Gagal mengambil data event.');
-    } finally {
       setLoading(false);
     }
-  }, [profileId, role, toast, token]);
+  }, [profileId, role, toast, token, loadMembers]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -114,28 +135,17 @@ export default function Events() {
     }
   }, [canManageMaster, token, loadUsers]);
 
-  const loadMembers = async (eventId) => {
-    try {
-      const rows = await fetchEventMembers(token, eventId);
-      setMembers((current) => ({ ...current, [eventId]: rows || [] }));
+  const toggleMembers = async (eventId) => {
+    const isExpanded = !!expandedEvents[eventId];
+    setExpandedEvents((current) => ({ ...current, [eventId]: !isExpanded }));
+    if (!isExpanded) {
+      if (members[eventId] === undefined && !loadingMembers[eventId]) {
+        await loadMembers(eventId);
+      }
       if (canManageMaster && users.length === 0 && !usersLoading) {
         loadUsers();
       }
-    } catch (error) {
-      toast.error(error.message || 'Gagal mengambil anggota event.');
     }
-  };
-
-  const toggleMembers = async (eventId) => {
-    if (members[eventId]) {
-      setMembers((current) => {
-        const next = { ...current };
-        delete next[eventId];
-        return next;
-      });
-      return;
-    }
-    await loadMembers(eventId);
   };
 
   const submitEvent = async (event) => {
@@ -299,6 +309,7 @@ export default function Events() {
             const treasurers = eventMembers.filter(m => m.assignment_role === 'event_treasurer');
             const leaderName = leader ? (leader.profile_name || users.find(u => u.id === leader.profile_id)?.full_name || 'Terisi') : null;
             const treasurerNames = treasurers.map(t => t.profile_name || users.find(u => u.id === t.profile_id)?.full_name || 'Terisi');
+            const isMembersLoading = loadingMembers[event.id] || members[event.id] === undefined;
 
             return (
               <article key={event.id} className="pv-card flex flex-col justify-between p-5">
@@ -336,12 +347,25 @@ export default function Events() {
 
                   {/* Committee status highlights */}
                   <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <span className={`px-2 py-0.5 rounded border ${leader ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                      {leader ? `👑 Ketua: ${leaderName}` : '⚠️ Ketua belum di-assign'}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded border ${treasurers.length > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                      {treasurers.length > 0 ? `💰 Bendahara: ${treasurerNames.join(', ')}` : '⚠️ Bendahara belum di-assign'}
-                    </span>
+                    {isMembersLoading ? (
+                      <>
+                        <span className="px-2 py-0.5 rounded border bg-forest-50 text-forest-600 border-forest-200">
+                          👑 Ketua: <span className="text-forest-400 italic">Memuat...</span>
+                        </span>
+                        <span className="px-2 py-0.5 rounded border bg-forest-50 text-forest-600 border-forest-200">
+                          💰 Bendahara: <span className="text-forest-400 italic">Memuat...</span>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className={`px-2 py-0.5 rounded border ${leader ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                          {leader ? `👑 Ketua: ${leaderName}` : '⚠️ Ketua belum di-assign'}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded border ${treasurers.length > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                          {treasurers.length > 0 ? `💰 Bendahara: ${treasurerNames.join(', ')}` : '⚠️ Bendahara belum di-assign'}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -349,7 +373,7 @@ export default function Events() {
                   <div className="flex flex-wrap items-center gap-2">
                     <Link className="pv-btn-primary py-1.5 text-xs" to={`/events/${event.id}`}>Lihat Keuangan</Link>
                     <button type="button" className="pv-btn-ghost py-1.5 text-xs" onClick={() => toggleMembers(event.id)}>
-                      {members[event.id] ? 'Tutup Panitia' : 'Kelola Panitia'}
+                      {expandedEvents[event.id] ? 'Tutup Panitia' : 'Kelola Panitia'}
                     </button>
                     {canManageMaster && (
                       <div className="ml-auto flex items-center gap-2">
@@ -380,14 +404,21 @@ export default function Events() {
                   </div>
 
                   {/* Panel Pengelolaan Anggota / Panitia */}
-                  {members[event.id] && (
+                  {expandedEvents[event.id] && (
                     <div className="mt-4 rounded-xl bg-forest-50 p-4 border border-forest-200">
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-xs font-bold uppercase tracking-wide text-forest-800">Susunan Kepanitiaan Event</p>
-                        <span className="text-xs text-forest-500">{eventMembers.length} Panitia Aktif</span>
+                        <span className="text-xs text-forest-500">
+                          {isMembersLoading ? 'Memuat...' : `${eventMembers.length} Panitia Aktif`}
+                        </span>
                       </div>
 
-                      {eventMembers.length === 0 ? (
+                      {isMembersLoading ? (
+                        <div className="py-4 text-center text-xs text-forest-500 flex items-center justify-center gap-2">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-forest-500 border-t-transparent"></div>
+                          Memuat susunan panitia...
+                        </div>
+                      ) : eventMembers.length === 0 ? (
                         <p className="text-xs text-forest-400 italic py-2">Belum ada panitia yang ditugaskan. Ketua dan Bendahara Event wajib diisi.</p>
                       ) : (
                         <div className="space-y-2 mb-4">
