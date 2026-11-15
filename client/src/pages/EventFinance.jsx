@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -13,6 +13,8 @@ import {
   createExpense,
   updateExpense,
   deleteExpense,
+  fetchUnits,
+  fetchResidents,
 } from '../services/dataService';
 import { formatDate, formatRupiah } from '../services/dataHelpers';
 
@@ -40,6 +42,8 @@ export default function EventFinance() {
   const [report, setReport] = useState(null);
   const [access, setAccess] = useState(null);
   const [members, setMembers] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [dateFrom, setDateFrom] = useState('');
@@ -51,6 +55,9 @@ export default function EventFinance() {
   const [incomeForm, setIncomeForm] = useState(EMPTY_INCOME_FORM);
   const [expenseForm, setExpenseForm] = useState(EMPTY_EXPENSE_FORM);
 
+  const [sourceSelection, setSourceSelection] = useState('');
+  const [customSource, setCustomSource] = useState('');
+
   const [editingIncomeId, setEditingIncomeId] = useState(null);
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [submittingIncome, setSubmittingIncome] = useState(false);
@@ -59,16 +66,20 @@ export default function EventFinance() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [eventData, reportData, accessData, membersData] = await Promise.all([
+      const [eventData, reportData, accessData, membersData, unitsData, residentsData] = await Promise.all([
         fetchEventDetail(session?.access_token, eventId),
         fetchEventFinanceReport(session?.access_token, { eventId }),
         fetchMyEventAccess(session?.access_token, { role, profileId: profile?.id }),
         fetchEventMembers(session?.access_token, eventId).catch(() => []),
+        fetchUnits(session?.access_token).catch(() => []),
+        fetchResidents(session?.access_token).catch(() => []),
       ]);
       setEvent(eventData);
       setReport(reportData);
       setAccess(accessData);
       setMembers(Array.isArray(membersData) ? membersData.filter(m => !m.revoked_at) : []);
+      setUnits(Array.isArray(unitsData) ? unitsData : []);
+      setResidents(Array.isArray(residentsData) ? residentsData : []);
     } catch (error) {
       toast.error(error.message || 'Gagal mengambil laporan keuangan event.');
     } finally {
@@ -77,6 +88,59 @@ export default function EventFinance() {
   }, [eventId, profile?.id, role, session?.access_token, toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Transform residents and units into sorted dropdown options with house labels
+  const residentOptions = useMemo(() => {
+    const list = [];
+    const addedKeys = new Set();
+
+    (residents || []).forEach((r) => {
+      if (!r.full_name) return;
+      const unit = (units || []).find((u) => u.id === r.unit_id);
+      const houseLabel = unit ? `${unit.block} no ${unit.unit_number}` : '';
+      const displayLabel = houseLabel ? `[${houseLabel}] ${r.full_name}` : r.full_name;
+      const value = houseLabel ? `${r.full_name} - ${houseLabel}` : r.full_name;
+
+      const key = `${r.full_name}_${houseLabel}`;
+      if (!addedKeys.has(key)) {
+        addedKeys.add(key);
+        list.push({
+          id: r.id,
+          label: displayLabel,
+          value,
+          block: unit?.block || 'ZZZ',
+          unit_number: unit?.unit_number || '',
+          name: r.full_name,
+        });
+      }
+    });
+
+    (units || []).forEach((u) => {
+      if (u._occupant && u._occupant.full_name) {
+        const houseLabel = `${u.block} no ${u.unit_number}`;
+        const key = `${u._occupant.full_name}_${houseLabel}`;
+        if (!addedKeys.has(key)) {
+          addedKeys.add(key);
+          list.push({
+            id: u._occupant.id || `unit-occ-${u.id}`,
+            label: `[${houseLabel}] ${u._occupant.full_name}`,
+            value: `${u._occupant.full_name} - ${houseLabel}`,
+            block: u.block || 'ZZZ',
+            unit_number: u.unit_number || '',
+            name: u._occupant.full_name,
+          });
+        }
+      }
+    });
+
+    list.sort((a, b) => {
+      if (a.block !== b.block) return a.block.localeCompare(b.block, undefined, { numeric: true });
+      if (a.unit_number !== b.unit_number) return String(a.unit_number).localeCompare(String(b.unit_number), undefined, { numeric: true });
+      return a.name.localeCompare(b.name);
+    });
+
+    return list;
+  }, [residents, units]);
 
   const assignment = (access?.events || []).find((item) => item.event_id === eventId);
   const canView = role === 'admin' || role === 'bendahara' || role === 'admin_viewer'
@@ -89,6 +153,8 @@ export default function EventFinance() {
   const handleCancelIncomeForm = () => {
     setShowIncomeForm(false);
     setEditingIncomeId(null);
+    setSourceSelection('');
+    setCustomSource('');
     setIncomeForm(EMPTY_INCOME_FORM);
   };
 
@@ -100,14 +166,48 @@ export default function EventFinance() {
 
   const handleStartEditIncome = (income) => {
     setEditingIncomeId(income.id);
-    setIncomeForm({
-      income_date: income.income_date ? new Date(income.income_date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-      category: income.category || '',
-      source_name: income.source_name || '',
-      amount: String(income.amount || ''),
-      payment_method: income.payment_method || 'cash',
-      description: income.description || '',
-    });
+    const existingSource = income.source_name || '';
+
+    // Check if existingSource matches any option in residentOptions
+    const match = residentOptions.find(
+      (opt) => opt.value === existingSource || opt.name === existingSource || opt.label === existingSource
+    );
+
+    if (match) {
+      setSourceSelection(match.value);
+      setCustomSource('');
+      setIncomeForm({
+        income_date: income.income_date ? new Date(income.income_date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+        category: income.category || '',
+        source_name: match.value,
+        amount: String(income.amount || ''),
+        payment_method: income.payment_method || 'cash',
+        description: income.description || '',
+      });
+    } else if (existingSource) {
+      setSourceSelection('__OTHER__');
+      setCustomSource(existingSource);
+      setIncomeForm({
+        income_date: income.income_date ? new Date(income.income_date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+        category: income.category || '',
+        source_name: existingSource,
+        amount: String(income.amount || ''),
+        payment_method: income.payment_method || 'cash',
+        description: income.description || '',
+      });
+    } else {
+      setSourceSelection('');
+      setCustomSource('');
+      setIncomeForm({
+        income_date: income.income_date ? new Date(income.income_date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+        category: income.category || '',
+        source_name: '',
+        amount: String(income.amount || ''),
+        payment_method: income.payment_method || 'cash',
+        description: income.description || '',
+      });
+    }
+
     setShowIncomeForm(true);
     window.scrollTo({ top: 300, behavior: 'smooth' });
   };
@@ -127,10 +227,18 @@ export default function EventFinance() {
   const submitIncome = async (e) => {
     e.preventDefault();
     if (submittingIncome) return;
+
+    const finalSource = sourceSelection === '__OTHER__' ? customSource.trim() : (incomeForm.source_name || '').trim();
+    if (!finalSource) {
+      toast.error('Sumber / pembayar wajib dipilih atau diisi.');
+      return;
+    }
+
     setSubmittingIncome(true);
     try {
       const payload = {
         ...incomeForm,
+        source_name: finalSource,
         amount: Number(incomeForm.amount),
         scope: 'event',
         event_id: eventId,
@@ -158,6 +266,14 @@ export default function EventFinance() {
     try {
       await deleteNonIplIncome(session?.access_token, id);
       toast.success('Pemasukan event berhasil dihapus.');
+      // Optimistic removal so UI updates immediately
+      setReport((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          incomes: (prev.incomes || []).filter((item) => item.id !== id),
+        };
+      });
       await load();
     } catch (error) {
       toast.error(error.message || 'Gagal menghapus pemasukan.');
@@ -204,6 +320,14 @@ export default function EventFinance() {
     try {
       await deleteExpense(session?.access_token, id);
       toast.success('Pengeluaran event berhasil dihapus.');
+      // Optimistic removal so UI updates immediately
+      setReport((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          expenses: (prev.expenses || []).filter((item) => item.id !== id),
+        };
+      });
       await load();
     } catch (error) {
       toast.error(error.message || 'Gagal menghapus pengeluaran.');
@@ -213,8 +337,9 @@ export default function EventFinance() {
   if (loading) return <div className="pv-card p-8 text-center text-sm text-forest-500">Memuat laporan event...</div>;
   if (!canView || !event) return <div className="pv-card p-8 text-center text-sm text-red-600">Event tidak ditemukan atau tidak dapat diakses.</div>;
 
-  let incomes = report?.incomes || [];
-  let expenses = report?.expenses || [];
+  // Defensive filtering for soft-deleted items
+  let incomes = (report?.incomes || []).filter(i => !i.deleted_at);
+  let expenses = (report?.expenses || []).filter(e => !e.deleted_at);
 
   if (dateFrom) {
     incomes = incomes.filter(i => i.income_date >= dateFrom);
@@ -324,7 +449,7 @@ export default function EventFinance() {
             </button>
           )}
         </div>
-        
+
         {showIncomeForm && (
           <form className="p-5 border-b border-forest-100 bg-forest-50 grid gap-3 md:grid-cols-2" onSubmit={submitIncome}>
             {editingIncomeId && (
@@ -339,17 +464,111 @@ export default function EventFinance() {
                 </button>
               </div>
             )}
-            <input className="pv-input" type="date" value={incomeForm.income_date} onChange={e => setIncomeForm({...incomeForm, income_date: e.target.value})} required/>
-            <input className="pv-input" placeholder="Kategori" value={incomeForm.category} onChange={e => setIncomeForm({...incomeForm, category: e.target.value})} required/>
-            <input className="pv-input" placeholder="Sumber/Pembayar" value={incomeForm.source_name} onChange={e => setIncomeForm({...incomeForm, source_name: e.target.value})} required/>
-            <input className="pv-input" type="number" placeholder="Nominal" value={incomeForm.amount} onChange={e => setIncomeForm({...incomeForm, amount: e.target.value})} required/>
-            <select className="pv-input md:col-span-2" value={incomeForm.payment_method} onChange={e => setIncomeForm({...incomeForm, payment_method: e.target.value})}>
-              <option value="cash">💵 Tunai / Cash</option>
-              <option value="bank_transfer">🏦 Transfer Bank</option>
-              <option value="qris">📱 QRIS</option>
-              <option value="other">Lainnya</option>
-            </select>
-            <textarea className="pv-input md:col-span-2" rows="2" placeholder="Deskripsi" value={incomeForm.description} onChange={e => setIncomeForm({...incomeForm, description: e.target.value})}/>
+            <div>
+              <label className="block text-xs font-medium text-forest-700 mb-1">Tanggal *</label>
+              <input
+                className="pv-input w-full"
+                type="date"
+                value={incomeForm.income_date}
+                onChange={e => setIncomeForm({...incomeForm, income_date: e.target.value})}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-forest-700 mb-1">Kategori *</label>
+              <input
+                className="pv-input w-full"
+                placeholder="Contoh: Patungan, Donasi"
+                value={incomeForm.category}
+                onChange={e => setIncomeForm({...incomeForm, category: e.target.value})}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-forest-700 mb-1">Sumber / Pembayar *</label>
+              <select
+                className="pv-input w-full"
+                value={sourceSelection}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSourceSelection(val);
+                  if (val === '__OTHER__') {
+                    setIncomeForm((prev) => ({ ...prev, source_name: customSource }));
+                  } else {
+                    setIncomeForm((prev) => ({ ...prev, source_name: val }));
+                  }
+                }}
+                required
+              >
+                <option value="">-- Pilih Warga (No Rumah & Nama) --</option>
+                <optgroup label="Daftar Warga Palm Village">
+                  {residentOptions.map((opt) => (
+                    <option key={opt.id} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Luar Warga / Lainnya">
+                  <option value="__OTHER__">➕ Lainnya (Input Manual / Luar Warga)</option>
+                </optgroup>
+              </select>
+
+              {sourceSelection === '__OTHER__' && (
+                <input
+                  type="text"
+                  className="pv-input w-full mt-2 border-amber-400 focus:border-amber-600 bg-amber-50/60"
+                  placeholder="Ketik sumber pembayaran manual (contoh: Kas RT, Sponsor, Donatur Luar)"
+                  value={customSource}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCustomSource(val);
+                    setIncomeForm((prev) => ({ ...prev, source_name: val }));
+                  }}
+                  required
+                  autoFocus
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-forest-700 mb-1">Nominal (Rp) *</label>
+              <input
+                className="pv-input w-full"
+                type="number"
+                placeholder="Contoh: 750000"
+                value={incomeForm.amount}
+                onChange={e => setIncomeForm({...incomeForm, amount: e.target.value})}
+                required
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-forest-700 mb-1">Metode Pembayaran</label>
+              <select
+                className="pv-input w-full"
+                value={incomeForm.payment_method}
+                onChange={e => setIncomeForm({...incomeForm, payment_method: e.target.value})}
+              >
+                <option value="cash">💵 Tunai / Cash</option>
+                <option value="bank_transfer">🏦 Transfer Bank</option>
+                <option value="qris">📱 QRIS</option>
+                <option value="other">Lainnya</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-forest-700 mb-1">Deskripsi / Catatan</label>
+              <textarea
+                className="pv-input w-full"
+                rows="2"
+                placeholder="Keterangan tambahan (contoh: Pembayaran 1 - Lunas)"
+                value={incomeForm.description}
+                onChange={e => setIncomeForm({...incomeForm, description: e.target.value})}
+              />
+            </div>
+
             <button
               type="submit"
               className="pv-btn-primary md:col-span-2"
@@ -461,10 +680,22 @@ export default function EventFinance() {
                 </button>
               </div>
             )}
-            <input className="pv-input" type="date" value={expenseForm.expense_date} onChange={e => setExpenseForm({...expenseForm, expense_date: e.target.value})} required/>
-            <input className="pv-input" placeholder="Kategori" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})} required/>
-            <input className="pv-input" type="number" placeholder="Nominal" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} required/>
-            <textarea className="pv-input md:col-span-2" rows="2" placeholder="Deskripsi" value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})}/>
+            <div>
+              <label className="block text-xs font-medium text-forest-700 mb-1">Tanggal *</label>
+              <input className="pv-input w-full" type="date" value={expenseForm.expense_date} onChange={e => setExpenseForm({...expenseForm, expense_date: e.target.value})} required/>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-forest-700 mb-1">Kategori *</label>
+              <input className="pv-input w-full" placeholder="Kategori" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})} required/>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-forest-700 mb-1">Nominal (Rp) *</label>
+              <input className="pv-input w-full" type="number" placeholder="Nominal" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} required/>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-forest-700 mb-1">Deskripsi / Catatan</label>
+              <textarea className="pv-input w-full" rows="2" placeholder="Deskripsi" value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})}/>
+            </div>
             <button
               type="submit"
               className="pv-btn-primary md:col-span-2"
