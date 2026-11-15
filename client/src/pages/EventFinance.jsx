@@ -8,9 +8,29 @@ import {
   fetchMyEventAccess,
   fetchEventMembers,
   createNonIplIncome,
+  updateNonIplIncome,
+  deleteNonIplIncome,
   createExpense,
+  updateExpense,
+  deleteExpense,
 } from '../services/dataService';
 import { formatDate, formatRupiah } from '../services/dataHelpers';
+
+const EMPTY_INCOME_FORM = {
+  income_date: new Date().toISOString().slice(0, 10),
+  category: '',
+  source_name: '',
+  amount: '',
+  payment_method: 'cash',
+  description: '',
+};
+
+const EMPTY_EXPENSE_FORM = {
+  expense_date: new Date().toISOString().slice(0, 10),
+  category: '',
+  amount: '',
+  description: '',
+};
 
 export default function EventFinance() {
   const { eventId } = useParams();
@@ -28,8 +48,13 @@ export default function EventFinance() {
 
   const [showIncomeForm, setShowIncomeForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [incomeForm, setIncomeForm] = useState({ income_date: new Date().toISOString().slice(0, 10), category: '', source_name: '', amount: '', payment_method: 'cash', description: '' });
-  const [expenseForm, setExpenseForm] = useState({ expense_date: new Date().toISOString().slice(0, 10), category: '', amount: '', description: '' });
+  const [incomeForm, setIncomeForm] = useState(EMPTY_INCOME_FORM);
+  const [expenseForm, setExpenseForm] = useState(EMPTY_EXPENSE_FORM);
+
+  const [editingIncomeId, setEditingIncomeId] = useState(null);
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const [submittingIncome, setSubmittingIncome] = useState(false);
+  const [submittingExpense, setSubmittingExpense] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,29 +86,127 @@ export default function EventFinance() {
   const leader = members.find(m => m.assignment_role === 'event_leader');
   const treasurer = members.find(m => m.assignment_role === 'event_treasurer');
 
+  const handleCancelIncomeForm = () => {
+    setShowIncomeForm(false);
+    setEditingIncomeId(null);
+    setIncomeForm(EMPTY_INCOME_FORM);
+  };
+
+  const handleCancelExpenseForm = () => {
+    setShowExpenseForm(false);
+    setEditingExpenseId(null);
+    setExpenseForm(EMPTY_EXPENSE_FORM);
+  };
+
+  const handleStartEditIncome = (income) => {
+    setEditingIncomeId(income.id);
+    setIncomeForm({
+      income_date: income.income_date ? new Date(income.income_date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+      category: income.category || '',
+      source_name: income.source_name || '',
+      amount: String(income.amount || ''),
+      payment_method: income.payment_method || 'cash',
+      description: income.description || '',
+    });
+    setShowIncomeForm(true);
+    window.scrollTo({ top: 300, behavior: 'smooth' });
+  };
+
+  const handleStartEditExpense = (expense) => {
+    setEditingExpenseId(expense.id);
+    setExpenseForm({
+      expense_date: (expense.expense_date || expense.date) ? new Date(expense.expense_date || expense.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+      category: expense.category || '',
+      amount: String(expense.amount || ''),
+      description: expense.description || '',
+    });
+    setShowExpenseForm(true);
+    window.scrollTo({ top: 600, behavior: 'smooth' });
+  };
+
   const submitIncome = async (e) => {
     e.preventDefault();
+    if (submittingIncome) return;
+    setSubmittingIncome(true);
     try {
-      await createNonIplIncome(session?.access_token, { ...incomeForm, amount: Number(incomeForm.amount), scope: 'event', event_id: eventId });
-      toast.success('Pemasukan event berhasil dicatat.');
-      setIncomeForm({ ...incomeForm, category: '', source_name: '', amount: '', description: '' });
-      setShowIncomeForm(false);
+      const payload = {
+        ...incomeForm,
+        amount: Number(incomeForm.amount),
+        scope: 'event',
+        event_id: eventId,
+      };
+
+      if (editingIncomeId) {
+        await updateNonIplIncome(session?.access_token, editingIncomeId, payload);
+        toast.success('Pemasukan event berhasil diperbarui.');
+      } else {
+        await createNonIplIncome(session?.access_token, payload);
+        toast.success('Pemasukan event berhasil dicatat.');
+      }
+
+      handleCancelIncomeForm();
       await load();
     } catch (error) {
       toast.error(error.message || 'Gagal mencatat pemasukan.');
+    } finally {
+      setSubmittingIncome(false);
+    }
+  };
+
+  const handleDeleteIncome = async (id) => {
+    if (!window.confirm('Hapus pemasukan event ini? Transaksi yang dihapus tidak akan dihitung dalam laporan keuangan.')) return;
+    try {
+      await deleteNonIplIncome(session?.access_token, id);
+      toast.success('Pemasukan event berhasil dihapus.');
+      await load();
+    } catch (error) {
+      toast.error(error.message || 'Gagal menghapus pemasukan.');
     }
   };
 
   const submitExpense = async (e) => {
     e.preventDefault();
+    if (submittingExpense) return;
+    setSubmittingExpense(true);
     try {
-      await createExpense(session?.access_token, { ...expenseForm, amount: Number(expenseForm.amount), event_id: eventId, is_event_expense: true });
-      toast.success('Pengeluaran event berhasil dicatat.');
-      setExpenseForm({ ...expenseForm, category: '', amount: '', description: '' });
-      setShowExpenseForm(false);
+      if (editingExpenseId) {
+        await updateExpense(session?.access_token, editingExpenseId, {
+          date: expenseForm.expense_date,
+          category: expenseForm.category,
+          amount: Number(expenseForm.amount),
+          description: expenseForm.description,
+          scope: 'event',
+          event_id: eventId,
+          is_event_expense: true,
+        });
+        toast.success('Pengeluaran event berhasil diperbarui.');
+      } else {
+        await createExpense(session?.access_token, {
+          ...expenseForm,
+          amount: Number(expenseForm.amount),
+          event_id: eventId,
+          is_event_expense: true,
+        });
+        toast.success('Pengeluaran event berhasil dicatat.');
+      }
+
+      handleCancelExpenseForm();
       await load();
     } catch (error) {
       toast.error(error.message || 'Gagal mencatat pengeluaran.');
+    } finally {
+      setSubmittingExpense(false);
+    }
+  };
+
+  const handleDeleteExpense = async (id) => {
+    if (!window.confirm('Hapus pengeluaran event ini? Transaksi yang dihapus tidak akan dihitung dalam laporan keuangan.')) return;
+    try {
+      await deleteExpense(session?.access_token, id);
+      toast.success('Pengeluaran event berhasil dihapus.');
+      await load();
+    } catch (error) {
+      toast.error(error.message || 'Gagal menghapus pengeluaran.');
     }
   };
 
@@ -186,11 +309,36 @@ export default function EventFinance() {
       <div className="pv-card overflow-hidden">
         <div className="border-b border-forest-100 px-5 py-4 flex justify-between items-center">
           <h2 className="font-semibold text-forest-900">Rincian Pemasukan</h2>
-          {canManageFinance && <button className="pv-btn-primary py-1 px-3 text-xs" onClick={() => setShowIncomeForm(!showIncomeForm)}>{showIncomeForm ? 'Batal' : '+ Pemasukan'}</button>}
+          {canManageFinance && (
+            <button
+              className="pv-btn-primary py-1 px-3 text-xs"
+              onClick={() => {
+                if (showIncomeForm) {
+                  handleCancelIncomeForm();
+                } else {
+                  setShowIncomeForm(true);
+                }
+              }}
+            >
+              {showIncomeForm ? 'Batal' : '+ Pemasukan'}
+            </button>
+          )}
         </div>
         
         {showIncomeForm && (
           <form className="p-5 border-b border-forest-100 bg-forest-50 grid gap-3 md:grid-cols-2" onSubmit={submitIncome}>
+            {editingIncomeId && (
+              <div className="md:col-span-2 flex items-center justify-between rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-800">
+                <span>✏️ Mengedit Pemasukan Event</span>
+                <button
+                  type="button"
+                  onClick={handleCancelIncomeForm}
+                  className="text-forest-600 hover:text-forest-900 underline font-normal"
+                >
+                  Batal Edit
+                </button>
+              </div>
+            )}
             <input className="pv-input" type="date" value={incomeForm.income_date} onChange={e => setIncomeForm({...incomeForm, income_date: e.target.value})} required/>
             <input className="pv-input" placeholder="Kategori" value={incomeForm.category} onChange={e => setIncomeForm({...incomeForm, category: e.target.value})} required/>
             <input className="pv-input" placeholder="Sumber/Pembayar" value={incomeForm.source_name} onChange={e => setIncomeForm({...incomeForm, source_name: e.target.value})} required/>
@@ -202,33 +350,182 @@ export default function EventFinance() {
               <option value="other">Lainnya</option>
             </select>
             <textarea className="pv-input md:col-span-2" rows="2" placeholder="Deskripsi" value={incomeForm.description} onChange={e => setIncomeForm({...incomeForm, description: e.target.value})}/>
-            <button type="submit" className="pv-btn-primary md:col-span-2">Simpan Pemasukan</button>
+            <button
+              type="submit"
+              className="pv-btn-primary md:col-span-2"
+              disabled={submittingIncome}
+            >
+              {submittingIncome
+                ? 'Menyimpan...'
+                : editingIncomeId
+                ? 'Simpan Perubahan Pemasukan'
+                : 'Simpan Pemasukan'}
+            </button>
           </form>
         )}
 
         {incomes.length === 0 ? <p className="p-5 text-sm text-forest-500">Belum ada pemasukan event.</p> : (
-          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-forest-50 text-xs uppercase text-forest-500"><tr><th className="px-5 py-3">Tanggal</th><th className="px-5 py-3">Kategori / Sumber</th><th className="px-5 py-3">Metode</th><th className="px-5 py-3 text-right">Nominal</th></tr></thead><tbody className="divide-y divide-forest-100">{incomes.map((income) => <tr key={income.id}><td className="px-5 py-3">{formatDate(income.income_date)}</td><td className="px-5 py-3"><div className="font-semibold text-forest-900">{income.category}</div><div className="text-xs text-forest-500">{income.source_name}</div></td><td className="px-5 py-3 text-xs font-medium text-forest-700">{income.payment_method === 'bank_transfer' ? '🏦 Transfer Bank' : income.payment_method === 'qris' ? '📱 QRIS' : income.payment_method === 'cash' ? '💵 Tunai' : (income.payment_method || '-')}</td><td className="px-5 py-3 text-right font-semibold text-emerald-700">{formatRupiah(income.amount)}</td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-forest-50 text-xs uppercase text-forest-500 font-semibold">
+                <tr>
+                  <th className="px-5 py-3">Tanggal</th>
+                  <th className="px-5 py-3">Kategori / Sumber</th>
+                  <th className="px-5 py-3">Metode</th>
+                  <th className="px-5 py-3 text-right">Nominal</th>
+                  {canManageFinance && <th className="px-5 py-3 text-center">Aksi</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-forest-100">
+                {incomes.map((income) => (
+                  <tr key={income.id}>
+                    <td className="px-5 py-3 whitespace-nowrap">{formatDate(income.income_date)}</td>
+                    <td className="px-5 py-3">
+                      <div className="font-semibold text-forest-900">{income.category}</div>
+                      <div className="text-xs text-forest-500">{income.source_name}</div>
+                      {income.description && (
+                        <div className="text-xs text-forest-400 mt-0.5 line-clamp-1">{income.description}</div>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-xs font-medium text-forest-700 whitespace-nowrap">
+                      {income.payment_method === 'bank_transfer'
+                        ? '🏦 Transfer Bank'
+                        : income.payment_method === 'qris'
+                        ? '📱 QRIS'
+                        : income.payment_method === 'cash'
+                        ? '💵 Tunai'
+                        : (income.payment_method || '-')}
+                    </td>
+                    <td className="px-5 py-3 text-right font-semibold text-emerald-700 whitespace-nowrap">
+                      {formatRupiah(income.amount)}
+                    </td>
+                    {canManageFinance && (
+                      <td className="px-5 py-3 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                            onClick={() => handleStartEditIncome(income)}
+                          >
+                            Edit
+                          </button>
+                          <span className="text-forest-200">|</span>
+                          <button
+                            type="button"
+                            className="text-xs font-semibold text-red-600 hover:text-red-800 hover:underline"
+                            onClick={() => handleDeleteIncome(income.id)}
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
       <div className="pv-card overflow-hidden">
         <div className="border-b border-forest-100 px-5 py-4 flex justify-between items-center">
           <h2 className="font-semibold text-forest-900">Rincian Pengeluaran</h2>
-          {canManageFinance && <button className="pv-btn-primary py-1 px-3 text-xs" onClick={() => setShowExpenseForm(!showExpenseForm)}>{showExpenseForm ? 'Batal' : '+ Pengeluaran'}</button>}
+          {canManageFinance && (
+            <button
+              className="pv-btn-primary py-1 px-3 text-xs"
+              onClick={() => {
+                if (showExpenseForm) {
+                  handleCancelExpenseForm();
+                } else {
+                  setShowExpenseForm(true);
+                }
+              }}
+            >
+              {showExpenseForm ? 'Batal' : '+ Pengeluaran'}
+            </button>
+          )}
         </div>
 
         {showExpenseForm && (
           <form className="p-5 border-b border-forest-100 bg-forest-50 grid gap-3 md:grid-cols-2" onSubmit={submitExpense}>
+            {editingExpenseId && (
+              <div className="md:col-span-2 flex items-center justify-between rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-800">
+                <span>✏️ Mengedit Pengeluaran Event</span>
+                <button
+                  type="button"
+                  onClick={handleCancelExpenseForm}
+                  className="text-forest-600 hover:text-forest-900 underline font-normal"
+                >
+                  Batal Edit
+                </button>
+              </div>
+            )}
             <input className="pv-input" type="date" value={expenseForm.expense_date} onChange={e => setExpenseForm({...expenseForm, expense_date: e.target.value})} required/>
             <input className="pv-input" placeholder="Kategori" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})} required/>
             <input className="pv-input" type="number" placeholder="Nominal" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} required/>
             <textarea className="pv-input md:col-span-2" rows="2" placeholder="Deskripsi" value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})}/>
-            <button type="submit" className="pv-btn-primary md:col-span-2">Simpan Pengeluaran</button>
+            <button
+              type="submit"
+              className="pv-btn-primary md:col-span-2"
+              disabled={submittingExpense}
+            >
+              {submittingExpense
+                ? 'Menyimpan...'
+                : editingExpenseId
+                ? 'Simpan Perubahan Pengeluaran'
+                : 'Simpan Pengeluaran'}
+            </button>
           </form>
         )}
 
         {expenses.length === 0 ? <p className="p-5 text-sm text-forest-500">Belum ada pengeluaran event.</p> : (
-          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-forest-50 text-xs uppercase text-forest-500"><tr><th className="px-5 py-3">Tanggal</th><th className="px-5 py-3">Kategori</th><th className="px-5 py-3">Deskripsi</th><th className="px-5 py-3 text-right">Nominal</th></tr></thead><tbody className="divide-y divide-forest-100">{expenses.map((expense) => <tr key={expense.id}><td className="px-5 py-3">{formatDate(expense.expense_date || expense.date)}</td><td className="px-5 py-3 font-semibold text-forest-900">{expense.category}</td><td className="px-5 py-3 text-xs text-forest-500">{expense.description || '-'}</td><td className="px-5 py-3 text-right font-semibold text-red-600">{formatRupiah(expense.amount)}</td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-forest-50 text-xs uppercase text-forest-500 font-semibold">
+                <tr>
+                  <th className="px-5 py-3">Tanggal</th>
+                  <th className="px-5 py-3">Kategori</th>
+                  <th className="px-5 py-3">Deskripsi</th>
+                  <th className="px-5 py-3 text-right">Nominal</th>
+                  {canManageFinance && <th className="px-5 py-3 text-center">Aksi</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-forest-100">
+                {expenses.map((expense) => (
+                  <tr key={expense.id}>
+                    <td className="px-5 py-3 whitespace-nowrap">{formatDate(expense.expense_date || expense.date)}</td>
+                    <td className="px-5 py-3 font-semibold text-forest-900">{expense.category}</td>
+                    <td className="px-5 py-3 text-xs text-forest-500">{expense.description || '-'}</td>
+                    <td className="px-5 py-3 text-right font-semibold text-red-600 whitespace-nowrap">
+                      {formatRupiah(expense.amount)}
+                    </td>
+                    {canManageFinance && (
+                      <td className="px-5 py-3 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                            onClick={() => handleStartEditExpense(expense)}
+                          >
+                            Edit
+                          </button>
+                          <span className="text-forest-200">|</span>
+                          <button
+                            type="button"
+                            className="text-xs font-semibold text-red-600 hover:text-red-800 hover:underline"
+                            onClick={() => handleDeleteExpense(expense.id)}
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

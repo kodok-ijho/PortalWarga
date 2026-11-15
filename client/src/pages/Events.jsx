@@ -69,6 +69,7 @@ export default function Events() {
   const [access, setAccess] = useState({ events: [], global: {} });
   const [members, setMembers] = useState({});
   const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [memberForm, setMemberForm] = useState({});
   const [showForm, setShowForm] = useState(false);
@@ -85,26 +86,56 @@ export default function Events() {
       ]);
       setEvents(Array.isArray(eventRows) ? eventRows : []);
       setAccess(accessData || { events: [], global: {} });
-      if (canManageMaster) {
-        const userRows = await fetchUsers(token);
-        setUsers((userRows || []).filter((user) => user.is_active !== false && user.approval_status !== 'rejected'));
-      }
     } catch (error) {
       toast.error(error.message || 'Gagal mengambil data event.');
     } finally {
       setLoading(false);
     }
-  }, [canManageMaster, profileId, role, toast, token]);
+  }, [profileId, role, toast, token]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadUsers = useCallback(async () => {
+    if (!canManageMaster || !token) return;
+    setUsersLoading(true);
+    try {
+      const userRows = await fetchUsers(token);
+      setUsers((userRows || []).filter((user) => user.is_active !== false && user.approval_status !== 'rejected'));
+    } catch (error) {
+      console.error('Gagal mengambil daftar warga:', error);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [canManageMaster, token]);
+
+  useEffect(() => {
+    if (canManageMaster && token) {
+      loadUsers();
+    }
+  }, [canManageMaster, token, loadUsers]);
 
   const loadMembers = async (eventId) => {
     try {
       const rows = await fetchEventMembers(token, eventId);
       setMembers((current) => ({ ...current, [eventId]: rows || [] }));
+      if (canManageMaster && users.length === 0 && !usersLoading) {
+        loadUsers();
+      }
     } catch (error) {
       toast.error(error.message || 'Gagal mengambil anggota event.');
     }
+  };
+
+  const toggleMembers = async (eventId) => {
+    if (members[eventId]) {
+      setMembers((current) => {
+        const next = { ...current };
+        delete next[eventId];
+        return next;
+      });
+      return;
+    }
+    await loadMembers(eventId);
   };
 
   const submitEvent = async (event) => {
@@ -317,7 +348,7 @@ export default function Events() {
                 <div className="mt-4 pt-4 border-t border-forest-100">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link className="pv-btn-primary py-1.5 text-xs" to={`/events/${event.id}`}>Lihat Keuangan</Link>
-                    <button type="button" className="pv-btn-ghost py-1.5 text-xs" onClick={() => loadMembers(event.id)}>
+                    <button type="button" className="pv-btn-ghost py-1.5 text-xs" onClick={() => toggleMembers(event.id)}>
                       {members[event.id] ? 'Tutup Panitia' : 'Kelola Panitia'}
                     </button>
                     {canManageMaster && (
@@ -390,8 +421,13 @@ export default function Events() {
                               className="pv-input text-xs"
                               value={memberForm[event.id]?.profile_id || ''}
                               onChange={(e) => setMemberForm({ ...memberForm, [event.id]: { ...memberForm[event.id], profile_id: e.target.value } })}
+                              disabled={usersLoading && users.length === 0}
                             >
-                              <option value="">Pilih warga / profil aktif *</option>
+                              <option value="">
+                                {usersLoading && users.length === 0
+                                  ? '⏳ Memuat daftar warga...'
+                                  : 'Pilih warga / profil aktif *'}
+                              </option>
                               {users.map((user) => <option key={user.id} value={user.id}>{user.full_name || user.email}</option>)}
                             </select>
 
@@ -415,10 +451,11 @@ export default function Events() {
 
                             <button
                               type="button"
-                              className="pv-btn-primary py-1.5 text-xs sm:col-span-2"
+                              className="pv-btn-primary py-1.5 text-xs sm:col-span-2 disabled:opacity-50"
                               onClick={() => assign(event.id)}
+                              disabled={usersLoading && users.length === 0}
                             >
-                              Simpan Penugasan Panitia
+                              {usersLoading && users.length === 0 ? 'Memuat Warga...' : 'Simpan Penugasan Panitia'}
                             </button>
                           </div>
                         </div>
