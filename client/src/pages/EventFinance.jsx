@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { AiOutlinePaperClip } from 'react-icons/ai';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import {
@@ -17,6 +18,7 @@ import {
   fetchResidents,
 } from '../services/dataService';
 import { formatDate, formatRupiah } from '../services/dataHelpers';
+import { compressImage } from '../utils/imageCompressor';
 
 const EMPTY_INCOME_FORM = {
   income_date: new Date().toISOString().slice(0, 10),
@@ -33,6 +35,9 @@ const EMPTY_EXPENSE_FORM = {
   amount: '',
   description: '',
 };
+
+const ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/png'];
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 
 export default function EventFinance() {
   const { eventId } = useParams();
@@ -54,6 +59,18 @@ export default function EventFinance() {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [incomeForm, setIncomeForm] = useState(EMPTY_INCOME_FORM);
   const [expenseForm, setExpenseForm] = useState(EMPTY_EXPENSE_FORM);
+
+  // File upload state for Income
+  const [selectedIncomeFile, setSelectedIncomeFile] = useState(null);
+  const [incomeFileName, setIncomeFileName] = useState('');
+  const [incomeUploadError, setIncomeUploadError] = useState('');
+  const [existingIncomeReceipt, setExistingIncomeReceipt] = useState(null);
+
+  // File upload state for Expense
+  const [selectedExpenseFile, setSelectedExpenseFile] = useState(null);
+  const [expenseFileName, setExpenseFileName] = useState('');
+  const [expenseUploadError, setExpenseUploadError] = useState('');
+  const [existingExpenseReceipt, setExistingExpenseReceipt] = useState(null);
 
   const [sourceSelection, setSourceSelection] = useState('');
   const [customSource, setCustomSource] = useState('');
@@ -105,7 +122,7 @@ export default function EventFinance() {
 
     // 2. Sort units naturally by block then unit_number
     const sortedUnits = [...validUnits].sort((a, b) => {
-      const blockCompare = String(a.block || '').localeCompare(String(b.block || ''), undefined, { numeric: true, sensitivity: 'base' });
+      const blockCompare = String(a.block || '').localeCompare(String(b.block || ''));
       if (blockCompare !== 0) return blockCompare;
       return String(a.unit_number || '').localeCompare(String(b.unit_number || ''), undefined, { numeric: true, sensitivity: 'base' });
     });
@@ -184,22 +201,135 @@ export default function EventFinance() {
   const leader = members.find(m => m.assignment_role === 'event_leader');
   const treasurer = members.find(m => m.assignment_role === 'event_treasurer');
 
+  // File change handlers
+  const handleIncomeFile = async (e) => {
+    setIncomeUploadError('');
+    const file = e.target.files?.[0];
+    if (!file) {
+      setSelectedIncomeFile(null);
+      setIncomeFileName(existingIncomeReceipt?.name || '');
+      return;
+    }
+    if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
+      setIncomeUploadError('Format tidak didukung. Gunakan file gambar JPG atau PNG.');
+      setSelectedIncomeFile(null);
+      setIncomeFileName('');
+      e.target.value = '';
+      return;
+    }
+    try {
+      const result = await compressImage(file);
+      const compressedFile = result.file;
+      if (compressedFile.size > MAX_FILE_SIZE) {
+        setIncomeUploadError('Ukuran file melebihi 2 MB setelah kompresi.');
+        setSelectedIncomeFile(null);
+        setIncomeFileName('');
+        e.target.value = '';
+        return;
+      }
+      setIncomeFileName(compressedFile.name);
+      setSelectedIncomeFile(compressedFile);
+    } catch {
+      if (file.size > MAX_FILE_SIZE) {
+        setIncomeUploadError('Ukuran file melebihi batas 2 MB.');
+        setSelectedIncomeFile(null);
+        setIncomeFileName('');
+        e.target.value = '';
+        return;
+      }
+      setIncomeFileName(file.name);
+      setSelectedIncomeFile(file);
+    }
+  };
+
+  const handleRemoveIncomeFile = () => {
+    setSelectedIncomeFile(null);
+    setIncomeFileName('');
+    setIncomeUploadError('');
+    setExistingIncomeReceipt(null);
+  };
+
+  const handleExpenseFile = async (e) => {
+    setExpenseUploadError('');
+    const file = e.target.files?.[0];
+    if (!file) {
+      setSelectedExpenseFile(null);
+      setExpenseFileName(existingExpenseReceipt?.name || '');
+      return;
+    }
+    if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
+      setExpenseUploadError('Format tidak didukung. Gunakan file gambar JPG atau PNG.');
+      setSelectedExpenseFile(null);
+      setExpenseFileName('');
+      e.target.value = '';
+      return;
+    }
+    try {
+      const result = await compressImage(file);
+      const compressedFile = result.file;
+      if (compressedFile.size > MAX_FILE_SIZE) {
+        setExpenseUploadError('Ukuran file melebihi 2 MB setelah kompresi.');
+        setSelectedExpenseFile(null);
+        setExpenseFileName('');
+        e.target.value = '';
+        return;
+      }
+      setExpenseFileName(compressedFile.name);
+      setSelectedExpenseFile(compressedFile);
+    } catch {
+      if (file.size > MAX_FILE_SIZE) {
+        setExpenseUploadError('Ukuran file melebihi batas 2 MB.');
+        setSelectedExpenseFile(null);
+        setExpenseFileName('');
+        e.target.value = '';
+        return;
+      }
+      setExpenseFileName(file.name);
+      setSelectedExpenseFile(file);
+    }
+  };
+
+  const handleRemoveExpenseFile = () => {
+    setSelectedExpenseFile(null);
+    setExpenseFileName('');
+    setExpenseUploadError('');
+    setExistingExpenseReceipt(null);
+  };
+
   const handleCancelIncomeForm = () => {
     setShowIncomeForm(false);
     setEditingIncomeId(null);
     setSourceSelection('');
     setCustomSource('');
     setIncomeForm(EMPTY_INCOME_FORM);
+    setSelectedIncomeFile(null);
+    setIncomeFileName('');
+    setIncomeUploadError('');
+    setExistingIncomeReceipt(null);
   };
 
   const handleCancelExpenseForm = () => {
     setShowExpenseForm(false);
     setEditingExpenseId(null);
     setExpenseForm(EMPTY_EXPENSE_FORM);
+    setSelectedExpenseFile(null);
+    setExpenseFileName('');
+    setExpenseUploadError('');
+    setExistingExpenseReceipt(null);
   };
 
   const handleStartEditIncome = (income) => {
     setEditingIncomeId(income.id);
+    setSelectedIncomeFile(null);
+    setIncomeUploadError('');
+
+    const receiptUrl = income.receipt_file_url || income.receipt_file;
+    setExistingIncomeReceipt(receiptUrl ? {
+      url: receiptUrl,
+      name: income.receipt_file_name || 'Bukti Pembayaran Tersimpan',
+    } : null);
+    setIncomeFileName(income.receipt_file_name || '');
+
     const existingSource = (income.source_name || '').trim();
 
     // Check if existingSource matches any option in residentOptions
@@ -267,6 +397,16 @@ export default function EventFinance() {
 
   const handleStartEditExpense = (expense) => {
     setEditingExpenseId(expense.id);
+    setSelectedExpenseFile(null);
+    setExpenseUploadError('');
+
+    const receiptUrl = expense.receipt_file_url || expense.receipt_file;
+    setExistingExpenseReceipt(receiptUrl ? {
+      url: receiptUrl,
+      name: expense.receipt_file_name || 'Bukti Pengeluaran Tersimpan',
+    } : null);
+    setExpenseFileName(expense.receipt_file_name || '');
+
     setExpenseForm({
       expense_date: (expense.expense_date || expense.date) ? new Date(expense.expense_date || expense.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
       category: expense.category || '',
@@ -295,6 +435,7 @@ export default function EventFinance() {
         amount: Number(incomeForm.amount),
         scope: 'event',
         event_id: eventId,
+        file: selectedIncomeFile,
       };
 
       if (editingIncomeId) {
@@ -338,24 +479,22 @@ export default function EventFinance() {
     if (submittingExpense) return;
     setSubmittingExpense(true);
     try {
+      const expensePayload = {
+        date: expenseForm.expense_date,
+        category: expenseForm.category,
+        amount: Number(expenseForm.amount),
+        description: expenseForm.description,
+        scope: 'event',
+        event_id: eventId,
+        is_event_expense: true,
+        file: selectedExpenseFile,
+      };
+
       if (editingExpenseId) {
-        await updateExpense(session?.access_token, editingExpenseId, {
-          date: expenseForm.expense_date,
-          category: expenseForm.category,
-          amount: Number(expenseForm.amount),
-          description: expenseForm.description,
-          scope: 'event',
-          event_id: eventId,
-          is_event_expense: true,
-        });
+        await updateExpense(session?.access_token, editingExpenseId, expensePayload);
         toast.success('Pengeluaran event berhasil diperbarui.');
       } else {
-        await createExpense(session?.access_token, {
-          ...expenseForm,
-          amount: Number(expenseForm.amount),
-          event_id: eventId,
-          is_event_expense: true,
-        });
+        await createExpense(session?.access_token, expensePayload);
         toast.success('Pengeluaran event berhasil dicatat.');
       }
 
@@ -622,6 +761,61 @@ export default function EventFinance() {
               />
             </div>
 
+            {/* Bukti Pemasukan File Upload */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-forest-700 mb-1">
+                Bukti Pemasukan / Transfer <span className="text-forest-400 font-normal">(opsional, JPG/PNG, maks 2 MB)</span>
+              </label>
+              <label
+                className={`flex items-center gap-3 p-3 border-2 border-dashed border-forest-200 rounded-lg transition-colors ${
+                  submittingIncome ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-gold-400 hover:bg-forest-50/50'
+                }`}
+              >
+                <AiOutlinePaperClip size={20} className="text-forest-400 shrink-0" />
+                <span className="text-xs text-forest-600 flex-1 truncate">
+                  {selectedIncomeFile
+                    ? `📎 ${selectedIncomeFile.name} (${(selectedIncomeFile.size / 1024).toFixed(0)} KB)`
+                    : existingIncomeReceipt
+                    ? `Tersimpan: ${existingIncomeReceipt.name}`
+                    : 'Pilih file bukti transfer / kwitansi (JPG/PNG)'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  className="hidden"
+                  onChange={handleIncomeFile}
+                  disabled={submittingIncome}
+                />
+              </label>
+              {incomeUploadError && (
+                <p className="text-[11px] text-red-600 mt-1">⚠️ {incomeUploadError}</p>
+              )}
+              {(selectedIncomeFile || existingIncomeReceipt) && (
+                <div className="flex items-center justify-between mt-1 text-[11px]">
+                  {existingIncomeReceipt?.url && !selectedIncomeFile && (
+                    <a
+                      href={existingIncomeReceipt.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-700 hover:text-emerald-900 underline font-medium"
+                    >
+                      Lihat bukti saat ini ↗
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleRemoveIncomeFile}
+                    disabled={submittingIncome}
+                    className={`ml-auto ${
+                      submittingIncome ? 'text-forest-300 cursor-not-allowed' : 'text-red-500 hover:text-red-700'
+                    }`}
+                  >
+                    Hapus file
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button
               type="submit"
               className="pv-btn-primary md:col-span-2"
@@ -645,55 +839,75 @@ export default function EventFinance() {
                   <th className="px-5 py-3">Kategori / Sumber</th>
                   <th className="px-5 py-3">Metode</th>
                   <th className="px-5 py-3 text-right">Nominal</th>
+                  <th className="px-5 py-3 text-center">Bukti</th>
                   {canManageFinance && <th className="px-5 py-3 text-center">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-forest-100">
-                {incomes.map((income) => (
-                  <tr key={income.id}>
-                    <td className="px-5 py-3 whitespace-nowrap">{formatDate(income.income_date)}</td>
-                    <td className="px-5 py-3">
-                      <div className="font-semibold text-forest-900">{income.category}</div>
-                      <div className="text-xs text-forest-500">{income.source_name}</div>
-                      {income.description && (
-                        <div className="text-xs text-forest-400 mt-0.5 line-clamp-1">{income.description}</div>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-xs font-medium text-forest-700 whitespace-nowrap">
-                      {income.payment_method === 'bank_transfer'
-                        ? '🏦 Transfer Bank'
-                        : income.payment_method === 'qris'
-                        ? '📱 QRIS'
-                        : income.payment_method === 'cash'
-                        ? '💵 Tunai'
-                        : (income.payment_method || '-')}
-                    </td>
-                    <td className="px-5 py-3 text-right font-semibold text-emerald-700 whitespace-nowrap">
-                      {formatRupiah(income.amount)}
-                    </td>
-                    {canManageFinance && (
-                      <td className="px-5 py-3 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                            onClick={() => handleStartEditIncome(income)}
-                          >
-                            Edit
-                          </button>
-                          <span className="text-forest-200">|</span>
-                          <button
-                            type="button"
-                            className="text-xs font-semibold text-red-600 hover:text-red-800 hover:underline"
-                            onClick={() => handleDeleteIncome(income.id)}
-                          >
-                            Hapus
-                          </button>
-                        </div>
+                {incomes.map((income) => {
+                  const receiptUrl = income.receipt_file_url || income.receipt_file;
+                  return (
+                    <tr key={income.id}>
+                      <td className="px-5 py-3 whitespace-nowrap">{formatDate(income.income_date)}</td>
+                      <td className="px-5 py-3">
+                        <div className="font-semibold text-forest-900">{income.category}</div>
+                        <div className="text-xs text-forest-500">{income.source_name}</div>
+                        {income.description && (
+                          <div className="text-xs text-forest-400 mt-0.5 line-clamp-1">{income.description}</div>
+                        )}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="px-5 py-3 text-xs font-medium text-forest-700 whitespace-nowrap">
+                        {income.payment_method === 'bank_transfer'
+                          ? '🏦 Transfer Bank'
+                          : income.payment_method === 'qris'
+                          ? '📱 QRIS'
+                          : income.payment_method === 'cash'
+                          ? '💵 Tunai'
+                          : (income.payment_method || '-')}
+                      </td>
+                      <td className="px-5 py-3 text-right font-semibold text-emerald-700 whitespace-nowrap">
+                        {formatRupiah(income.amount)}
+                      </td>
+                      <td className="px-5 py-3 text-center whitespace-nowrap">
+                        {receiptUrl ? (
+                          <a
+                            href={receiptUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded transition-colors"
+                            title={income.receipt_file_name || 'Buka Bukti Pembayaran'}
+                          >
+                            <AiOutlinePaperClip className="shrink-0" />
+                            <span>Bukti</span>
+                          </a>
+                        ) : (
+                          <span className="text-xs text-forest-300">-</span>
+                        )}
+                      </td>
+                      {canManageFinance && (
+                        <td className="px-5 py-3 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              onClick={() => handleStartEditIncome(income)}
+                            >
+                              Edit
+                            </button>
+                            <span className="text-forest-200">|</span>
+                            <button
+                              type="button"
+                              className="text-xs font-semibold text-red-600 hover:text-red-800 hover:underline"
+                              onClick={() => handleDeleteIncome(income.id)}
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -749,6 +963,62 @@ export default function EventFinance() {
               <label className="block text-xs font-medium text-forest-700 mb-1">Deskripsi / Catatan</label>
               <textarea className="pv-input w-full" rows="2" placeholder="Deskripsi" value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})}/>
             </div>
+
+            {/* Bukti Pengeluaran File Upload */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-forest-700 mb-1">
+                Bukti Pengeluaran / Kwitansi <span className="text-forest-400 font-normal">(opsional, JPG/PNG, maks 2 MB)</span>
+              </label>
+              <label
+                className={`flex items-center gap-3 p-3 border-2 border-dashed border-forest-200 rounded-lg transition-colors ${
+                  submittingExpense ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-gold-400 hover:bg-forest-50/50'
+                }`}
+              >
+                <AiOutlinePaperClip size={20} className="text-forest-400 shrink-0" />
+                <span className="text-xs text-forest-600 flex-1 truncate">
+                  {selectedExpenseFile
+                    ? `📎 ${selectedExpenseFile.name} (${(selectedExpenseFile.size / 1024).toFixed(0)} KB)`
+                    : existingExpenseReceipt
+                    ? `Tersimpan: ${existingExpenseReceipt.name}`
+                    : 'Pilih file bukti kwitansi / nota (JPG/PNG)'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  className="hidden"
+                  onChange={handleExpenseFile}
+                  disabled={submittingExpense}
+                />
+              </label>
+              {expenseUploadError && (
+                <p className="text-[11px] text-red-600 mt-1">⚠️ {expenseUploadError}</p>
+              )}
+              {(selectedExpenseFile || existingExpenseReceipt) && (
+                <div className="flex items-center justify-between mt-1 text-[11px]">
+                  {existingExpenseReceipt?.url && !selectedExpenseFile && (
+                    <a
+                      href={existingExpenseReceipt.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-red-700 hover:text-red-900 underline font-medium"
+                    >
+                      Lihat bukti saat ini ↗
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleRemoveExpenseFile}
+                    disabled={submittingExpense}
+                    className={`ml-auto ${
+                      submittingExpense ? 'text-forest-300 cursor-not-allowed' : 'text-red-500 hover:text-red-700'
+                    }`}
+                  >
+                    Hapus file
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button
               type="submit"
               className="pv-btn-primary md:col-span-2"
@@ -772,41 +1042,61 @@ export default function EventFinance() {
                   <th className="px-5 py-3">Kategori</th>
                   <th className="px-5 py-3">Deskripsi</th>
                   <th className="px-5 py-3 text-right">Nominal</th>
+                  <th className="px-5 py-3 text-center">Bukti</th>
                   {canManageFinance && <th className="px-5 py-3 text-center">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-forest-100">
-                {expenses.map((expense) => (
-                  <tr key={expense.id}>
-                    <td className="px-5 py-3 whitespace-nowrap">{formatDate(expense.expense_date || expense.date)}</td>
-                    <td className="px-5 py-3 font-semibold text-forest-900">{expense.category}</td>
-                    <td className="px-5 py-3 text-xs text-forest-500">{expense.description || '-'}</td>
-                    <td className="px-5 py-3 text-right font-semibold text-red-600 whitespace-nowrap">
-                      {formatRupiah(expense.amount)}
-                    </td>
-                    {canManageFinance && (
-                      <td className="px-5 py-3 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                            onClick={() => handleStartEditExpense(expense)}
-                          >
-                            Edit
-                          </button>
-                          <span className="text-forest-200">|</span>
-                          <button
-                            type="button"
-                            className="text-xs font-semibold text-red-600 hover:text-red-800 hover:underline"
-                            onClick={() => handleDeleteExpense(expense.id)}
-                          >
-                            Hapus
-                          </button>
-                        </div>
+                {expenses.map((expense) => {
+                  const receiptUrl = expense.receipt_file_url || expense.receipt_file;
+                  return (
+                    <tr key={expense.id}>
+                      <td className="px-5 py-3 whitespace-nowrap">{formatDate(expense.expense_date || expense.date)}</td>
+                      <td className="px-5 py-3 font-semibold text-forest-900">{expense.category}</td>
+                      <td className="px-5 py-3 text-xs text-forest-500">{expense.description || '-'}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-red-600 whitespace-nowrap">
+                        {formatRupiah(expense.amount)}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="px-5 py-3 text-center whitespace-nowrap">
+                        {receiptUrl ? (
+                          <a
+                            href={receiptUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-red-700 hover:text-red-900 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-1 rounded transition-colors"
+                            title={expense.receipt_file_name || 'Buka Bukti Pengeluaran'}
+                          >
+                            <AiOutlinePaperClip className="shrink-0" />
+                            <span>Bukti</span>
+                          </a>
+                        ) : (
+                          <span className="text-xs text-forest-300">-</span>
+                        )}
+                      </td>
+                      {canManageFinance && (
+                        <td className="px-5 py-3 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                              onClick={() => handleStartEditExpense(expense)}
+                            >
+                              Edit
+                            </button>
+                            <span className="text-forest-200">|</span>
+                            <button
+                              type="button"
+                              className="text-xs font-semibold text-red-600 hover:text-red-800 hover:underline"
+                              onClick={() => handleDeleteExpense(expense.id)}
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
