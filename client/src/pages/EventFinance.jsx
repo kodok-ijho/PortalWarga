@@ -89,54 +89,88 @@ export default function EventFinance() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Transform residents and units into sorted dropdown options with house labels
+  // Transform units and residents into distinct sorted dropdown options per house
   const residentOptions = useMemo(() => {
     const list = [];
-    const addedKeys = new Set();
+    const seenHouseKeys = new Set();
 
-    (residents || []).forEach((r) => {
-      if (!r.full_name) return;
-      const unit = (units || []).find((u) => u.id === r.unit_id);
-      const houseLabel = unit ? `${unit.block} no ${unit.unit_number}` : '';
-      const displayLabel = houseLabel ? `[${houseLabel}] ${r.full_name}` : r.full_name;
-      const value = houseLabel ? `${r.full_name} - ${houseLabel}` : r.full_name;
-
-      const key = `${r.full_name}_${houseLabel}`;
-      if (!addedKeys.has(key)) {
-        addedKeys.add(key);
-        list.push({
-          id: r.id,
-          label: displayLabel,
-          value,
-          block: unit?.block || 'ZZZ',
-          unit_number: unit?.unit_number || '',
-          name: r.full_name,
-        });
-      }
+    // 1. Filter valid units
+    const validUnits = (units || []).filter((u) => {
+      if (!u) return false;
+      if (u.id === 5) return false;
+      if (u.block === 'Z_DEMO') return false;
+      if (String(u.unit_number || '').includes('DEMO_HIDDEN')) return false;
+      return true;
     });
 
-    (units || []).forEach((u) => {
-      if (u._occupant && u._occupant.full_name) {
-        const houseLabel = `${u.block} no ${u.unit_number}`;
-        const key = `${u._occupant.full_name}_${houseLabel}`;
-        if (!addedKeys.has(key)) {
-          addedKeys.add(key);
-          list.push({
-            id: u._occupant.id || `unit-occ-${u.id}`,
-            label: `[${houseLabel}] ${u._occupant.full_name}`,
-            value: `${u._occupant.full_name} - ${houseLabel}`,
-            block: u.block || 'ZZZ',
-            unit_number: u.unit_number || '',
-            name: u._occupant.full_name,
-          });
-        }
-      }
+    // 2. Sort units naturally by block then unit_number
+    const sortedUnits = [...validUnits].sort((a, b) => {
+      const blockCompare = String(a.block || '').localeCompare(String(b.block || ''), undefined, { numeric: true, sensitivity: 'base' });
+      if (blockCompare !== 0) return blockCompare;
+      return String(a.unit_number || '').localeCompare(String(b.unit_number || ''), undefined, { numeric: true, sensitivity: 'base' });
     });
 
-    list.sort((a, b) => {
-      if (a.block !== b.block) return a.block.localeCompare(b.block, undefined, { numeric: true });
-      if (a.unit_number !== b.unit_number) return String(a.unit_number).localeCompare(String(b.unit_number), undefined, { numeric: true });
-      return a.name.localeCompare(b.name);
+    // 3. Process each unit distinct by house key
+    sortedUnits.forEach((u) => {
+      const block = String(u.block || '').trim();
+      const unitNumber = String(u.unit_number || '').trim();
+      const houseLabel = block && unitNumber ? `${block} no ${unitNumber}` : (block || unitNumber || `Unit ${u.id}`);
+      const houseKey = `${block.toUpperCase()}_${unitNumber.toUpperCase()}`;
+
+      if (seenHouseKeys.has(houseKey)) return;
+      seenHouseKeys.add(houseKey);
+
+      // Find residents associated with this unit
+      const unitResidents = (residents || []).filter(
+        (r) => r && String(r.unit_id) === String(u.id) && r.full_name
+      );
+
+      // Priority 1: active + approved + non-test
+      let chosenResident = unitResidents.find(
+        (r) => r.is_active && r.approval_status === 'approved' && !/test|uji coba/i.test(r.full_name || '')
+      );
+
+      // Priority 2: active + non-test
+      if (!chosenResident) {
+        chosenResident = unitResidents.find(
+          (r) => r.is_active && !/test|uji coba/i.test(r.full_name || '')
+        );
+      }
+
+      // Priority 3: any non-test
+      if (!chosenResident) {
+        chosenResident = unitResidents.find(
+          (r) => !/test|uji coba/i.test(r.full_name || '')
+        );
+      }
+
+      // Priority 4: fallback to u._occupant if exists
+      const occupantNameFromUnit = u._occupant?.full_name ? String(u._occupant.full_name).trim() : '';
+
+      // Priority 5: any registered resident for this unit
+      if (!chosenResident && !occupantNameFromUnit && unitResidents.length > 0) {
+        chosenResident = unitResidents[0];
+      }
+
+      const occupantName = chosenResident?.full_name?.trim() || occupantNameFromUnit || '';
+
+      const displayLabel = occupantName
+        ? `[${houseLabel}] ${occupantName}`
+        : `[${houseLabel}] (Kosong / Belum terdata)`;
+
+      const value = occupantName
+        ? `${occupantName} - ${houseLabel}`
+        : houseLabel;
+
+      list.push({
+        id: u.id,
+        label: displayLabel,
+        value,
+        block: u.block || '',
+        unit_number: u.unit_number || '',
+        houseLabel,
+        name: occupantName || '',
+      });
     });
 
     return list;
@@ -166,12 +200,31 @@ export default function EventFinance() {
 
   const handleStartEditIncome = (income) => {
     setEditingIncomeId(income.id);
-    const existingSource = income.source_name || '';
+    const existingSource = (income.source_name || '').trim();
 
     // Check if existingSource matches any option in residentOptions
-    const match = residentOptions.find(
-      (opt) => opt.value === existingSource || opt.name === existingSource || opt.label === existingSource
-    );
+    const match = residentOptions.find((opt) => {
+      if (!existingSource) return false;
+      const srcLower = existingSource.toLowerCase();
+      const valLower = (opt.value || '').toLowerCase();
+      const nameLower = (opt.name || '').toLowerCase();
+      const labelLower = (opt.label || '').toLowerCase();
+      const houseLower = (opt.houseLabel || '').toLowerCase();
+
+      // Direct exact match
+      if (valLower === srcLower || nameLower === srcLower || labelLower === srcLower) {
+        return true;
+      }
+      // House label match (e.g., existingSource is "Ula H. iswara - CB1 no 6" or contains "CB1 no 6")
+      if (houseLower && (srcLower.includes(houseLower) || houseLower.includes(srcLower))) {
+        return true;
+      }
+      // Name match (if length > 2)
+      if (nameLower && nameLower.length > 2 && (srcLower.includes(nameLower) || nameLower.includes(srcLower))) {
+        return true;
+      }
+      return false;
+    });
 
     if (match) {
       setSourceSelection(match.value);
@@ -503,7 +556,7 @@ export default function EventFinance() {
                 required
               >
                 <option value="">-- Pilih Warga (No Rumah & Nama) --</option>
-                <optgroup label="Daftar Warga Palm Village">
+                <optgroup label="Daftar Warga Palm Village (Per Rumah)">
                   {residentOptions.map((opt) => (
                     <option key={opt.id} value={opt.value}>
                       {opt.label}
