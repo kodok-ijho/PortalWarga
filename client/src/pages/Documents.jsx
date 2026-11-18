@@ -44,6 +44,7 @@ import {
   formatFileSize,
   formatDate,
   hasMinRole,
+  unitDriveFolderName,
 } from '../services/dataHelpers';
 
 export default function Documents() {
@@ -365,7 +366,7 @@ export default function Documents() {
       if (uploadForm.category === 'resident') {
         const targetUnitId = isWarga ? userUnitId : uploadForm.unit_id;
         const u = units.find((x) => String(x.id) === String(targetUnitId));
-        folderPath = u ? `${u.block}-${u.unit_number}` : `Unit-${targetUnitId}`;
+        folderPath = unitDriveFolderName(u, targetUnitId);
       } else if (uploadForm.category === 'event') {
         const ev = events.find((x) => String(x.id) === String(uploadForm.event_id));
         folderPath = ev ? `${ev.id}-${ev.title || 'Event'}` : `Event-${uploadForm.event_id}`;

@@ -407,6 +407,23 @@ export function canUploadResidentDoc(role, userUnitId, targetUnitId, isReadOnly 
   return role === 'warga' && userUnitId && String(userUnitId) === String(targetUnitId);
 }
 
+export function canViewResidentDocsForUnit(role, userUnitId, targetUnitId) {
+  if (hasMinRole(role, 'pengurus')) return true;
+  return role === 'warga' && Boolean(userUnitId) && String(userUnitId) === String(targetUnitId);
+}
+
+// Nama subfolder Google Drive untuk satu rumah di dalam folder induk "Dokumen Warga",
+// misal "CB1-1A". Dipakai bersama oleh halaman Dokumen dan halaman Rumah agar
+// setiap rumah selalu masuk ke folder yang sama.
+export function unitDriveFolderName(unit, fallbackUnitId = null) {
+  if (!unit) return `Unit-${fallbackUnitId ?? 'unknown'}`;
+  const clean = (value) => String(value ?? '').trim().toUpperCase().replace(/[^A-Z0-9]+/g, '');
+  const block = clean(unit.block);
+  const number = clean(unit.unit_number);
+  if (!block || !number) return `Unit-${unit.id ?? fallbackUnitId ?? 'unknown'}`;
+  return `${block}-${number}`;
+}
+
 export function canDeleteResidentDoc(role, isReadOnly = false) {
   if (isReadOnly || role === 'admin_viewer') return false;
   return hasMinRole(role, 'pengurus');
